@@ -1,3 +1,5 @@
+import { applyEffect } from "./effects.js";
+
 const MODULE_ID = "dnd5e-buff-on-trigger";
 
 export function registerTriggers() {
@@ -18,5 +20,5 @@ export function registerTriggers() {
 
 function handleMwakTrigger(workflow, flag) {
   console.log(`[${MODULE_ID}] Déclencheur mwak détecté sur ${workflow.actor.name}`);
-  console.log(`[${MODULE_ID}] Flag buff :`, flag);
+  applyEffect(workflow, flag);
 }
