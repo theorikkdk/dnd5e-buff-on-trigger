@@ -1,4 +1,4 @@
-// import { registerTriggers } from "./triggers.js";
+import { registerTriggers } from "./triggers.js";
 // import { registerEffects } from "./effects.js";
 // import { registerUI } from "./ui.js";
 
@@ -10,4 +10,5 @@ Hooks.once("init", () => {
 
 Hooks.once("ready", () => {
   console.log(`[${MODULE_ID}] Module ready`);
+  registerTriggers();
 });
