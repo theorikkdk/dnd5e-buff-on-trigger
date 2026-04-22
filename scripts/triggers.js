@@ -2,17 +2,29 @@ import { applyEffect } from "./effects.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
 
+const ATTACK_ACTION_TYPES = new Set(["mwak", "rwak", "msak", "rsak"]);
+
 export function registerTriggers() {
-  Hooks.on("midi-qol.RollComplete", (workflow) => {
+  Hooks.on("midi-qol.RollComplete", async (workflow) => {
     if (!workflow.actor) return;
     if (!workflow.activity) return;
 
-    console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${workflow.activity.actionType}`);
+    const actionType = workflow.activity.actionType;
+    console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
 
-    const flag = workflow.actor.getFlag(MODULE_ID, "buffTrigger");
+    // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
+    const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
+    if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
+      await workflow.actor.setFlag(MODULE_ID, "activeBuff", buffConfig);
+      console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
+      return;
+    }
+
+    // Phase 2 : attaque → lit le marqueur sur l'acteur et déclenche l'effet
+    const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
     if (!flag) return;
 
-    if (flag.type === workflow.activity.actionType) {
+    if (flag.type === actionType) {
       handleAttackTrigger(workflow, flag);
     }
   });

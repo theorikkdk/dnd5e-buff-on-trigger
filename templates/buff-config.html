@@ -1,0 +1,56 @@
+<form>
+  <div class="form-group">
+    <label>Activer le buff on trigger</label>
+    <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
+  </div>
+
+  <div class="form-group">
+    <label>Déclencheur</label>
+    <select name="type">
+      <option value="mwak" {{#if flag.typeMwak}}selected{{/if}}>Attaque au corps à corps (mwak)</option>
+      <option value="rwak" {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance (rwak)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Condition</label>
+    <select name="condition">
+      <option value="hit" {{#if flag.conditionHit}}selected{{/if}}>Touché (hit)</option>
+      <option value="miss" {{#if flag.conditionMiss}}selected{{/if}}>Raté (miss)</option>
+      <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>Toujours (always)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Formule de dégâts</label>
+    <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="ex : 2d8" />
+  </div>
+
+  <div class="form-group">
+    <label>Type de dégâts</label>
+    <select name="damageType">
+      <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>acid</option>
+      <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>bludgeoning</option>
+      <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>cold</option>
+      <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>fire</option>
+      <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>force</option>
+      <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>lightning</option>
+      <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>necrotic</option>
+      <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>piercing</option>
+      <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>poison</option>
+      <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>psychic</option>
+      <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>radiant</option>
+      <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>slashing</option>
+      <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>thunder</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Statut à appliquer</label>
+    <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="ex : frightened" />
+  </div>
+
+  <footer>
+    <button type="submit">Sauvegarder</button>
+  </footer>
+</form>
