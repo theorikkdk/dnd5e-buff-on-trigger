@@ -1,0 +1,45 @@
+{
+  "id": "dnd5e-buff-on-trigger",
+  "title": "D&D5e Buff on Trigger",
+  "description": "Automates deferred buff effects triggered by combat conditions (attacks, damage, turn events) for D&D 5e.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "authors": [
+    {
+      "name": "Theorik"
+    }
+  ],
+  "esmodules": ["scripts/main.js"],
+  "styles": ["styles/buff-on-trigger.css"],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system"
+      }
+    ],
+    "modules": [
+      {
+        "id": "midi-qol",
+        "type": "module",
+        "compatibility": {
+          "minimum": "11"
+        },
+        "reason": "Enhanced attack/damage workflow hooks",
+        "required": false
+      }
+    ]
+  },
+  "url": "https://github.com/theorikkdk/dnd5e-buff-on-trigger",
+  "bugs": "https://github.com/theorikkdk/dnd5e-buff-on-trigger/issues"
+}
