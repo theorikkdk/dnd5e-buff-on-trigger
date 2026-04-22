@@ -1,10 +1,14 @@
-import { applyEffect } from "./effects.js";
+import { applyEffect, refreshBuffIndicator } from "./effects.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
 
 const ATTACK_ACTION_TYPES = new Set(["mwak", "rwak", "msak", "rsak"]);
 
 export function registerTriggers() {
+  Hooks.once("ready", () => {
+    game.actors.forEach((actor) => refreshBuffIndicator(actor));
+  });
+
   Hooks.on("midi-qol.RollComplete", async (workflow) => {
     if (!workflow.actor) return;
     if (!workflow.activity) return;
@@ -15,8 +19,13 @@ export function registerTriggers() {
     // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
     const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
-      await workflow.actor.setFlag(MODULE_ID, "activeBuff", buffConfig);
+      await workflow.actor.setFlag(MODULE_ID, "activeBuff", {
+        ...buffConfig,
+        _itemName: workflow.item?.name,
+        _itemImg: workflow.item?.img,
+      });
       console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
+      await refreshBuffIndicator(workflow.actor);
       return;
     }
 

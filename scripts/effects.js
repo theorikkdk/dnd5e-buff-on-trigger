@@ -1,4 +1,24 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
+const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
+
+export async function refreshBuffIndicator(actor) {
+  const existing = actor.effects.find((e) => e.statuses.has("bot-active"));
+  const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+
+  if (existing) await existing.delete();
+
+  if (activeBuff) {
+    const itemImg = activeBuff._itemImg ?? BUFF_ICON;
+    const itemName = activeBuff._itemName ?? "Buff on Trigger actif";
+    await actor.createEmbeddedDocuments("ActiveEffect", [{
+      name: itemName,
+      img: itemImg,
+      statuses: ["bot-active"],
+      flags: { [MODULE_ID]: { indicator: true } },
+      duration: {},
+    }]);
+  }
+}
 
 export async function applyBonusDamage(workflow, flag) {
   const condition = flag.condition ?? "hit";
@@ -34,6 +54,7 @@ export async function applyBonusDamage(workflow, flag) {
 
   await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
   console.log(`[${MODULE_ID}] Buff consommé sur ${workflow.actor.name}`);
+  await refreshBuffIndicator(workflow.actor);
 }
 
 export async function applyStatusEffect(workflow, flag) {
@@ -67,6 +88,7 @@ export async function applyStatusEffect(workflow, flag) {
   if (!flag.damage) {
     await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
     console.log(`[${MODULE_ID}] Buff (statut) consommé sur ${workflow.actor.name}`);
+    await refreshBuffIndicator(workflow.actor);
   }
 }
 
