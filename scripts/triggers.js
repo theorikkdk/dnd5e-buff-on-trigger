@@ -13,12 +13,12 @@ export function registerTriggers() {
     if (!flag) return;
 
     if (flag.type === workflow.activity.actionType) {
-      handleMwakTrigger(workflow, flag);
+      handleAttackTrigger(workflow, flag);
     }
   });
 }
 
-function handleMwakTrigger(workflow, flag) {
-  console.log(`[${MODULE_ID}] Déclencheur mwak détecté sur ${workflow.actor.name}`);
+function handleAttackTrigger(workflow, flag) {
+  console.log(`[${MODULE_ID}] Déclencheur ${workflow.activity.actionType} détecté sur ${workflow.actor.name}`);
   applyEffect(workflow, flag);
 }
