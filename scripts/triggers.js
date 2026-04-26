@@ -42,11 +42,33 @@ export function registerTriggers() {
     if (changed.turn === undefined) return;
 
     // turnStart : acteur dont c'est maintenant le tour
-    const currentActor = combat.combatant?.actor;
+    const currentCombatant = combat.combatant;
+    const currentActor = currentCombatant?.actor;
     if (currentActor) {
       const flag = currentActor.getFlag(MODULE_ID, "activeBuff");
       if (flag?.type === "turnStart") {
         await handleTurnTrigger(currentActor, flag, "turnStart");
+      }
+    }
+
+    // targetTurnStart : cherche un lanceur dont le buff se déclenche sur le combattant qui commence son tour
+    const currentToken = canvas.tokens.get(currentCombatant?.tokenId);
+    if (currentToken) {
+      const isHostile = currentToken.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE;
+      const isUserTarget = game.user.targets.has(currentToken);
+      if (isHostile || isUserTarget) {
+        const sceneActors = new Map();
+        for (const token of canvas.tokens.placeables) {
+          if (token.actor && !sceneActors.has(token.actor.id)) {
+            sceneActors.set(token.actor.id, token.actor);
+          }
+        }
+        for (const sceneActor of sceneActors.values()) {
+          const flag = sceneActor.getFlag(MODULE_ID, "activeBuff");
+          if (flag?.type === "targetTurnStart") {
+            await handleTurnTrigger(sceneActor, flag, "targetTurnStart", [currentToken]);
+          }
+        }
       }
     }
 

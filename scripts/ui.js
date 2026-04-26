@@ -24,6 +24,7 @@ class BuffTriggerConfig extends FormApplication {
       typeRwak:              raw.type === "rwak",
       typeTurnStart:         raw.type === "turnStart",
       typeTurnEnd:           raw.type === "turnEnd",
+      typeTargetTurnStart:   raw.type === "targetTurnStart",
       typeTargetTurnEnd:     raw.type === "targetTurnEnd",
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
