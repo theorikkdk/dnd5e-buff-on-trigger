@@ -138,10 +138,6 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   }
   console.log(`[${MODULE_ID}] Cibles pour ${triggerType} : ${cibles.length}`);
 
-  for (const token of cibles) {
-    if (token.actor) await applyTargetIndicator(token.actor, flag);
-  }
-
   const targetsSet = new Set(cibles);
   const workflow = {
     actor,

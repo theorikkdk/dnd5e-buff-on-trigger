@@ -33,7 +33,7 @@ export async function applyTargetIndicator(targetActor, flag) {
   const existing = targetActor.effects.find(
     (e) => e.flags?.[MODULE_ID]?.targetIndicator === true && e.name === itemName
   );
-  if (existing) await existing.delete();
+  if (existing) return;
   await targetActor.createEmbeddedDocuments("ActiveEffect", [{
     name: itemName,
     img: itemImg,
