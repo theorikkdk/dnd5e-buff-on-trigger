@@ -7,8 +7,11 @@
   <div class="form-group">
     <label>Déclencheur</label>
     <select name="type">
-      <option value="mwak" {{#if flag.typeMwak}}selected{{/if}}>Attaque au corps à corps (mwak)</option>
-      <option value="rwak" {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance (rwak)</option>
+      <option value="mwak"      {{#if flag.typeMwak}}selected{{/if}}>Attaque au corps à corps (mwak)</option>
+      <option value="rwak"      {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance (rwak)</option>
+      <option value="turnStart" {{#if flag.typeTurnStart}}selected{{/if}}>Début de tour</option>
+      <option value="turnEnd"        {{#if flag.typeTurnEnd}}selected{{/if}}>Fin de tour</option>
+      <option value="targetTurnEnd" {{#if flag.typeTargetTurnEnd}}selected{{/if}}>Fin de tour de la cible</option>
     </select>
   </div>
 

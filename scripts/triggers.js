@@ -37,9 +37,86 @@ export function registerTriggers() {
       handleAttackTrigger(workflow, flag);
     }
   });
+
+  Hooks.on("updateCombat", async (combat, changed, options, userId) => {
+    if (changed.turn === undefined) return;
+
+    // turnStart : acteur dont c'est maintenant le tour
+    const currentActor = combat.combatant?.actor;
+    if (currentActor) {
+      const flag = currentActor.getFlag(MODULE_ID, "activeBuff");
+      if (flag?.type === "turnStart") {
+        await handleTurnTrigger(currentActor, flag, "turnStart");
+      }
+    }
+
+    // turnEnd et targetTurnEnd : acteur dont le tour vient de se terminer
+    const prevTurnIndex = (combat.turn - 1 + combat.turns.length) % combat.turns.length;
+    const prevCombatant = combat.turns[prevTurnIndex];
+    const prevActor = prevCombatant?.actor;
+
+    if (prevActor) {
+      const flag = prevActor.getFlag(MODULE_ID, "activeBuff");
+      if (flag?.type === "turnEnd") {
+        await handleTurnTrigger(prevActor, flag, "turnEnd");
+      }
+    }
+
+    // targetTurnEnd : cherche un lanceur dans la scène dont le buff se déclenche sur la cible qui vient de finir son tour
+    const prevToken = canvas.tokens.get(prevCombatant?.tokenId);
+    if (prevToken) {
+      const isHostile = prevToken.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE;
+      const isUserTarget = game.user.targets.has(prevToken);
+      if (isHostile || isUserTarget) {
+        const sceneActors = new Map();
+        for (const token of canvas.tokens.placeables) {
+          if (token.actor && !sceneActors.has(token.actor.id)) {
+            sceneActors.set(token.actor.id, token.actor);
+          }
+        }
+        for (const sceneActor of sceneActors.values()) {
+          const flag = sceneActor.getFlag(MODULE_ID, "activeBuff");
+          if (flag?.type === "targetTurnEnd") {
+            await handleTurnTrigger(sceneActor, flag, "targetTurnEnd", [prevToken]);
+          }
+        }
+      }
+    }
+  });
 }
 
 function handleAttackTrigger(workflow, flag) {
   console.log(`[${MODULE_ID}] Déclencheur ${workflow.activity.actionType} détecté sur ${workflow.actor.name}`);
   applyEffect(workflow, flag);
+}
+
+async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = null) {
+  console.log(`[${MODULE_ID}] Déclencheur ${triggerType} pour ${actor.name}`);
+
+  let cibles;
+  if (overrideTargets !== null) {
+    cibles = overrideTargets;
+  } else {
+    cibles = [...game.user.targets];
+    if (cibles.length === 0) {
+      cibles = canvas.tokens.placeables.filter(
+        (t) => t.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE
+      );
+    }
+  }
+  console.log(`[${MODULE_ID}] Cibles pour ${triggerType} : ${cibles.length}`);
+
+  const targetsSet = new Set(cibles);
+  const workflow = {
+    actor,
+    item: null,
+    targets: targetsSet,
+    hitTargets: new Set(cibles),
+    missedTargets: new Set(),
+  };
+  await applyEffect(workflow, flag);
+  if (flag.consumeOnTrigger === true) {
+    await actor.unsetFlag(MODULE_ID, "activeBuff");
+    await refreshBuffIndicator(actor);
+  }
 }

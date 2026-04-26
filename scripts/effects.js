@@ -52,9 +52,11 @@ export async function applyBonusDamage(workflow, flag) {
     await targetActor.applyDamage([{ value: roll.total, type: damageType }]);
   }
 
-  await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
-  console.log(`[${MODULE_ID}] Buff consommé sur ${workflow.actor.name}`);
-  await refreshBuffIndicator(workflow.actor);
+  if (workflow.item !== null) {
+    await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
+    console.log(`[${MODULE_ID}] Buff consommé sur ${workflow.actor.name}`);
+    await refreshBuffIndicator(workflow.actor);
+  }
 }
 
 export async function applyStatusEffect(workflow, flag) {
@@ -85,7 +87,7 @@ export async function applyStatusEffect(workflow, flag) {
     console.log(`[${MODULE_ID}] Statut ${statusId} appliqué sur ${targetActor.name}`);
   }
 
-  if (!flag.damage) {
+  if (workflow.item !== null && !flag.damage) {
     await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
     console.log(`[${MODULE_ID}] Buff (statut) consommé sur ${workflow.actor.name}`);
     await refreshBuffIndicator(workflow.actor);
