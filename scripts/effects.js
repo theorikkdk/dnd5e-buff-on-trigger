@@ -1,23 +1,56 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
 const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
 
-export async function refreshBuffIndicator(actor) {
+export async function refreshBuffIndicator(actor, itemName = null) {
   const existing = actor.effects.find((e) => e.statuses.has("bot-active"));
   const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
   if (existing) await existing.delete();
 
+  if (!activeBuff && itemName) {
+    for (const token of canvas.tokens.placeables) {
+      if (token.actor) await removeTargetIndicator(token.actor, itemName);
+    }
+  }
+
   if (activeBuff) {
     const itemImg = activeBuff._itemImg ?? BUFF_ICON;
-    const itemName = activeBuff._itemName ?? "Buff on Trigger actif";
+    const name = activeBuff._itemName ?? "Buff on Trigger actif";
     await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: itemName,
+      name,
       img: itemImg,
       statuses: ["bot-active"],
       flags: { [MODULE_ID]: { indicator: true } },
       duration: {},
     }]);
   }
+}
+
+export async function applyTargetIndicator(targetActor, flag) {
+  if (!targetActor) return;
+  const itemName = flag._itemName ?? "Buff on Trigger";
+  const itemImg = flag._itemImg ?? BUFF_ICON;
+  const existing = targetActor.effects.find(
+    (e) => e.flags?.[MODULE_ID]?.targetIndicator === true && e.name === itemName
+  );
+  if (existing) await existing.delete();
+  await targetActor.createEmbeddedDocuments("ActiveEffect", [{
+    name: itemName,
+    img: itemImg,
+    icon: itemImg,
+    statuses: ["bot-target-" + (flag._itemName ?? "buff").slugify()],
+    flags: { [MODULE_ID]: { targetIndicator: true } },
+    duration: {},
+  }]);
+  console.log(`[${MODULE_ID}] Indicateur posé sur ${targetActor.name}`);
+}
+
+export async function removeTargetIndicator(targetActor, itemName) {
+  if (!targetActor) return;
+  const existing = targetActor.effects.find(
+    (e) => e.flags?.[MODULE_ID]?.targetIndicator && e.name === itemName
+  );
+  if (existing) await existing.delete();
 }
 
 export async function applyBonusDamage(workflow, flag) {
@@ -55,7 +88,10 @@ export async function applyBonusDamage(workflow, flag) {
   if (workflow.item !== null) {
     await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
     console.log(`[${MODULE_ID}] Buff consommé sur ${workflow.actor.name}`);
-    await refreshBuffIndicator(workflow.actor);
+    await refreshBuffIndicator(workflow.actor, flag._itemName);
+    for (const token of targets) {
+      if (token.actor) await removeTargetIndicator(token.actor, flag._itemName);
+    }
   }
 }
 
@@ -90,7 +126,10 @@ export async function applyStatusEffect(workflow, flag) {
   if (workflow.item !== null && !flag.damage) {
     await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
     console.log(`[${MODULE_ID}] Buff (statut) consommé sur ${workflow.actor.name}`);
-    await refreshBuffIndicator(workflow.actor);
+    await refreshBuffIndicator(workflow.actor, flag._itemName);
+    for (const token of targets) {
+      if (token.actor) await removeTargetIndicator(token.actor, flag._itemName);
+    }
   }
 }
 

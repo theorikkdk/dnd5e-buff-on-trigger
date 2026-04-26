@@ -1,4 +1,4 @@
-import { applyEffect, refreshBuffIndicator } from "./effects.js";
+import { applyEffect, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
 
@@ -19,13 +19,13 @@ export function registerTriggers() {
     // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
     const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
-      await workflow.actor.setFlag(MODULE_ID, "activeBuff", {
-        ...buffConfig,
-        _itemName: workflow.item?.name,
-        _itemImg: workflow.item?.img,
-      });
+      const activeFlag = { ...buffConfig, _itemName: workflow.item?.name, _itemImg: workflow.item?.img };
+      await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
       console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
       await refreshBuffIndicator(workflow.actor);
+      for (const token of game.user.targets) {
+        if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
+      }
       return;
     }
 
@@ -105,6 +105,16 @@ export function registerTriggers() {
       }
     }
   });
+
+  Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
+    if (!effect.statuses?.has("bot-active")) return;
+    const actor = effect.parent;
+    if (!actor) return;
+    const itemName = effect.name;
+    await actor.unsetFlag(MODULE_ID, "activeBuff");
+    await refreshBuffIndicator(actor, itemName);
+    console.log(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
+  });
 }
 
 function handleAttackTrigger(workflow, flag) {
@@ -128,6 +138,10 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   }
   console.log(`[${MODULE_ID}] Cibles pour ${triggerType} : ${cibles.length}`);
 
+  for (const token of cibles) {
+    if (token.actor) await applyTargetIndicator(token.actor, flag);
+  }
+
   const targetsSet = new Set(cibles);
   const workflow = {
     actor,
@@ -139,6 +153,6 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   await applyEffect(workflow, flag);
   if (flag.consumeOnTrigger === true) {
     await actor.unsetFlag(MODULE_ID, "activeBuff");
-    await refreshBuffIndicator(actor);
+    await refreshBuffIndicator(actor, flag._itemName);
   }
 }
