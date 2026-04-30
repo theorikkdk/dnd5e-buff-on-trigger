@@ -14,8 +14,8 @@ export async function refreshBuffIndicator(actor, itemName = null) {
   }
 
   if (activeBuff) {
-    const itemImg = activeBuff._itemImg ?? BUFF_ICON;
-    const name = activeBuff._itemName ?? "Buff on Trigger actif";
+    const itemImg = activeBuff.itemImg ?? BUFF_ICON;
+    const name = activeBuff.itemName ?? "Buff on Trigger actif";
     const durationRounds = activeBuff.duration?.rounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name,
@@ -29,8 +29,8 @@ export async function refreshBuffIndicator(actor, itemName = null) {
 
 export async function applyTargetIndicator(targetActor, flag) {
   if (!targetActor) return;
-  const itemName = flag._itemName ?? "Buff on Trigger";
-  const itemImg = flag._itemImg ?? BUFF_ICON;
+  const itemName = flag.itemName ?? "Buff on Trigger";
+  const itemImg = flag.itemImg ?? BUFF_ICON;
   const existing = targetActor.effects.find(
     (e) => e.flags?.[MODULE_ID]?.targetIndicator === true && e.name === itemName
   );
@@ -39,7 +39,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     name: itemName,
     img: itemImg,
     icon: itemImg,
-    statuses: ["bot-target-" + (flag._itemName ?? "buff").slugify()],
+    statuses: ["bot-target-" + (flag.itemName ?? "buff").slugify()],
     flags: { [MODULE_ID]: { targetIndicator: true } },
     duration: {},
   }]);
@@ -60,7 +60,7 @@ function resolveTargets(workflow, flag) {
   const hitIds = new Set((workflow.hitTargets ?? []).map((t) => t.id));
 
   if (targetMode === "target") {
-    const token = canvas.tokens.get(flag._targetTokenId);
+    const token = canvas.tokens.get(flag.targetTokenId);
     if (!token) return new Set();
     const targetIds = new Set((workflow.targets ?? []).map((t) => t.id));
     if (!targetIds.has(token.id)) {
@@ -82,6 +82,47 @@ function resolveTargets(workflow, flag) {
   }
 }
 
+async function consumeOrDecrementCharges(workflow, flag, targets) {
+  if (flag.chargesRemaining !== null) {
+    const newCharges = flag.chargesRemaining - 1;
+    console.log(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
+    if (newCharges <= 0) {
+      const actor = workflow.actor;
+      await actor?.unsetFlag(MODULE_ID, "activeBuff");
+      console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
+      const concentrationEffect = actor?.effects.find(
+        (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
+      );
+      if (concentrationEffect) {
+        await concentrationEffect.delete();
+        console.log(`[${MODULE_ID}] Concentration retirée (charges épuisées) sur ${actor.name}`);
+      }
+      await refreshBuffIndicator(actor, flag.itemName);
+      for (const token of targets) {
+        if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
+      }
+    } else {
+      await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
+      console.log(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
+    }
+  } else if (workflow.item !== null && flag.consumeOnTrigger !== false) {
+    const actor = workflow.actor;
+    await actor?.unsetFlag(MODULE_ID, "activeBuff");
+    console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
+    const concentrationEffect = actor?.effects.find(
+      (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
+    );
+    if (concentrationEffect) {
+      await concentrationEffect.delete();
+      console.log(`[${MODULE_ID}] Concentration retirée sur ${actor?.name}`);
+    }
+    await refreshBuffIndicator(actor, flag.itemName);
+    for (const token of targets) {
+      if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
+    }
+  }
+}
+
 export async function applyBonusDamage(workflow, flag) {
   const targets = resolveTargets(workflow, flag);
 
@@ -100,8 +141,8 @@ export async function applyBonusDamage(workflow, flag) {
 
   await ChatMessage.create({
     content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
-      <img src="${flag._itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-      <strong>${flag._itemName ?? "Buff on Trigger"}</strong> se déclenche !
+      <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
+      <strong>${flag.itemName ?? "Buff on Trigger"}</strong> se déclenche !
     </div>`,
     speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
   });
@@ -134,7 +175,7 @@ export async function applyBonusDamage(workflow, flag) {
         fullTargets,
         workflow.item ?? null,
         new Set(),
-        { flavor: flag._itemName ?? "Buff on Trigger" }
+        { flavor: flag.itemName ?? "Buff on Trigger" }
       );
     }
     if (halfTargets.size) {
@@ -145,7 +186,7 @@ export async function applyBonusDamage(workflow, flag) {
         halfTargets,
         workflow.item ?? null,
         new Set(),
-        { flavor: flag._itemName ?? "Buff on Trigger" }
+        { flavor: flag.itemName ?? "Buff on Trigger" }
       );
     }
   } else {
@@ -157,21 +198,14 @@ export async function applyBonusDamage(workflow, flag) {
     }
     if (fullTargets.size || halfTargets.size) {
       await ChatMessage.create({
-        content: `${flag._itemName ?? "Buff on Trigger"} — ${roll.total} dégâts ${damageType}`,
+        content: `${flag.itemName ?? "Buff on Trigger"} — ${roll.total} dégâts ${damageType}`,
         speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
         rolls: [roll],
       });
     }
   }
 
-  if (workflow.item !== null && flag.consumeOnTrigger !== false) {
-    await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
-    console.log(`[${MODULE_ID}] Buff consommé sur ${workflow.actor.name}`);
-    await refreshBuffIndicator(workflow.actor, flag._itemName);
-    for (const token of targets) {
-      if (token.actor) await removeTargetIndicator(token.actor, flag._itemName);
-    }
-  }
+  await consumeOrDecrementCharges(workflow, flag, targets);
 }
 
 export async function applyStatusEffect(workflow, flag) {
@@ -192,14 +226,7 @@ export async function applyStatusEffect(workflow, flag) {
     console.log(`[${MODULE_ID}] Statut ${statusId} appliqué sur ${targetActor.name}`);
   }
 
-  if (workflow.item !== null && !flag.damage && flag.consumeOnTrigger !== false) {
-    await workflow.actor?.unsetFlag(MODULE_ID, "activeBuff");
-    console.log(`[${MODULE_ID}] Buff (statut) consommé sur ${workflow.actor.name}`);
-    await refreshBuffIndicator(workflow.actor, flag._itemName);
-    for (const token of targets) {
-      if (token.actor) await removeTargetIndicator(token.actor, flag._itemName);
-    }
-  }
+  if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
 }
 
 export async function applyEffect(workflow, flag) {

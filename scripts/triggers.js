@@ -20,7 +20,7 @@ export function registerTriggers() {
     const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
       const targetMode = buffConfig.targetMode ?? "self";
-      const activeFlag = { ...buffConfig, _itemName: workflow.item?.name, _itemImg: workflow.item?.img };
+      const activeFlag = { ...buffConfig, itemName: workflow.item?.name, itemImg: workflow.item?.img, chargesRemaining: buffConfig.charges ?? null };
 
       if (targetMode === "ally") {
         const allyToken = [...game.user.targets][0];
@@ -33,7 +33,7 @@ export function registerTriggers() {
         await refreshBuffIndicator(allyToken.actor);
       } else if (targetMode === "target") {
         const targetToken = [...game.user.targets][0];
-        if (targetToken) activeFlag._targetTokenId = targetToken.id;
+        if (targetToken) activeFlag.targetTokenId = targetToken.id;
         await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
         console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken?.name ?? "aucune"})`);
         await refreshBuffIndicator(workflow.actor);
@@ -155,8 +155,8 @@ export function registerTriggers() {
       await actor.unsetFlag(MODULE_ID, "activeBuff");
       const botEffect = actor.effects.find((e) => e.statuses?.has("bot-active"));
       if (botEffect) await botEffect.delete();
-      await refreshBuffIndicator(actor, activeBuff._itemName);
-      console.log(`[${MODULE_ID}] Concentration brisée — buff ${activeBuff._itemName} annulé sur ${actor.name}`);
+      await refreshBuffIndicator(actor, activeBuff.itemName);
+      console.log(`[${MODULE_ID}] Concentration brisée — buff ${activeBuff.itemName} annulé sur ${actor.name}`);
     }
   });
 }
@@ -193,6 +193,6 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   await applyEffect(workflow, flag);
   if (flag.consumeOnTrigger === true) {
     await actor.unsetFlag(MODULE_ID, "activeBuff");
-    await refreshBuffIndicator(actor, flag._itemName);
+    await refreshBuffIndicator(actor, flag.itemName);
   }
 }
