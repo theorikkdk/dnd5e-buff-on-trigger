@@ -5,6 +5,15 @@
   </div>
 
   <div class="form-group">
+    <label>Mode de ciblage</label>
+    <select name="targetMode">
+      <option value="self"   {{#if flag.targetModeSelf}}selected{{/if}}>Sur moi-même (buff offensif)</option>
+      <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>Sur une cible (malus/debuff)</option>
+      <option value="ally"   {{#if flag.targetModeAlly}}selected{{/if}}>Sur un allié (buff défensif)</option>
+    </select>
+  </div>
+
+  <div class="form-group">
     <label>Déclencheur</label>
     <select name="type">
       <option value="mwak"           {{#if flag.typeMwak}}selected{{/if}}>Attaque corps à corps</option>
@@ -50,8 +59,40 @@
   </div>
 
   <div class="form-group">
+    <label>Caractéristique de sauvegarde</label>
+    <select name="saveAbility">
+      <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>Aucune</option>
+      <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>Force</option>
+      <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>Dextérité</option>
+      <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>Constitution</option>
+      <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>Intelligence</option>
+      <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>Sagesse</option>
+      <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>Charisme</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>DD</label>
+    <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" />
+  </div>
+
+  <div class="form-group">
+    <label>Effet sur réussite</label>
+    <select name="saveEffect">
+      <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>Aucun dégât</option>
+      <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>Dégâts de moitié</option>
+      <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>Dégâts complets quand même</option>
+    </select>
+  </div>
+
+  <div class="form-group">
     <label>Statut à appliquer</label>
     <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="ex : frightened" />
+  </div>
+
+  <div class="form-group">
+    <label>Consommer après déclenchement</label>
+    <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
   </div>
 
   <footer>

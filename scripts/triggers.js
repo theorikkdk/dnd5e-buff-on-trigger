@@ -19,12 +19,32 @@ export function registerTriggers() {
     // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
     const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
+      const targetMode = buffConfig.targetMode ?? "self";
       const activeFlag = { ...buffConfig, _itemName: workflow.item?.name, _itemImg: workflow.item?.img };
-      await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-      console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
-      await refreshBuffIndicator(workflow.actor);
-      for (const token of game.user.targets) {
-        if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
+
+      if (targetMode === "ally") {
+        const allyToken = [...game.user.targets][0];
+        if (!allyToken?.actor) {
+          console.warn(`[${MODULE_ID}] Mode "ally" : aucune cible sélectionnée`);
+          return;
+        }
+        await allyToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+        console.log(`[${MODULE_ID}] Buff activé sur l'allié ${allyToken.actor.name} via ${workflow.item.name}`);
+        await refreshBuffIndicator(allyToken.actor);
+      } else if (targetMode === "target") {
+        const targetToken = [...game.user.targets][0];
+        if (targetToken) activeFlag._targetTokenId = targetToken.id;
+        await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+        console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken?.name ?? "aucune"})`);
+        await refreshBuffIndicator(workflow.actor);
+        if (targetToken?.actor) await applyTargetIndicator(targetToken.actor, activeFlag);
+      } else {
+        await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+        console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
+        await refreshBuffIndicator(workflow.actor);
+        for (const token of game.user.targets) {
+          if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
+        }
       }
       return;
     }

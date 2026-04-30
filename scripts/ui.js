@@ -20,12 +20,22 @@ class BuffTriggerConfig extends FormApplication {
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
     const flag = {
       ...raw,
+      targetMode:            raw.targetMode ?? "self",
+      targetModeSelf:        (raw.targetMode ?? "self") === "self",
+      targetModeTarget:      raw.targetMode === "target",
+      targetModeAlly:        raw.targetMode === "ally",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
       typeTurnStart:         raw.type === "turnStart",
       typeTurnEnd:           raw.type === "turnEnd",
       typeTargetTurnStart:   raw.type === "targetTurnStart",
       typeTargetTurnEnd:     raw.type === "targetTurnEnd",
+      consumeOnTrigger:      raw.consumeOnTrigger ?? true,
+      saveAbility:           raw.save?.ability ?? "",
+      saveDC:                raw.save?.dc ?? 15,
+      saveEffectNone:        (raw.save?.effect ?? "half") === "none",
+      saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
+      saveEffectFull:        raw.save?.effect === "full",
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
@@ -51,9 +61,12 @@ class BuffTriggerConfig extends FormApplication {
       await this.item.unsetFlag(MODULE_ID, "buffTrigger");
     } else {
       const flag = {
+        targetMode: formData.targetMode ?? "self",
         type: formData.type,
         condition: formData.condition,
+        consumeOnTrigger: formData.consumeOnTrigger ?? true,
         damage: formData.damageFormula ? { formula: formData.damageFormula, type: formData.damageType } : null,
+        save: formData.saveAbility ? { ability: formData.saveAbility, dc: Number(formData.saveDC), effect: formData.saveEffect } : null,
         status: formData.statusId ? { id: formData.statusId } : null,
       };
       await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
