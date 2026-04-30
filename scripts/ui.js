@@ -31,6 +31,8 @@ class BuffTriggerConfig extends FormApplication {
       typeTargetTurnStart:   raw.type === "targetTurnStart",
       typeTargetTurnEnd:     raw.type === "targetTurnEnd",
       consumeOnTrigger:      raw.consumeOnTrigger ?? true,
+      durationRounds:        raw.duration?.rounds ?? "",
+      concentration:         raw.duration?.concentration ?? false,
       saveAbility:           raw.save?.ability ?? "",
       saveDC:                raw.save?.dc ?? 15,
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
@@ -68,6 +70,10 @@ class BuffTriggerConfig extends FormApplication {
         damage: formData.damageFormula ? { formula: formData.damageFormula, type: formData.damageType } : null,
         save: formData.saveAbility ? { ability: formData.saveAbility, dc: Number(formData.saveDC), effect: formData.saveEffect } : null,
         status: formData.statusId ? { id: formData.statusId } : null,
+        duration: {
+          rounds: formData.durationRounds ? Number(formData.durationRounds) : null,
+          concentration: formData.concentration ?? false,
+        },
       };
       await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
     }

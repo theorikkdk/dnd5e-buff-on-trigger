@@ -16,12 +16,13 @@ export async function refreshBuffIndicator(actor, itemName = null) {
   if (activeBuff) {
     const itemImg = activeBuff._itemImg ?? BUFF_ICON;
     const name = activeBuff._itemName ?? "Buff on Trigger actif";
+    const durationRounds = activeBuff.duration?.rounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name,
       img: itemImg,
       statuses: ["bot-active"],
       flags: { [MODULE_ID]: { indicator: true } },
-      duration: {},
+      duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
     }]);
   }
 }

@@ -127,13 +127,37 @@ export function registerTriggers() {
   });
 
   Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
-    if (!effect.statuses?.has("bot-active")) return;
-    const actor = effect.parent;
-    if (!actor) return;
-    const itemName = effect.name;
-    await actor.unsetFlag(MODULE_ID, "activeBuff");
-    await refreshBuffIndicator(actor, itemName);
-    console.log(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
+    if (effect.statuses?.has("bot-active")) {
+      const actor = effect.parent;
+      if (!actor) return;
+      const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+      const itemName = effect.name;
+      await actor.unsetFlag(MODULE_ID, "activeBuff");
+      await refreshBuffIndicator(actor, itemName);
+      console.log(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
+      if (activeBuff?.duration?.concentration) {
+        const concentrationEffect = actor.effects.find(
+          (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
+        );
+        if (concentrationEffect) {
+          await concentrationEffect.delete();
+          console.log(`[${MODULE_ID}] Concentration retirée sur ${actor.name}`);
+        }
+      }
+      return;
+    }
+
+    if (effect.statuses?.has("concentrating") || effect.statuses?.has("concentration")) {
+      const actor = effect.parent;
+      if (!actor) return;
+      const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+      if (!activeBuff?.duration?.concentration) return;
+      await actor.unsetFlag(MODULE_ID, "activeBuff");
+      const botEffect = actor.effects.find((e) => e.statuses?.has("bot-active"));
+      if (botEffect) await botEffect.delete();
+      await refreshBuffIndicator(actor, activeBuff._itemName);
+      console.log(`[${MODULE_ID}] Concentration brisée — buff ${activeBuff._itemName} annulé sur ${actor.name}`);
+    }
   });
 }
 

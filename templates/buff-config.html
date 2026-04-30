@@ -95,6 +95,16 @@
     <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
   </div>
 
+  <div class="form-group">
+    <label>Durée (rounds)</label>
+    <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="illimitée" min="0" />
+  </div>
+
+  <div class="form-group">
+    <label>Concentration</label>
+    <input type="checkbox" name="concentration" {{#if flag.concentration}}checked{{/if}} />
+  </div>
+
   <footer>
     <button type="submit">Sauvegarder</button>
   </footer>
