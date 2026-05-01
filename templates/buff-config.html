@@ -91,6 +91,48 @@
   </div>
 
   <div class="form-group">
+    <label>Bonus de CA</label>
+    <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="ex: 2 ou -2" step="1" />
+  </div>
+
+  <div class="form-group">
+    <label>Jets d'attaque</label>
+    <select name="buffAttackMode">
+      <option value="none"        {{#if flag.buffAttackModeNone}}selected{{/if}}>aucun</option>
+      <option value="advantage"   {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>avantage</option>
+      <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>désavantage</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Jets de sauvegarde</label>
+    <select name="buffSaveMode">
+      <option value="none"        {{#if flag.buffSaveModeNone}}selected{{/if}}>aucun</option>
+      <option value="advantage"   {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>avantage</option>
+      <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>désavantage</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Jets de caractéristique</label>
+    <select name="buffSkillMode">
+      <option value="none"        {{#if flag.buffSkillModeNone}}selected{{/if}}>aucun</option>
+      <option value="advantage"   {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>avantage</option>
+      <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>désavantage</option>
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>Bonus aux JdS</label>
+    <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="ex: 1d4 ou 2" />
+  </div>
+
+  <div class="form-group">
+    <label>Bonus aux attaques</label>
+    <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="ex: 1 ou -1" />
+  </div>
+
+  <div class="form-group">
     <label>Consommer après déclenchement</label>
     <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
   </div>

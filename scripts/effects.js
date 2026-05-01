@@ -1,7 +1,7 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
 const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
 
-export async function refreshBuffIndicator(actor, itemName = null) {
+export async function refreshBuffIndicator(actor, itemName = null, extraChanges = []) {
   const existing = actor.effects.find((e) => e.statuses.has("bot-active"));
   const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
@@ -14,15 +14,14 @@ export async function refreshBuffIndicator(actor, itemName = null) {
   }
 
   if (activeBuff) {
-    const itemImg = activeBuff.itemImg ?? BUFF_ICON;
-    const name = activeBuff.itemName ?? "Buff on Trigger actif";
     const durationRounds = activeBuff.duration?.rounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name,
-      img: itemImg,
+      name: (activeBuff.itemName ?? "Buff on Trigger") + " ⚡",
+      img: activeBuff.itemImg ?? BUFF_ICON,
       statuses: ["bot-active"],
-      flags: { [MODULE_ID]: { indicator: true } },
+      changes: extraChanges,
       duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+      flags: { [MODULE_ID]: { indicator: true } },
     }]);
   }
 }
@@ -90,6 +89,8 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
+      const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
+      for (const e of mechEffects ?? []) await e.delete();
       const concentrationEffect = actor?.effects.find(
         (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
       );
@@ -109,6 +110,8 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
     const actor = workflow.actor;
     await actor?.unsetFlag(MODULE_ID, "activeBuff");
     console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
+    const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
+    for (const e of mechEffects ?? []) await e.delete();
     const concentrationEffect = actor?.effects.find(
       (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
     );
@@ -121,6 +124,44 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
     }
   }
+}
+
+export function buildMechanicalChanges(flag) {
+  if (!flag.buffs) return [];
+  const { ac, attackMode, saveMode, skillMode, saveBonus, attackBonus } = flag.buffs;
+  const changes = [];
+  if (ac) changes.push({ key: "system.attributes.ac.bonus", mode: 2, value: String(ac), priority: 20 });
+  if (attackMode) {
+    const key = attackMode === "advantage" ? "flags.midi-qol.advantage.attack.all" : "flags.midi-qol.disadvantage.attack.all";
+    changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  if (saveMode) {
+    const key = saveMode === "advantage" ? "flags.midi-qol.advantage.save.all" : "flags.midi-qol.disadvantage.save.all";
+    changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  if (skillMode) {
+    const key = skillMode === "advantage" ? "flags.midi-qol.advantage.ability.check.all" : "flags.midi-qol.disadvantage.ability.check.all";
+    changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  if (saveBonus) changes.push({ key: "system.bonuses.abilities.save", mode: 2, value: String(saveBonus), priority: 20 });
+  if (attackBonus) {
+    changes.push({ key: "system.bonuses.mwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
+    changes.push({ key: "system.bonuses.rwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
+  }
+  return changes;
+}
+
+export async function applyMechanicalBuffs(actor, flag, durationRounds) {
+  const changes = buildMechanicalChanges(flag);
+  if (!changes.length) return;
+  await actor.createEmbeddedDocuments("ActiveEffect", [{
+    name: flag.itemName ?? "Buff on Trigger",
+    img: flag.itemImg ?? BUFF_ICON,
+    changes,
+    duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+    flags: { [MODULE_ID]: { mechanicalBuff: true } },
+  }]);
+  console.log(`[${MODULE_ID}] Buffs mécaniques appliqués sur ${actor.name}`);
 }
 
 export async function applyBonusDamage(workflow, flag) {

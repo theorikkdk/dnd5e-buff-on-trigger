@@ -1,4 +1,4 @@
-import { applyEffect, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
 
@@ -21,29 +21,59 @@ export function registerTriggers() {
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
       const targetMode = buffConfig.targetMode ?? "self";
       const activeFlag = { ...buffConfig, itemName: workflow.item?.name, itemImg: workflow.item?.img, chargesRemaining: buffConfig.charges ?? null };
+      const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
 
       if (targetMode === "ally") {
         const allyToken = [...game.user.targets][0];
         if (!allyToken?.actor) {
-          console.warn(`[${MODULE_ID}] Mode "ally" : aucune cible sélectionnée`);
-          return;
+          // Fallback sur le lanceur
+          await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+          console.log(`[${MODULE_ID}] Mode "ally" sans cible — buff appliqué sur le lanceur ${workflow.actor.name}`);
+          if (hasMechBuffs) {
+            const changes = buildMechanicalChanges(activeFlag);
+            await refreshBuffIndicator(workflow.actor, null, changes);
+          } else {
+            await refreshBuffIndicator(workflow.actor);
+          }
+        } else {
+          await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+          console.log(`[${MODULE_ID}] Buff activé sur l'allié ${allyToken.actor.name} via ${workflow.item.name}`);
+          await refreshBuffIndicator(workflow.actor);
+          if (hasMechBuffs) {
+            await applyMechanicalBuffs(allyToken.actor, activeFlag, activeFlag.duration?.rounds ?? null);
+          } else {
+            await applyTargetIndicator(allyToken.actor, activeFlag);
+          }
         }
-        await allyToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-        console.log(`[${MODULE_ID}] Buff activé sur l'allié ${allyToken.actor.name} via ${workflow.item.name}`);
-        await refreshBuffIndicator(allyToken.actor);
       } else if (targetMode === "target") {
         const targetToken = [...game.user.targets][0];
-        if (targetToken) activeFlag.targetTokenId = targetToken.id;
+        if (!targetToken) {
+          ui.notifications.warn("Buff on Trigger : aucune cible sélectionnée. Ciblez un token avant d'utiliser ce sort.");
+          console.log(`[${MODULE_ID}] Mode target — activation annulée, aucune cible`);
+          return;
+        }
+        activeFlag.targetTokenId = targetToken.id;
         await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-        console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken?.name ?? "aucune"})`);
-        await refreshBuffIndicator(workflow.actor);
-        if (targetToken?.actor) await applyTargetIndicator(targetToken.actor, activeFlag);
+        console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken.name})`);
+        const buffTarget = canvas.tokens.get(activeFlag.targetTokenId)?.actor ?? null;
+        if (hasMechBuffs && buffTarget) {
+          await refreshBuffIndicator(workflow.actor);
+          await applyMechanicalBuffs(buffTarget, activeFlag, activeFlag.duration?.rounds ?? null);
+        } else {
+          await refreshBuffIndicator(workflow.actor);
+          if (targetToken.actor) await applyTargetIndicator(targetToken.actor, activeFlag);
+        }
       } else {
         await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
         console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
-        await refreshBuffIndicator(workflow.actor);
-        for (const token of game.user.targets) {
-          if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
+        if (hasMechBuffs) {
+          const changes = buildMechanicalChanges(activeFlag);
+          await refreshBuffIndicator(workflow.actor, null, changes);
+        } else {
+          await refreshBuffIndicator(workflow.actor);
+          for (const token of game.user.targets) {
+            if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
+          }
         }
       }
       return;
@@ -126,6 +156,18 @@ export function registerTriggers() {
     }
   });
 
+  Hooks.on("dnd5e.preRollAbility", (actor, config, abilityId) => {
+    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    if (!activeBuff?.buffs?.skillMode) return;
+    if (activeBuff.buffs.skillMode === "advantage") {
+      config.advantage = true;
+      console.log(`[${MODULE_ID}] Avantage caractéristique appliqué sur ${actor.name}`);
+    } else if (activeBuff.buffs.skillMode === "disadvantage") {
+      config.disadvantage = true;
+      console.log(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
+    }
+  });
+
   Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
     if (effect.statuses?.has("bot-active")) {
       const actor = effect.parent;
@@ -155,6 +197,11 @@ export function registerTriggers() {
       await actor.unsetFlag(MODULE_ID, "activeBuff");
       const botEffect = actor.effects.find((e) => e.statuses?.has("bot-active"));
       if (botEffect) await botEffect.delete();
+      for (const token of canvas.tokens.placeables) {
+        if (!token.actor) continue;
+        const tokenMechEffects = token.actor.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
+        for (const e of tokenMechEffects) await e.delete();
+      }
       await refreshBuffIndicator(actor, activeBuff.itemName);
       console.log(`[${MODULE_ID}] Concentration brisée — buff ${activeBuff.itemName} annulé sur ${actor.name}`);
     }
