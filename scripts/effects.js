@@ -148,6 +148,10 @@ export function buildMechanicalChanges(flag) {
     armorProfs,
     languages,
     darkvision,
+    blindsight,
+    tremorsense,
+    truesight,
+    sensesSpecial,
     passivePerception
   } = flag.buffs;
   const changes = [];
@@ -208,6 +212,18 @@ export function buildMechanicalChanges(flag) {
   }
   if (darkvision) {
     changes.push({ key: "system.attributes.senses.darkvision", mode: 2, value: String(darkvision), priority: 20 });
+  }
+  if (blindsight) {
+    changes.push({ key: "system.attributes.senses.blindsight", mode: 2, value: String(blindsight), priority: 20 });
+  }
+  if (tremorsense) {
+    changes.push({ key: "system.attributes.senses.tremorsense", mode: 2, value: String(tremorsense), priority: 20 });
+  }
+  if (truesight) {
+    changes.push({ key: "system.attributes.senses.truesight", mode: 2, value: String(truesight), priority: 20 });
+  }
+  if (sensesSpecial) {
+    changes.push({ key: "system.attributes.senses.special", mode: 0, value: sensesSpecial, priority: 20 });
   }
   if (passivePerception) {
     changes.push({ key: "system.skills.prc.bonuses.passive", mode: 2, value: String(passivePerception), priority: 20 });

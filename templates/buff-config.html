@@ -194,6 +194,31 @@
         <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>Fouissement</option>
       </select>
     </div>
+    <p class="bot-section-label">Sens</p>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vision dans le noir</label>
+      <input type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vision aveugle</label>
+      <input type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vision trémie</label>
+      <input type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vision vraie</label>
+      <input type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Sens spéciaux</label>
+      <input type="text" name="buffSensesSpecial" value="{{flag.buffSensesSpecial}}" placeholder="ex: Odorat aiguisé 30 pieds" style="flex:1" />
+    </div>
 
     <p class="bot-section-label">Capacités</p>
     <div class="form-group">
@@ -234,11 +259,6 @@
         </select>
         <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
       </div>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vision dans le noir</label>
-      <input type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
     </div>
     <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
       <label style="white-space:nowrap">Perception passive</label>
