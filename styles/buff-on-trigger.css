@@ -1,1 +1,85 @@
 /* D&D5e Buff on Trigger — styles */
+
+.bot-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 8px 0 0;
+  border-bottom: 2px solid var(--color-border-light-primary, #c9c7b8);
+}
+
+.bot-tab-btn {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 0.8em;
+  background: var(--color-bg, #f0ece0);
+  border: 1px solid var(--color-border-light-primary, #c9c7b8);
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  color: var(--color-text-dark-secondary, #4b4a44);
+  white-space: nowrap;
+}
+
+.bot-tab-btn:hover {
+  background: var(--color-bg-btn-minor-hover, #ddd8c4);
+}
+
+.bot-tab-active {
+  background: var(--color-bg-sheet, #f9f6ef);
+  color: var(--color-text-dark-primary, #191813);
+  font-weight: bold;
+  border-color: var(--color-border-light-primary, #c9c7b8);
+  position: relative;
+  bottom: -2px;
+  z-index: 1;
+}
+
+.bot-tab-panel {
+  padding: 8px 0 4px;
+}
+
+.bot-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.bot-row .form-group {
+  flex: 1;
+  min-width: 60px;
+}
+
+.bot-skill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px 8px;
+  margin: 4px 0 6px;
+  font-size: 0.85em;
+}
+
+.bot-skill-grid label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.bot-tab-panel {
+  overflow: visible;
+  height: auto;
+}
+
+.window-content {
+  overflow-y: auto;
+}
+
+.bot-section-label {
+  font-weight: bold;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  color: var(--color-text-dark-secondary, #4b4a44);
+  border-bottom: 1px solid var(--color-border-light-tertiary, #d8d3bc);
+  margin: 8px 0 4px;
+  padding-bottom: 2px;
+}

@@ -156,6 +156,18 @@ export function registerTriggers() {
     }
   });
 
+  Hooks.on("dnd5e.preRollSkill", (config, skillId) => {
+    const actor = config.subject ?? config.actor ?? null;
+    if (!actor?.getFlag) return;
+    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    const skills = activeBuff?.buffs?.skills;
+    if (!skills?.length) return;
+    if (skills.includes("all") || skills.includes(skillId)) {
+      config.advantage = true;
+      console.log(`[${MODULE_ID}] Avantage compétence ${skillId} appliqué sur ${actor.name}`);
+    }
+  });
+
   Hooks.on("dnd5e.preRollAbility", (actor, config, abilityId) => {
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
     if (!activeBuff?.buffs?.skillMode) return;

@@ -1,4 +1,5 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
+const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
 
 class BuffTriggerConfig extends FormApplication {
   static get defaultOptions() {
@@ -7,6 +8,7 @@ class BuffTriggerConfig extends FormApplication {
       template: "modules/dnd5e-buff-on-trigger/templates/buff-config.html",
       width: 400,
       height: "auto",
+      resizable: true,
       closeOnSubmit: true,
     });
   }
@@ -35,6 +37,26 @@ class BuffTriggerConfig extends FormApplication {
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
       buffSkillMode:             raw.buffs?.skillMode ?? "none",
+      buffSkillAll:              raw.buffs?.skills?.includes("all") ?? false,
+      buffSkill_acr:             raw.buffs?.skills?.includes("acr") ?? false,
+      buffSkill_ani:             raw.buffs?.skills?.includes("ani") ?? false,
+      buffSkill_arc:             raw.buffs?.skills?.includes("arc") ?? false,
+      buffSkill_ath:             raw.buffs?.skills?.includes("ath") ?? false,
+      buffSkill_dec:             raw.buffs?.skills?.includes("dec") ?? false,
+      buffSkill_his:             raw.buffs?.skills?.includes("his") ?? false,
+      buffSkill_ins:             raw.buffs?.skills?.includes("ins") ?? false,
+      buffSkill_itm:             raw.buffs?.skills?.includes("itm") ?? false,
+      buffSkill_inv:             raw.buffs?.skills?.includes("inv") ?? false,
+      buffSkill_med:             raw.buffs?.skills?.includes("med") ?? false,
+      buffSkill_nat:             raw.buffs?.skills?.includes("nat") ?? false,
+      buffSkill_prc:             raw.buffs?.skills?.includes("prc") ?? false,
+      buffSkill_prf:             raw.buffs?.skills?.includes("prf") ?? false,
+      buffSkill_per:             raw.buffs?.skills?.includes("per") ?? false,
+      buffSkill_rel:             raw.buffs?.skills?.includes("rel") ?? false,
+      buffSkill_slt:             raw.buffs?.skills?.includes("slt") ?? false,
+      buffSkill_ste:             raw.buffs?.skills?.includes("ste") ?? false,
+      buffSkill_sur:             raw.buffs?.skills?.includes("sur") ?? false,
+      buffSkillBonus:            raw.buffs?.skillBonus ?? "",
       buffSaveBonus:             raw.buffs?.saveBonus ?? "",
       buffAttackBonus:           raw.buffs?.attackBonus ?? "",
       buffAttackModeNone:        (raw.buffs?.attackMode ?? "none") === "none",
@@ -91,6 +113,10 @@ class BuffTriggerConfig extends FormApplication {
           attackMode: formData.buffAttackMode !== "none" ? formData.buffAttackMode : null,
           saveMode: formData.buffSaveMode !== "none" ? formData.buffSaveMode : null,
           skillMode: formData.buffSkillMode !== "none" ? formData.buffSkillMode : null,
+          skills: formData.buffSkillAll
+            ? ["all"]
+            : SKILL_IDS.filter((id) => formData[`buffSkill_${id}`]),
+          skillBonus: formData.buffSkillBonus || null,
           saveBonus: formData.buffSaveBonus || null,
           attackBonus: formData.buffAttackBonus || null,
         },

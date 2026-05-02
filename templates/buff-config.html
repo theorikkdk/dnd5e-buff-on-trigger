@@ -1,9 +1,9 @@
 <form>
+  <!-- En-tête toujours visible -->
   <div class="form-group">
     <label>Activer le buff on trigger</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
-
   <div class="form-group">
     <label>Mode de ciblage</label>
     <select name="targetMode">
@@ -13,141 +13,196 @@
     </select>
   </div>
 
-  <div class="form-group">
-    <label>Déclencheur</label>
-    <select name="type">
-      <option value="mwak"           {{#if flag.typeMwak}}selected{{/if}}>Attaque corps à corps</option>
-      <option value="rwak"           {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance</option>
-      <option value="turnStart"      {{#if flag.typeTurnStart}}selected{{/if}}>Début de tour (lanceur)</option>
-      <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>Début de tour de la cible</option>
-      <option value="turnEnd"        {{#if flag.typeTurnEnd}}selected{{/if}}>Fin de tour (lanceur)</option>
-      <option value="targetTurnEnd"  {{#if flag.typeTargetTurnEnd}}selected{{/if}}>Fin de tour de la cible</option>
-    </select>
+  <!-- Navigation par onglets -->
+  <div class="bot-tabs">
+    <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">Déclencheur</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-damage')">Dégâts &amp; Effets</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-buffs')">Buffs</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-settings')">Paramètres</button>
   </div>
 
-  <div class="form-group">
-    <label>Condition</label>
-    <select name="condition">
-      <option value="hit" {{#if flag.conditionHit}}selected{{/if}}>Touché (hit)</option>
-      <option value="miss" {{#if flag.conditionMiss}}selected{{/if}}>Raté (miss)</option>
-      <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>Toujours (always)</option>
-    </select>
+  <!-- Onglet 1 : Déclencheur -->
+  <div id="bot-tab-trigger" class="bot-tab-panel">
+    <div class="form-group">
+      <label>Déclencheur</label>
+      <select name="type">
+        <option value="mwak"            {{#if flag.typeMwak}}selected{{/if}}>Attaque corps à corps</option>
+        <option value="rwak"            {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance</option>
+        <option value="turnStart"       {{#if flag.typeTurnStart}}selected{{/if}}>Début de tour (lanceur)</option>
+        <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>Début de tour de la cible</option>
+        <option value="turnEnd"         {{#if flag.typeTurnEnd}}selected{{/if}}>Fin de tour (lanceur)</option>
+        <option value="targetTurnEnd"   {{#if flag.typeTargetTurnEnd}}selected{{/if}}>Fin de tour de la cible</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Condition</label>
+      <select name="condition">
+        <option value="hit"    {{#if flag.conditionHit}}selected{{/if}}>Touché (hit)</option>
+        <option value="miss"   {{#if flag.conditionMiss}}selected{{/if}}>Raté (miss)</option>
+        <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>Toujours (always)</option>
+      </select>
+    </div>
   </div>
 
-  <div class="form-group">
-    <label>Formule de dégâts</label>
-    <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="ex : 2d8" />
+  <!-- Onglet 2 : Dégâts & Effets -->
+  <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
+    <div class="bot-row">
+      <div class="form-group">
+        <label>Formule de dégâts</label>
+        <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="ex : 2d8" />
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select name="damageType">
+          <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>acid</option>
+          <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>bludgeoning</option>
+          <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>cold</option>
+          <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>fire</option>
+          <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>force</option>
+          <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>lightning</option>
+          <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>necrotic</option>
+          <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>piercing</option>
+          <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>poison</option>
+          <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>psychic</option>
+          <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>radiant</option>
+          <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>slashing</option>
+          <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>thunder</option>
+        </select>
+      </div>
+    </div>
+    <div class="bot-row">
+      <div class="form-group">
+        <label>Jet de sauvegarde</label>
+        <select name="saveAbility">
+          <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>Aucune</option>
+          <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>Force</option>
+          <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>Dextérité</option>
+          <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>Constitution</option>
+          <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>Intelligence</option>
+          <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>Sagesse</option>
+          <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>Charisme</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>DD</label>
+        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" style="width:56px" />
+      </div>
+      <div class="form-group">
+        <label>Réussite</label>
+        <select name="saveEffect">
+          <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>Aucun dégât</option>
+          <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>Moitié</option>
+          <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>Complets</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Statut à appliquer</label>
+      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="ex : frightened" />
+    </div>
   </div>
 
-  <div class="form-group">
-    <label>Type de dégâts</label>
-    <select name="damageType">
-      <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>acid</option>
-      <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>bludgeoning</option>
-      <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>cold</option>
-      <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>fire</option>
-      <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>force</option>
-      <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>lightning</option>
-      <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>necrotic</option>
-      <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>piercing</option>
-      <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>poison</option>
-      <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>psychic</option>
-      <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>radiant</option>
-      <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>slashing</option>
-      <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>thunder</option>
-    </select>
+  <!-- Onglet 3 : Buffs -->
+  <div id="bot-tab-buffs" class="bot-tab-panel" style="display:none">
+    <div class="form-group">
+      <label>Bonus CA</label>
+      <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" style="width:56px" />
+    </div>
+    <div class="form-group">
+      <label>Jets d'attaque</label>
+      <select name="buffAttackMode">
+        <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>Normal</option>
+        <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>Avantage</option>
+        <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>Désavantage</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Jets de sauvegarde</label>
+      <select name="buffSaveMode">
+        <option value="none"         {{#if flag.buffSaveModeNone}}selected{{/if}}>Normal</option>
+        <option value="advantage"    {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>Avantage</option>
+        <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>Désavantage</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Jets de caractéristique</label>
+      <select name="buffSkillMode">
+        <option value="none"         {{#if flag.buffSkillModeNone}}selected{{/if}}>Normal</option>
+        <option value="advantage"    {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>Avantage</option>
+        <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>Désavantage</option>
+      </select>
+    </div>
+    <div class="bot-row">
+      <div class="form-group">
+        <label>Bonus aux attaques</label>
+        <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" style="width:56px" />
+      </div>
+      <div class="form-group">
+        <label>Bonus aux JdS</label>
+        <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" style="width:56px" />
+      </div>
+    </div>
+
+    <p class="bot-section-label">Compétences</p>
+    <div class="form-group">
+      <label>Toutes</label>
+      <input type="checkbox" name="buffSkillAll" {{#if flag.buffSkillAll}}checked{{/if}} />
+    </div>
+    <div class="bot-skill-grid">
+      <label><input type="checkbox" name="buffSkill_acr" {{#if flag.buffSkill_acr}}checked{{/if}} /> Acrobaties</label>
+      <label><input type="checkbox" name="buffSkill_ani" {{#if flag.buffSkill_ani}}checked{{/if}} /> Dressage</label>
+      <label><input type="checkbox" name="buffSkill_arc" {{#if flag.buffSkill_arc}}checked{{/if}} /> Arcanes</label>
+      <label><input type="checkbox" name="buffSkill_ath" {{#if flag.buffSkill_ath}}checked{{/if}} /> Athlétisme</label>
+      <label><input type="checkbox" name="buffSkill_dec" {{#if flag.buffSkill_dec}}checked{{/if}} /> Tromperie</label>
+      <label><input type="checkbox" name="buffSkill_his" {{#if flag.buffSkill_his}}checked{{/if}} /> Histoire</label>
+      <label><input type="checkbox" name="buffSkill_ins" {{#if flag.buffSkill_ins}}checked{{/if}} /> Perspicacité</label>
+      <label><input type="checkbox" name="buffSkill_itm" {{#if flag.buffSkill_itm}}checked{{/if}} /> Intimidation</label>
+      <label><input type="checkbox" name="buffSkill_inv" {{#if flag.buffSkill_inv}}checked{{/if}} /> Investigation</label>
+      <label><input type="checkbox" name="buffSkill_med" {{#if flag.buffSkill_med}}checked{{/if}} /> Médecine</label>
+      <label><input type="checkbox" name="buffSkill_nat" {{#if flag.buffSkill_nat}}checked{{/if}} /> Nature</label>
+      <label><input type="checkbox" name="buffSkill_prc" {{#if flag.buffSkill_prc}}checked{{/if}} /> Perception</label>
+      <label><input type="checkbox" name="buffSkill_prf" {{#if flag.buffSkill_prf}}checked{{/if}} /> Représentation</label>
+      <label><input type="checkbox" name="buffSkill_per" {{#if flag.buffSkill_per}}checked{{/if}} /> Persuasion</label>
+      <label><input type="checkbox" name="buffSkill_rel" {{#if flag.buffSkill_rel}}checked{{/if}} /> Religion</label>
+      <label><input type="checkbox" name="buffSkill_slt" {{#if flag.buffSkill_slt}}checked{{/if}} /> Escamotage</label>
+      <label><input type="checkbox" name="buffSkill_ste" {{#if flag.buffSkill_ste}}checked{{/if}} /> Discrétion</label>
+      <label><input type="checkbox" name="buffSkill_sur" {{#if flag.buffSkill_sur}}checked{{/if}} /> Survie</label>
+    </div>
+    <div class="form-group">
+      <label>Bonus aux compétences</label>
+      <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="ex: 1d4 ou 2" />
+    </div>
   </div>
 
-  <div class="form-group">
-    <label>Caractéristique de sauvegarde</label>
-    <select name="saveAbility">
-      <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>Aucune</option>
-      <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>Force</option>
-      <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>Dextérité</option>
-      <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>Constitution</option>
-      <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>Intelligence</option>
-      <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>Sagesse</option>
-      <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>Charisme</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>DD</label>
-    <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" />
-  </div>
-
-  <div class="form-group">
-    <label>Effet sur réussite</label>
-    <select name="saveEffect">
-      <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>Aucun dégât</option>
-      <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>Dégâts de moitié</option>
-      <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>Dégâts complets quand même</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>Statut à appliquer</label>
-    <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="ex : frightened" />
-  </div>
-
-  <div class="form-group">
-    <label>Bonus de CA</label>
-    <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="ex: 2 ou -2" step="1" />
-  </div>
-
-  <div class="form-group">
-    <label>Jets d'attaque</label>
-    <select name="buffAttackMode">
-      <option value="none"        {{#if flag.buffAttackModeNone}}selected{{/if}}>aucun</option>
-      <option value="advantage"   {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>avantage</option>
-      <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>désavantage</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>Jets de sauvegarde</label>
-    <select name="buffSaveMode">
-      <option value="none"        {{#if flag.buffSaveModeNone}}selected{{/if}}>aucun</option>
-      <option value="advantage"   {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>avantage</option>
-      <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>désavantage</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>Jets de caractéristique</label>
-    <select name="buffSkillMode">
-      <option value="none"        {{#if flag.buffSkillModeNone}}selected{{/if}}>aucun</option>
-      <option value="advantage"   {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>avantage</option>
-      <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>désavantage</option>
-    </select>
-  </div>
-
-  <div class="form-group">
-    <label>Bonus aux JdS</label>
-    <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="ex: 1d4 ou 2" />
-  </div>
-
-  <div class="form-group">
-    <label>Bonus aux attaques</label>
-    <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="ex: 1 ou -1" />
-  </div>
-
-  <div class="form-group">
-    <label>Consommer après déclenchement</label>
-    <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
-  </div>
-
-  <div class="form-group">
-    <label>Nombre de charges</label>
-    <input type="number" name="charges" value="{{flag.charges}}" placeholder="illimitées" min="1" />
-  </div>
-
-  <div class="form-group">
-    <label>Durée (rounds)</label>
-    <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="illimitée" min="0" />
+  <!-- Onglet 4 : Paramètres -->
+  <div id="bot-tab-settings" class="bot-tab-panel" style="display:none">
+    <div class="form-group">
+      <label>Consommer après déclenchement</label>
+      <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
+    </div>
+    <div class="form-group">
+      <label>Nombre de charges</label>
+      <input type="number" name="charges" value="{{flag.charges}}" placeholder="illimitées" min="1" />
+    </div>
+    <div class="form-group">
+      <label>Durée (rounds)</label>
+      <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="illimitée" min="0" />
+    </div>
   </div>
 
   <footer>
     <button type="submit">Sauvegarder</button>
   </footer>
 </form>
+
+<script>
+function botShowTab(btn, tabId) {
+  const form = btn.closest('form');
+  form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
+  form.querySelectorAll('.bot-tab-btn').forEach(b => b.classList.remove('bot-tab-active'));
+  document.getElementById(tabId).style.display = '';
+  btn.classList.add('bot-tab-active');
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.setPosition({ height: "auto" });
+}
+</script>

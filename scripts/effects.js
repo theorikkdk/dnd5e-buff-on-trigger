@@ -126,9 +126,11 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
   }
 }
 
+const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
+
 export function buildMechanicalChanges(flag) {
   if (!flag.buffs) return [];
-  const { ac, attackMode, saveMode, skillMode, saveBonus, attackBonus } = flag.buffs;
+  const { ac, attackMode, saveMode, skillMode, skills, skillBonus, saveBonus, attackBonus } = flag.buffs;
   const changes = [];
   if (ac) changes.push({ key: "system.attributes.ac.bonus", mode: 2, value: String(ac), priority: 20 });
   if (attackMode) {
@@ -140,8 +142,29 @@ export function buildMechanicalChanges(flag) {
     changes.push({ key, mode: 5, value: "1", priority: 20 });
   }
   if (skillMode) {
-    const key = skillMode === "advantage" ? "flags.midi-qol.advantage.ability.check.all" : "flags.midi-qol.disadvantage.ability.check.all";
+    const key = skillMode === "advantage" ? "flags.midi-qol.advantage.check.all" : "flags.midi-qol.disadvantage.check.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  if (skills?.length) {
+    if (skills.includes("all")) {
+      changes.push({ key: "flags.midi-qol.advantage.skill.all", mode: 5, value: "1", priority: 20 });
+      if (skillBonus) {
+        for (const id of SKILL_IDS) {
+          changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
+        }
+      }
+    } else {
+      for (const id of skills) {
+        changes.push({ key: `flags.midi-qol.advantage.skill.${id}`, mode: 5, value: "1", priority: 20 });
+        if (skillBonus) {
+          changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
+        }
+      }
+    }
+  } else if (skillBonus) {
+    for (const id of SKILL_IDS) {
+      changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
+    }
   }
   if (saveBonus) changes.push({ key: "system.bonuses.abilities.save", mode: 2, value: String(saveBonus), priority: 20 });
   if (attackBonus) {
