@@ -3,6 +3,24 @@ const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","
 const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
 const SKILL_LABELS = { acr:"Acrobaties", ani:"Dressage", arc:"Arcanes", ath:"Athlétisme", dec:"Tromperie", his:"Histoire", ins:"Perspicacité", itm:"Intimidation", inv:"Investigation", med:"Médecine", nat:"Nature", prc:"Perception", prf:"Représentation", per:"Persuasion", rel:"Religion", slt:"Escamotage", ste:"Discrétion", sur:"Survie" };
 const DAMAGE_LABELS = { acid:"Acide", bludgeoning:"Contondant", cold:"Froid", fire:"Feu", force:"Force", lightning:"Foudre", necrotic:"Nécrotique", piercing:"Perforant", poison:"Poison", psychic:"Psychique", radiant:"Radiant", slashing:"Tranchant", thunder:"Tonnerre" };
+const WEAPON_PROF_LABELS = {
+  sim: "Armes courantes", mar: "Armes de guerre",
+  longsword: "Épée longue", shortsword: "Épée courte",
+  dagger: "Dague", handaxe: "Hachette", greataxe: "Grande hache",
+  battleaxe: "Hache de bataille", mace: "Masse", warhammer: "Marteau de guerre",
+  spear: "Lance", quarterstaff: "Bâton", bow: "Arc", crossbow: "Arbalète"
+};
+const ARMOR_PROF_LABELS = {
+  lgt: "Armures légères", med: "Armures intermédiaires",
+  hvy: "Armures lourdes", shl: "Boucliers"
+};
+const LANGUAGE_LABELS = {
+  common: "Commun", elvish: "Elfique", dwarvish: "Nain",
+  orcish: "Orque", draconic: "Draconique", infernal: "Infernal",
+  celestial: "Céleste", abyssal: "Abyssal", undercommon: "Commun des profondeurs",
+  gnomish: "Gnome", halfling: "Halfelin", goblin: "Gobelin",
+  sylvan: "Sylvestre", primordial: "Primordial", deep: "Profond"
+};
 
 class BuffTriggerConfig extends FormApplication {
   static get defaultOptions() {
@@ -28,6 +46,9 @@ class BuffTriggerConfig extends FormApplication {
     const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
     const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
     const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
+    const weaponProfOptions     = Object.entries(WEAPON_PROF_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
+    const armorProfOptions      = Object.entries(ARMOR_PROF_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
+    const languageOptions       = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.languages ?? []).includes(value) }));
     const flag = {
       ...raw,
       targetMode:            raw.targetMode ?? "self",
@@ -51,11 +72,16 @@ class BuffTriggerConfig extends FormApplication {
       buffAttackBonus:           raw.buffs?.attackBonus ?? "",
       buffSpeed:                 raw.buffs?.speed?.value ?? "",
       buffSpeedType:             raw.buffs?.speed?.type ?? "walk",
+      buffDarkvision:            raw.buffs?.darkvision ?? "",
+      buffPassivePerception:     raw.buffs?.passivePerception ?? "",
       skillAdvantageOptions,
       skillBonusOptions,
       resistanceOptions,
       vulnOptions,
       immunityOptions,
+      weaponProfOptions,
+      armorProfOptions,
+      languageOptions,
       buffAttackModeNone:        (raw.buffs?.attackMode ?? "none") === "none",
       buffAttackModeAdvantage:   raw.buffs?.attackMode === "advantage",
       buffAttackModeDisadvantage: raw.buffs?.attackMode === "disadvantage",
@@ -119,6 +145,11 @@ class BuffTriggerConfig extends FormApplication {
             saveBonus: formData.buffSaveBonus || null,
             attackBonus: formData.buffAttackBonus || null,
             speed: formData.buffSpeed ? { value: Number(formData.buffSpeed), type: formData.buffSpeedType ?? "walk" } : null,
+            weaponProfs: toArray(formData.buffWeaponProfsList),
+            armorProfs: toArray(formData.buffArmorProfsList),
+            languages: toArray(formData.buffLanguagesList),
+            darkvision: formData.buffDarkvision ? Number(formData.buffDarkvision) : null,
+            passivePerception: formData.buffPassivePerception ? Number(formData.buffPassivePerception) : null,
             resistances: toArray(formData.buffResistancesList),
             vulnerabilities: toArray(formData.buffVulnsList),
             immunities: toArray(formData.buffImmunitiesList),

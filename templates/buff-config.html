@@ -195,6 +195,57 @@
       </select>
     </div>
 
+    <p class="bot-section-label">Capacités</p>
+    <div class="form-group">
+      <label>Maîtrises d'armes</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffWeaponProfsList">
+          {{#each flag.weaponProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffWeaponProfsList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffWeaponProfsList')">
+          <option value="">— Ajouter une maîtrise d'arme —</option>
+          {{#each flag.weaponProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffWeaponProfsList" id="hidden-buffWeaponProfsList" value="{{#each flag.weaponProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Maîtrises d'armures</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffArmorProfsList">
+          {{#each flag.armorProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffArmorProfsList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffArmorProfsList')">
+          <option value="">— Ajouter une maîtrise d'armure —</option>
+          {{#each flag.armorProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffArmorProfsList" id="hidden-buffArmorProfsList" value="{{#each flag.armorProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Langues</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffLanguagesList">
+          {{#each flag.languageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffLanguagesList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffLanguagesList')">
+          <option value="">— Ajouter une langue —</option>
+          {{#each flag.languageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vision dans le noir</label>
+      <input type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+    </div>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Perception passive</label>
+      <input type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">(bonus)</label>
+    </div>
+
     <p class="bot-section-label">Résistances / Vulnérabilités / Immunités</p>
     <div class="form-group">
       <label>Résistances</label>

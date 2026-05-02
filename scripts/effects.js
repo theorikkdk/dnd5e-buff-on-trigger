@@ -129,7 +129,27 @@ const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","
 
 export function buildMechanicalChanges(flag) {
   if (!flag.buffs) return [];
-  const { ac, attackMode, saveMode, skillMode, skills, skillBonus, skillBonusSkills, skillBonusAll, saveBonus, attackBonus, speed, resistances, vulnerabilities, immunities } = flag.buffs;
+  const {
+    ac,
+    attackMode,
+    saveMode,
+    skillMode,
+    skills,
+    skillBonus,
+    skillBonusSkills,
+    skillBonusAll,
+    saveBonus,
+    attackBonus,
+    speed,
+    resistances,
+    vulnerabilities,
+    immunities,
+    weaponProfs,
+    armorProfs,
+    languages,
+    darkvision,
+    passivePerception
+  } = flag.buffs;
   const changes = [];
   if (ac) changes.push({ key: "system.attributes.ac.bonus", mode: 2, value: String(ac), priority: 20 });
   if (attackMode) {
@@ -176,6 +196,21 @@ export function buildMechanicalChanges(flag) {
   }
   if (immunities?.length) {
     for (const type of immunities) changes.push({ key: "system.traits.di.value", mode: 2, value: type, priority: 20 });
+  }
+  for (const id of weaponProfs ?? []) {
+    changes.push({ key: "system.traits.weaponProf.value", mode: 0, value: id, priority: 20 });
+  }
+  for (const id of armorProfs ?? []) {
+    changes.push({ key: "system.traits.armorProf.value", mode: 0, value: id, priority: 20 });
+  }
+  for (const id of languages ?? []) {
+    changes.push({ key: "system.traits.languages.value", mode: 0, value: id, priority: 20 });
+  }
+  if (darkvision) {
+    changes.push({ key: "system.attributes.senses.darkvision", mode: 2, value: String(darkvision), priority: 20 });
+  }
+  if (passivePerception) {
+    changes.push({ key: "system.skills.prc.bonuses.passive", mode: 2, value: String(passivePerception), priority: 20 });
   }
   return changes;
 }
