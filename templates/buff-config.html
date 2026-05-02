@@ -1,45 +1,45 @@
 <form>
   <!-- En-tête toujours visible -->
   <div class="form-group">
-    <label>Activer le buff on trigger</label>
+    <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
   <div class="form-group">
-    <label>Mode de ciblage</label>
+    <label>{{localize "BOT.ui.targetMode.label"}}</label>
     <select name="targetMode">
-      <option value="self"   {{#if flag.targetModeSelf}}selected{{/if}}>Sur moi-même (buff offensif)</option>
-      <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>Sur une cible (malus/debuff)</option>
-      <option value="ally"   {{#if flag.targetModeAlly}}selected{{/if}}>Sur un allié (buff défensif)</option>
+      <option value="self"   {{#if flag.targetModeSelf}}selected{{/if}}>{{localize "BOT.ui.targetMode.self"}}</option>
+      <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>{{localize "BOT.ui.targetMode.target"}}</option>
+      <option value="ally"   {{#if flag.targetModeAlly}}selected{{/if}}>{{localize "BOT.ui.targetMode.ally"}}</option>
     </select>
   </div>
 
   <!-- Navigation par onglets -->
   <div class="bot-tabs">
-    <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">Déclencheur</button>
-    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-damage')">Dégâts &amp; Effets</button>
-    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-buffs')">Buffs</button>
-    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-settings')">Paramètres</button>
+    <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">{{localize "BOT.ui.tabs.trigger"}}</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-damage')">{{localize "BOT.ui.tabs.damageEffects"}}</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-buffs')">{{localize "BOT.ui.tabs.buffs"}}</button>
+    <button type="button" class="bot-tab-btn" onclick="botShowTab(this,'bot-tab-settings')">{{localize "BOT.ui.tabs.settings"}}</button>
   </div>
 
   <!-- Onglet 1 : Déclencheur -->
   <div id="bot-tab-trigger" class="bot-tab-panel">
     <div class="form-group">
-      <label>Déclencheur</label>
+      <label>{{localize "BOT.ui.trigger.label"}}</label>
       <select name="type">
-        <option value="mwak"            {{#if flag.typeMwak}}selected{{/if}}>Attaque corps à corps</option>
-        <option value="rwak"            {{#if flag.typeRwak}}selected{{/if}}>Attaque à distance</option>
-        <option value="turnStart"       {{#if flag.typeTurnStart}}selected{{/if}}>Début de tour (lanceur)</option>
-        <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>Début de tour de la cible</option>
-        <option value="turnEnd"         {{#if flag.typeTurnEnd}}selected{{/if}}>Fin de tour (lanceur)</option>
-        <option value="targetTurnEnd"   {{#if flag.typeTargetTurnEnd}}selected{{/if}}>Fin de tour de la cible</option>
+        <option value="mwak"            {{#if flag.typeMwak}}selected{{/if}}>{{localize "BOT.ui.trigger.mwak"}}</option>
+        <option value="rwak"            {{#if flag.typeRwak}}selected{{/if}}>{{localize "BOT.ui.trigger.rwak"}}</option>
+        <option value="turnStart"       {{#if flag.typeTurnStart}}selected{{/if}}>{{localize "BOT.ui.trigger.turnStart"}}</option>
+        <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnStart"}}</option>
+        <option value="turnEnd"         {{#if flag.typeTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.turnEnd"}}</option>
+        <option value="targetTurnEnd"   {{#if flag.typeTargetTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnEnd"}}</option>
       </select>
     </div>
     <div class="form-group">
-      <label>Condition</label>
+      <label>{{localize "BOT.ui.condition.label"}}</label>
       <select name="condition">
-        <option value="hit"    {{#if flag.conditionHit}}selected{{/if}}>Touché (hit)</option>
-        <option value="miss"   {{#if flag.conditionMiss}}selected{{/if}}>Raté (miss)</option>
-        <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>Toujours (always)</option>
+        <option value="hit"    {{#if flag.conditionHit}}selected{{/if}}>{{localize "BOT.ui.condition.hit"}}</option>
+        <option value="miss"   {{#if flag.conditionMiss}}selected{{/if}}>{{localize "BOT.ui.condition.miss"}}</option>
+        <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>{{localize "BOT.ui.condition.always"}}</option>
       </select>
     </div>
   </div>
@@ -48,57 +48,57 @@
   <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
     <div class="bot-row">
       <div class="form-group">
-        <label>Formule de dégâts</label>
-        <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="ex : 2d8" />
+        <label>{{localize "BOT.ui.damageFormula.label"}}</label>
+        <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="{{localize "BOT.ui.damageFormula.placeholder"}}" />
       </div>
       <div class="form-group">
-        <label>Type</label>
+        <label>{{localize "BOT.ui.damageType.label"}}</label>
         <select name="damageType">
-          <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>acid</option>
-          <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>bludgeoning</option>
-          <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>cold</option>
-          <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>fire</option>
-          <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>force</option>
-          <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>lightning</option>
-          <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>necrotic</option>
-          <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>piercing</option>
-          <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>poison</option>
-          <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>psychic</option>
-          <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>radiant</option>
-          <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>slashing</option>
-          <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>thunder</option>
+          <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
+          <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
+          <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>
+          <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>{{localize "BOT.damageTypes.fire"}}</option>
+          <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>{{localize "BOT.damageTypes.force"}}</option>
+          <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>{{localize "BOT.damageTypes.lightning"}}</option>
+          <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>{{localize "BOT.damageTypes.necrotic"}}</option>
+          <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>{{localize "BOT.damageTypes.piercing"}}</option>
+          <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>{{localize "BOT.damageTypes.poison"}}</option>
+          <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>{{localize "BOT.damageTypes.psychic"}}</option>
+          <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>{{localize "BOT.damageTypes.radiant"}}</option>
+          <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>{{localize "BOT.damageTypes.slashing"}}</option>
+          <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>{{localize "BOT.damageTypes.thunder"}}</option>
         </select>
       </div>
     </div>
     <div class="bot-row">
       <div class="form-group">
-        <label>Jet de sauvegarde</label>
+        <label>{{localize "BOT.ui.save.label"}}</label>
         <select name="saveAbility">
-          <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>Aucune</option>
-          <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>Force</option>
-          <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>Dextérité</option>
-          <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>Constitution</option>
-          <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>Intelligence</option>
-          <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>Sagesse</option>
-          <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>Charisme</option>
+          <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
+          <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
+          <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
+          <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>{{localize "BOT.abilities.con"}}</option>
+          <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>{{localize "BOT.abilities.int"}}</option>
+          <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
+          <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
         </select>
       </div>
       <div class="form-group">
-        <label>DD</label>
+        <label>{{localize "BOT.ui.dc.label"}}</label>
         <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" style="width:56px" />
       </div>
       <div class="form-group">
-        <label>Réussite</label>
+        <label>{{localize "BOT.ui.success.label"}}</label>
         <select name="saveEffect">
-          <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>Aucun dégât</option>
-          <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>Moitié</option>
-          <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>Complets</option>
+          <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
+          <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
+          <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
         </select>
       </div>
     </div>
     <div class="form-group">
-      <label>Statut à appliquer</label>
-      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="ex : frightened" />
+      <label>{{localize "BOT.ui.status.label"}}</label>
+      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="{{localize "BOT.ui.status.placeholder"}}" />
     </div>
   </div>
 
@@ -106,48 +106,48 @@
   <div id="bot-tab-buffs" class="bot-tab-panel" style="display:none">
     <div class="bot-subtabs-container">
       <div class="bot-tabs">
-        <button type="button" class="bot-tab-btn bot-subtab-btn bot-tab-active" onclick="botShowSubTab(this,'bot-subtab-combat')">Combat</button>
-        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-skills')">Compétences</button>
-        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-defense')">Défense</button>
-        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-capacities')">Capacités</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn bot-tab-active" onclick="botShowSubTab(this,'bot-subtab-combat')">{{localize "BOT.ui.subtabs.combat"}}</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-skills')">{{localize "BOT.ui.subtabs.skills"}}</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-defense')">{{localize "BOT.ui.subtabs.defense"}}</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-capacities')">{{localize "BOT.ui.subtabs.capacities"}}</button>
       </div>
 
       <div id="bot-subtab-combat" class="bot-subtab-panel">
         <div class="form-group">
-          <label>Bonus CA</label>
+          <label>{{localize "BOT.ui.combat.acBonus"}}</label>
           <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" style="width:56px" />
         </div>
         <div class="form-group">
-          <label>Jets d'attaque</label>
+          <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
           <select name="buffAttackMode">
-            <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>Normal</option>
-            <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>Avantage</option>
-            <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>Désavantage</option>
+            <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>{{localize "BOT.ui.common.normal"}}</option>
+            <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.common.advantage"}}</option>
+            <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Jets de sauvegarde</label>
+          <label>{{localize "BOT.ui.combat.saveRolls"}}</label>
           <select name="buffSaveMode">
-            <option value="none"         {{#if flag.buffSaveModeNone}}selected{{/if}}>Normal</option>
-            <option value="advantage"    {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>Avantage</option>
-            <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>Désavantage</option>
+            <option value="none"         {{#if flag.buffSaveModeNone}}selected{{/if}}>{{localize "BOT.ui.common.normal"}}</option>
+            <option value="advantage"    {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.common.advantage"}}</option>
+            <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
         </div>
         <div class="form-group">
-          <label>Jets de caractéristique</label>
+          <label>{{localize "BOT.ui.combat.abilityRolls"}}</label>
           <select name="buffSkillMode">
-            <option value="none"         {{#if flag.buffSkillModeNone}}selected{{/if}}>Normal</option>
-            <option value="advantage"    {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>Avantage</option>
-            <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>Désavantage</option>
+            <option value="none"         {{#if flag.buffSkillModeNone}}selected{{/if}}>{{localize "BOT.ui.common.normal"}}</option>
+            <option value="advantage"    {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.common.advantage"}}</option>
+            <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
         </div>
         <div class="bot-row">
           <div class="form-group">
-            <label>Bonus aux attaques</label>
+            <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
             <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" style="width:56px" />
           </div>
           <div class="form-group">
-            <label>Bonus aux JdS</label>
+            <label>{{localize "BOT.ui.combat.saveBonus"}}</label>
             <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" style="width:56px" />
           </div>
         </div>
@@ -155,13 +155,13 @@
 
       <div id="bot-subtab-skills" class="bot-subtab-panel" style="display:none">
         <div class="form-group">
-          <label>Avantage aux compétences</label>
+          <label>{{localize "BOT.ui.skills.advantage"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffSkillAdvantageList">
               {{#each flag.skillAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillAdvantageList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillAdvantageList')">
-              <option value="">— Ajouter une compétence —</option>
+              <option value="">— {{localize "BOT.ui.skills.addSkill"}} —</option>
               {{#each flag.skillAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
@@ -169,64 +169,64 @@
         </div>
         <div class="bot-row">
           <div class="form-group" style="flex:1">
-            <label>Bonus aux compétences</label>
+            <label>{{localize "BOT.ui.skills.bonus"}}</label>
             <div class="bot-tag-picker">
               <div class="bot-tags" id="tags-buffSkillBonusList">
                 {{#each flag.skillBonusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillBonusList')">✕</span></span>{{/if}}{{/each}}
               </div>
               <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillBonusList')">
-                <option value="">— Ajouter une compétence —</option>
+                <option value="">— {{localize "BOT.ui.skills.addSkill"}} —</option>
                 {{#each flag.skillBonusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
               </select>
               <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
             </div>
           </div>
           <div class="form-group" style="flex:0 0 70px">
-            <label>Valeur</label>
+            <label>{{localize "BOT.ui.common.value"}}</label>
             <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" style="width:100%" />
           </div>
         </div>
         <div class="form-group">
-          <label>Bonus à toutes les compétences</label>
-          <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="ex: 1d4 ou 2" />
+          <label>{{localize "BOT.ui.skills.bonusAll"}}</label>
+          <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="{{localize "BOT.ui.skills.bonusAllPlaceholder"}}" />
         </div>
       </div>
 
       <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
         <div class="form-group">
-          <label>Résistances</label>
+          <label>{{localize "BOT.ui.defense.resistances"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffResistancesList">
               {{#each flag.resistanceOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffResistancesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffResistancesList')">
-              <option value="">— Ajouter un type —</option>
+              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.resistanceOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffResistancesList" id="hidden-buffResistancesList" value="{{#each flag.resistanceOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
         <div class="form-group">
-          <label>Vulnérabilités</label>
+          <label>{{localize "BOT.ui.defense.vulnerabilities"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffVulnsList">
               {{#each flag.vulnOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffVulnsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffVulnsList')">
-              <option value="">— Ajouter un type —</option>
+              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.vulnOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffVulnsList" id="hidden-buffVulnsList" value="{{#each flag.vulnOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
         <div class="form-group">
-          <label>Immunités</label>
+          <label>{{localize "BOT.ui.defense.immunities"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffImmunitiesList">
               {{#each flag.immunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffImmunitiesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffImmunitiesList')">
-              <option value="">— Ajouter un type —</option>
+              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
@@ -236,83 +236,83 @@
 
       <div id="bot-subtab-capacities" class="bot-subtab-panel" style="display:none">
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Vitesse</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.speed"}}</label>
           <input class="bot-capacity-input" type="number" name="buffSpeed" value="{{flag.buffSpeed}}" placeholder="±" />
-          <label class="bot-capacity-unit">pieds</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
           <select class="bot-capacity-text" name="buffSpeedType">
-            <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>Marche</option>
-            <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>Vol</option>
-            <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>Nage</option>
-            <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>Escalade</option>
-            <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>Fouissement</option>
+            <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.walk"}}</option>
+            <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.fly"}}</option>
+            <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.swim"}}</option>
+            <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.climb"}}</option>
+            <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.burrow"}}</option>
           </select>
         </div>
 
-        <p class="bot-section-label">Sens</p>
+        <p class="bot-section-label">{{localize "BOT.ui.capacities.senses.title"}}</p>
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Vision dans le noir</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.darkvision"}}</label>
           <input class="bot-capacity-input" type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" />
-          <label class="bot-capacity-unit">pieds</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Vision aveugle</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.blindsight"}}</label>
           <input class="bot-capacity-input" type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="±" />
-          <label class="bot-capacity-unit">pieds</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Vision trémie</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.tremorsense"}}</label>
           <input class="bot-capacity-input" type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="±" />
-          <label class="bot-capacity-unit">pieds</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Vision vraie</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.truesight"}}</label>
           <input class="bot-capacity-input" type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="±" />
-          <label class="bot-capacity-unit">pieds</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Sens spéciaux</label>
-          <input class="bot-capacity-text" type="text" name="buffSensesSpecial" value="{{flag.buffSensesSpecial}}" placeholder="ex: Odorat aiguisé 30 pieds" />
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.special"}}</label>
+          <input class="bot-capacity-text" type="text" name="buffSensesSpecial" value="{{flag.buffSensesSpecial}}" placeholder="{{localize "BOT.ui.capacities.senses.specialPlaceholder"}}" />
         </div>
 
         <div class="bot-capacity-row">
-          <label class="bot-capacity-label">Perception passive</label>
+          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.passivePerception"}}</label>
           <input class="bot-capacity-input" type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" />
-          <label class="bot-capacity-unit">(bonus)</label>
+          <label class="bot-capacity-unit">{{localize "BOT.ui.capacities.passivePerceptionUnit"}}</label>
         </div>
         <div class="form-group bot-capacity-picker-group">
-          <label>Maîtrises d'armes</label>
+          <label>{{localize "BOT.ui.capacities.weaponProficiencies"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffWeaponProfsList">
               {{#each flag.weaponProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffWeaponProfsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffWeaponProfsList')">
-              <option value="">— Ajouter une maîtrise d'arme —</option>
+              <option value="">— {{localize "BOT.ui.capacities.addWeaponProficiency"}} —</option>
               {{#each flag.weaponProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffWeaponProfsList" id="hidden-buffWeaponProfsList" value="{{#each flag.weaponProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
         <div class="form-group bot-capacity-picker-group">
-          <label>Maîtrises d'armures</label>
+          <label>{{localize "BOT.ui.capacities.armorProficiencies"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffArmorProfsList">
               {{#each flag.armorProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffArmorProfsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffArmorProfsList')">
-              <option value="">— Ajouter une maîtrise d'armure —</option>
+              <option value="">— {{localize "BOT.ui.capacities.addArmorProficiency"}} —</option>
               {{#each flag.armorProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffArmorProfsList" id="hidden-buffArmorProfsList" value="{{#each flag.armorProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
         <div class="form-group bot-capacity-picker-group">
-          <label>Langues</label>
+          <label>{{localize "BOT.ui.capacities.languages"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffLanguagesList">
               {{#each flag.languageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffLanguagesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffLanguagesList')">
-              <option value="">— Ajouter une langue —</option>
+              <option value="">— {{localize "BOT.ui.capacities.addLanguage"}} —</option>
               {{#each flag.languageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
@@ -325,21 +325,21 @@
   <!-- Onglet 4 : Paramètres -->
   <div id="bot-tab-settings" class="bot-tab-panel" style="display:none">
     <div class="form-group">
-      <label>Consommer après déclenchement</label>
+      <label>{{localize "BOT.ui.settings.consumeOnTrigger"}}</label>
       <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
     </div>
     <div class="form-group">
-      <label>Nombre de charges</label>
-      <input type="number" name="charges" value="{{flag.charges}}" placeholder="illimitées" min="1" />
+      <label>{{localize "BOT.ui.settings.charges"}}</label>
+      <input type="number" name="charges" value="{{flag.charges}}" placeholder="{{localize "BOT.ui.settings.chargesPlaceholder"}}" min="1" />
     </div>
     <div class="form-group">
-      <label>Durée (rounds)</label>
-      <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="illimitée" min="0" />
+      <label>{{localize "BOT.ui.settings.durationRounds"}}</label>
+      <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="{{localize "BOT.ui.settings.durationPlaceholder"}}" min="0" />
     </div>
   </div>
 
   <footer>
-    <button type="submit">Sauvegarder</button>
+    <button type="submit">{{localize "BOT.ui.actions.save"}}</button>
   </footer>
 </form>
 

@@ -1,5 +1,28 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
 const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
+const DAMAGE_LABEL_KEYS = {
+  acid: "BOT.damageTypes.acid",
+  bludgeoning: "BOT.damageTypes.bludgeoning",
+  cold: "BOT.damageTypes.cold",
+  fire: "BOT.damageTypes.fire",
+  force: "BOT.damageTypes.force",
+  lightning: "BOT.damageTypes.lightning",
+  necrotic: "BOT.damageTypes.necrotic",
+  piercing: "BOT.damageTypes.piercing",
+  poison: "BOT.damageTypes.poison",
+  psychic: "BOT.damageTypes.psychic",
+  radiant: "BOT.damageTypes.radiant",
+  slashing: "BOT.damageTypes.slashing",
+  thunder: "BOT.damageTypes.thunder"
+};
+
+function localize(key) {
+  return game.i18n.localize(key);
+}
+
+function localizeDamageType(type) {
+  return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
+}
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = []) {
   const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
@@ -16,7 +39,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
   if (activeBuff) {
     const durationRounds = activeBuff.duration?.rounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: (activeBuff.itemName ?? "Buff on Trigger") + " ⚡",
+      name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " ⚡",
       img: activeBuff.itemImg ?? BUFF_ICON,
       statuses: ["bot-active"],
       changes: extraChanges,
@@ -28,7 +51,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
 
 export async function applyTargetIndicator(targetActor, flag) {
   if (!targetActor) return;
-  const itemName = flag.itemName ?? "Buff on Trigger";
+  const itemName = flag.itemName ?? localize("BOT.fallback.effectName");
   const itemImg = flag.itemImg ?? BUFF_ICON;
   const existing = targetActor.effects.find(
     (e) => e.flags?.[MODULE_ID]?.targetIndicator === true && e.name === itemName
@@ -235,7 +258,7 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
   const changes = buildMechanicalChanges(flag);
   if (!changes.length) return;
   await actor.createEmbeddedDocuments("ActiveEffect", [{
-    name: flag.itemName ?? "Buff on Trigger",
+    name: flag.itemName ?? localize("BOT.fallback.effectName"),
     img: flag.itemImg ?? BUFF_ICON,
     changes,
     duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
@@ -263,7 +286,7 @@ export async function applyBonusDamage(workflow, flag) {
   await ChatMessage.create({
     content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
       <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-      <strong>${flag.itemName ?? "Buff on Trigger"}</strong> se déclenche !
+      <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
     </div>`,
     speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
   });
@@ -305,7 +328,7 @@ export async function applyBonusDamage(workflow, flag) {
         fullTargets,
         workflow.item ?? null,
         new Set(),
-        { flavor: flag.itemName ?? "Buff on Trigger" }
+        { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
       );
     }
     if (halfTargets.size) {
@@ -316,7 +339,7 @@ export async function applyBonusDamage(workflow, flag) {
         halfTargets,
         workflow.item ?? null,
         new Set(),
-        { flavor: flag.itemName ?? "Buff on Trigger" }
+        { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
       );
     }
   } else {
@@ -328,7 +351,11 @@ export async function applyBonusDamage(workflow, flag) {
     }
     if (fullTargets.size || halfTargets.size) {
       await ChatMessage.create({
-        content: `${flag.itemName ?? "Buff on Trigger"} — ${roll.total} dégâts ${damageType}`,
+        content: game.i18n.format("BOT.chat.damageResult", {
+          name: flag.itemName ?? localize("BOT.fallback.effectName"),
+          total: roll.total,
+          type: localizeDamageType(damageType)
+        }),
         speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
         rolls: [roll],
       });

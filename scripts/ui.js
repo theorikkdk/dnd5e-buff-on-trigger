@@ -1,31 +1,90 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
 const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
 const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
-const SKILL_LABELS = { acr:"Acrobaties", ani:"Dressage", arc:"Arcanes", ath:"Athlétisme", dec:"Tromperie", his:"Histoire", ins:"Perspicacité", itm:"Intimidation", inv:"Investigation", med:"Médecine", nat:"Nature", prc:"Perception", prf:"Représentation", per:"Persuasion", rel:"Religion", slt:"Escamotage", ste:"Discrétion", sur:"Survie" };
-const DAMAGE_LABELS = { acid:"Acide", bludgeoning:"Contondant", cold:"Froid", fire:"Feu", force:"Force", lightning:"Foudre", necrotic:"Nécrotique", piercing:"Perforant", poison:"Poison", psychic:"Psychique", radiant:"Radiant", slashing:"Tranchant", thunder:"Tonnerre" };
-const WEAPON_PROF_LABELS = {
-  sim: "Armes courantes", mar: "Armes de guerre",
-  longsword: "Épée longue", shortsword: "Épée courte",
-  dagger: "Dague", handaxe: "Hachette", greataxe: "Grande hache",
-  battleaxe: "Hache de bataille", mace: "Masse", warhammer: "Marteau de guerre",
-  spear: "Lance", quarterstaff: "Bâton", bow: "Arc", crossbow: "Arbalète"
-};
-const ARMOR_PROF_LABELS = {
-  lgt: "Armures légères", med: "Armures intermédiaires",
-  hvy: "Armures lourdes", shl: "Boucliers"
-};
-const LANGUAGE_LABELS = {
-  common: "Commun", elvish: "Elfique", dwarvish: "Nain",
-  orcish: "Orque", draconic: "Draconique", infernal: "Infernal",
-  celestial: "Céleste", abyssal: "Abyssal", undercommon: "Commun des profondeurs",
-  gnomish: "Gnome", halfling: "Halfelin", goblin: "Gobelin",
-  sylvan: "Sylvestre", primordial: "Primordial", deep: "Profond"
-};
+
+const getSkillLabels = () => ({
+  acr: game.i18n.localize("BOT.skills.acr"),
+  ani: game.i18n.localize("BOT.skills.ani"),
+  arc: game.i18n.localize("BOT.skills.arc"),
+  ath: game.i18n.localize("BOT.skills.ath"),
+  dec: game.i18n.localize("BOT.skills.dec"),
+  his: game.i18n.localize("BOT.skills.his"),
+  ins: game.i18n.localize("BOT.skills.ins"),
+  itm: game.i18n.localize("BOT.skills.itm"),
+  inv: game.i18n.localize("BOT.skills.inv"),
+  med: game.i18n.localize("BOT.skills.med"),
+  nat: game.i18n.localize("BOT.skills.nat"),
+  prc: game.i18n.localize("BOT.skills.prc"),
+  prf: game.i18n.localize("BOT.skills.prf"),
+  per: game.i18n.localize("BOT.skills.per"),
+  rel: game.i18n.localize("BOT.skills.rel"),
+  slt: game.i18n.localize("BOT.skills.slt"),
+  ste: game.i18n.localize("BOT.skills.ste"),
+  sur: game.i18n.localize("BOT.skills.sur")
+});
+
+const getDamageLabels = () => ({
+  acid: game.i18n.localize("BOT.damageTypes.acid"),
+  bludgeoning: game.i18n.localize("BOT.damageTypes.bludgeoning"),
+  cold: game.i18n.localize("BOT.damageTypes.cold"),
+  fire: game.i18n.localize("BOT.damageTypes.fire"),
+  force: game.i18n.localize("BOT.damageTypes.force"),
+  lightning: game.i18n.localize("BOT.damageTypes.lightning"),
+  necrotic: game.i18n.localize("BOT.damageTypes.necrotic"),
+  piercing: game.i18n.localize("BOT.damageTypes.piercing"),
+  poison: game.i18n.localize("BOT.damageTypes.poison"),
+  psychic: game.i18n.localize("BOT.damageTypes.psychic"),
+  radiant: game.i18n.localize("BOT.damageTypes.radiant"),
+  slashing: game.i18n.localize("BOT.damageTypes.slashing"),
+  thunder: game.i18n.localize("BOT.damageTypes.thunder")
+});
+
+const getWeaponProfLabels = () => ({
+  sim: game.i18n.localize("BOT.weaponProficiencies.sim"),
+  mar: game.i18n.localize("BOT.weaponProficiencies.mar"),
+  longsword: game.i18n.localize("BOT.weaponProficiencies.longsword"),
+  shortsword: game.i18n.localize("BOT.weaponProficiencies.shortsword"),
+  dagger: game.i18n.localize("BOT.weaponProficiencies.dagger"),
+  handaxe: game.i18n.localize("BOT.weaponProficiencies.handaxe"),
+  greataxe: game.i18n.localize("BOT.weaponProficiencies.greataxe"),
+  battleaxe: game.i18n.localize("BOT.weaponProficiencies.battleaxe"),
+  mace: game.i18n.localize("BOT.weaponProficiencies.mace"),
+  warhammer: game.i18n.localize("BOT.weaponProficiencies.warhammer"),
+  spear: game.i18n.localize("BOT.weaponProficiencies.spear"),
+  quarterstaff: game.i18n.localize("BOT.weaponProficiencies.quarterstaff"),
+  bow: game.i18n.localize("BOT.weaponProficiencies.bow"),
+  crossbow: game.i18n.localize("BOT.weaponProficiencies.crossbow")
+});
+
+const getArmorProfLabels = () => ({
+  lgt: game.i18n.localize("BOT.armorProficiencies.lgt"),
+  med: game.i18n.localize("BOT.armorProficiencies.med"),
+  hvy: game.i18n.localize("BOT.armorProficiencies.hvy"),
+  shl: game.i18n.localize("BOT.armorProficiencies.shl")
+});
+
+const getLanguageLabels = () => ({
+  common: game.i18n.localize("BOT.languages.common"),
+  elvish: game.i18n.localize("BOT.languages.elvish"),
+  dwarvish: game.i18n.localize("BOT.languages.dwarvish"),
+  orcish: game.i18n.localize("BOT.languages.orcish"),
+  draconic: game.i18n.localize("BOT.languages.draconic"),
+  infernal: game.i18n.localize("BOT.languages.infernal"),
+  celestial: game.i18n.localize("BOT.languages.celestial"),
+  abyssal: game.i18n.localize("BOT.languages.abyssal"),
+  undercommon: game.i18n.localize("BOT.languages.undercommon"),
+  gnomish: game.i18n.localize("BOT.languages.gnomish"),
+  halfling: game.i18n.localize("BOT.languages.halfling"),
+  goblin: game.i18n.localize("BOT.languages.goblin"),
+  sylvan: game.i18n.localize("BOT.languages.sylvan"),
+  primordial: game.i18n.localize("BOT.languages.primordial"),
+  deep: game.i18n.localize("BOT.languages.deep")
+});
 
 class BuffTriggerConfig extends FormApplication {
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      title: "Buff on Trigger — Configuration",
+      title: game.i18n.localize("BOT.ui.configTitle"),
       template: "modules/dnd5e-buff-on-trigger/templates/buff-config.html",
       width: 400,
       height: "auto",
@@ -41,14 +100,19 @@ class BuffTriggerConfig extends FormApplication {
 
   getData() {
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
-    const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: SKILL_LABELS[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
-    const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: SKILL_LABELS[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
-    const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
-    const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
-    const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
-    const weaponProfOptions     = Object.entries(WEAPON_PROF_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
-    const armorProfOptions      = Object.entries(ARMOR_PROF_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
-    const languageOptions       = Object.entries(LANGUAGE_LABELS).map(([value, label]) => ({ value, label, selected: (raw.buffs?.languages ?? []).includes(value) }));
+    const skillLabels = getSkillLabels();
+    const damageLabels = getDamageLabels();
+    const weaponProfLabels = getWeaponProfLabels();
+    const armorProfLabels = getArmorProfLabels();
+    const languageLabels = getLanguageLabels();
+    const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
+    const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
+    const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
+    const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
+    const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
+    const weaponProfOptions     = Object.entries(weaponProfLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
+    const armorProfOptions      = Object.entries(armorProfLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
+    const languageOptions       = Object.entries(languageLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.languages ?? []).includes(value) }));
     const flag = {
       ...raw,
       targetMode:            raw.targetMode ?? "self",
@@ -203,8 +267,8 @@ export function registerItemSheetButton() {
     const button = document.createElement(buttonTag);
     button.classList.add("header-control", "bot-config-btn");
     button.type = "button";
-    button.title = "Buff on Trigger";
-    button.setAttribute("aria-label", "Buff on Trigger");
+    button.title = game.i18n.localize("BOT.moduleTitle");
+    button.setAttribute("aria-label", game.i18n.localize("BOT.moduleTitle"));
     button.innerHTML = '<i class="fas fa-bolt" aria-hidden="true"></i>';
 
     button.addEventListener("click", (event) => {

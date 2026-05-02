@@ -47,7 +47,7 @@ export function registerTriggers() {
       } else if (targetMode === "target") {
         const targetToken = [...game.user.targets][0];
         if (!targetToken) {
-          ui.notifications.warn("Buff on Trigger : aucune cible sélectionnée. Ciblez un token avant d'utiliser ce sort.");
+          ui.notifications.warn(game.i18n.localize("BOT.notifications.noTargetSelected"));
           console.log(`[${MODULE_ID}] Mode target — activation annulée, aucune cible`);
           return;
         }

@@ -10,7 +10,7 @@ Hooks.once("init", () => {
 Hooks.once("setup", () => {
   CONFIG.statusEffects.push({
     id: "bot-active",
-    name: "Buff on Trigger actif",
+    name: game.i18n.localize("BOT.status.active"),
     img: "modules/dnd5e-buff-on-trigger/icons/buff-active.svg",
   });
   console.log(`[${MODULE_ID}] Statut bot-active enregistré dans setup`);
