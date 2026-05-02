@@ -74,6 +74,46 @@
   overflow-y: auto;
 }
 
+.bot-tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bot-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.bot-tag {
+  background: #4a3728;
+  border: 1px solid #8b6914;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #f0d060;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bot-tag-remove {
+  cursor: pointer;
+  color: #c0a060;
+  font-size: 10px;
+}
+
+.bot-tag-remove:hover {
+  color: #ff6060;
+}
+
+.bot-tag-select {
+  width: 100%;
+}
+
 .bot-section-label {
   font-weight: bold;
   font-size: 0.8em;

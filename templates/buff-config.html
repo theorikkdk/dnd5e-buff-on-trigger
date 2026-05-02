@@ -145,32 +145,95 @@
 
     <p class="bot-section-label">Compétences</p>
     <div class="form-group">
-      <label>Toutes</label>
-      <input type="checkbox" name="buffSkillAll" {{#if flag.buffSkillAll}}checked{{/if}} />
+      <label>Avantage aux compétences</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffSkillAdvantageList">
+          {{#each flag.skillAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillAdvantageList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillAdvantageList')">
+          <option value="">— Ajouter une compétence —</option>
+          {{#each flag.skillAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
     </div>
-    <div class="bot-skill-grid">
-      <label><input type="checkbox" name="buffSkill_acr" {{#if flag.buffSkill_acr}}checked{{/if}} /> Acrobaties</label>
-      <label><input type="checkbox" name="buffSkill_ani" {{#if flag.buffSkill_ani}}checked{{/if}} /> Dressage</label>
-      <label><input type="checkbox" name="buffSkill_arc" {{#if flag.buffSkill_arc}}checked{{/if}} /> Arcanes</label>
-      <label><input type="checkbox" name="buffSkill_ath" {{#if flag.buffSkill_ath}}checked{{/if}} /> Athlétisme</label>
-      <label><input type="checkbox" name="buffSkill_dec" {{#if flag.buffSkill_dec}}checked{{/if}} /> Tromperie</label>
-      <label><input type="checkbox" name="buffSkill_his" {{#if flag.buffSkill_his}}checked{{/if}} /> Histoire</label>
-      <label><input type="checkbox" name="buffSkill_ins" {{#if flag.buffSkill_ins}}checked{{/if}} /> Perspicacité</label>
-      <label><input type="checkbox" name="buffSkill_itm" {{#if flag.buffSkill_itm}}checked{{/if}} /> Intimidation</label>
-      <label><input type="checkbox" name="buffSkill_inv" {{#if flag.buffSkill_inv}}checked{{/if}} /> Investigation</label>
-      <label><input type="checkbox" name="buffSkill_med" {{#if flag.buffSkill_med}}checked{{/if}} /> Médecine</label>
-      <label><input type="checkbox" name="buffSkill_nat" {{#if flag.buffSkill_nat}}checked{{/if}} /> Nature</label>
-      <label><input type="checkbox" name="buffSkill_prc" {{#if flag.buffSkill_prc}}checked{{/if}} /> Perception</label>
-      <label><input type="checkbox" name="buffSkill_prf" {{#if flag.buffSkill_prf}}checked{{/if}} /> Représentation</label>
-      <label><input type="checkbox" name="buffSkill_per" {{#if flag.buffSkill_per}}checked{{/if}} /> Persuasion</label>
-      <label><input type="checkbox" name="buffSkill_rel" {{#if flag.buffSkill_rel}}checked{{/if}} /> Religion</label>
-      <label><input type="checkbox" name="buffSkill_slt" {{#if flag.buffSkill_slt}}checked{{/if}} /> Escamotage</label>
-      <label><input type="checkbox" name="buffSkill_ste" {{#if flag.buffSkill_ste}}checked{{/if}} /> Discrétion</label>
-      <label><input type="checkbox" name="buffSkill_sur" {{#if flag.buffSkill_sur}}checked{{/if}} /> Survie</label>
+    <div class="bot-row">
+      <div class="form-group" style="flex:1">
+        <label>Bonus aux compétences</label>
+        <div class="bot-tag-picker">
+          <div class="bot-tags" id="tags-buffSkillBonusList">
+            {{#each flag.skillBonusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillBonusList')">✕</span></span>{{/if}}{{/each}}
+          </div>
+          <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillBonusList')">
+            <option value="">— Ajouter une compétence —</option>
+            {{#each flag.skillBonusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+          </select>
+          <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+        </div>
+      </div>
+      <div class="form-group" style="flex:0 0 70px">
+        <label>Valeur</label>
+        <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" style="width:100%" />
+      </div>
     </div>
     <div class="form-group">
-      <label>Bonus aux compétences</label>
-      <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="ex: 1d4 ou 2" />
+      <label>Bonus à toutes les compétences</label>
+      <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="ex: 1d4 ou 2" />
+    </div>
+
+    <p class="bot-section-label">Autres effets</p>
+    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
+      <label style="white-space:nowrap">Vitesse</label>
+      <input type="number" name="buffSpeed" value="{{flag.buffSpeed}}" placeholder="±" style="width:60px;flex:0 0 60px" />
+      <label style="white-space:nowrap">pieds</label>
+      <select name="buffSpeedType" style="flex:1">
+        <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>Marche</option>
+        <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>Vol</option>
+        <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>Nage</option>
+        <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>Escalade</option>
+        <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>Fouissement</option>
+      </select>
+    </div>
+
+    <p class="bot-section-label">Résistances / Vulnérabilités / Immunités</p>
+    <div class="form-group">
+      <label>Résistances</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffResistancesList">
+          {{#each flag.resistanceOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffResistancesList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffResistancesList')">
+          <option value="">— Ajouter un type —</option>
+          {{#each flag.resistanceOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffResistancesList" id="hidden-buffResistancesList" value="{{#each flag.resistanceOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Vulnérabilités</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffVulnsList">
+          {{#each flag.vulnOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffVulnsList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffVulnsList')">
+          <option value="">— Ajouter un type —</option>
+          {{#each flag.vulnOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffVulnsList" id="hidden-buffVulnsList" value="{{#each flag.vulnOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Immunités</label>
+      <div class="bot-tag-picker">
+        <div class="bot-tags" id="tags-buffImmunitiesList">
+          {{#each flag.immunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffImmunitiesList')">✕</span></span>{{/if}}{{/each}}
+        </div>
+        <select class="bot-tag-select" onchange="botAddTag(this,'buffImmunitiesList')">
+          <option value="">— Ajouter un type —</option>
+          {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        </select>
+        <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+      </div>
     </div>
   </div>
 
@@ -204,5 +267,34 @@ function botShowTab(btn, tabId) {
   btn.classList.add('bot-tab-active');
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.setPosition({ height: "auto" });
+}
+
+function botAddTag(selectEl, targetId) {
+  const value = selectEl.value;
+  if (!value) return;
+  const label = selectEl.options[selectEl.selectedIndex].text;
+  const tagsDiv = document.getElementById('tags-' + targetId);
+  if ([...tagsDiv.querySelectorAll('.bot-tag')].some(t => t.dataset.value === value)) {
+    selectEl.value = '';
+    return;
+  }
+  const tag = document.createElement('span');
+  tag.className = 'bot-tag';
+  tag.dataset.value = value;
+  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this,\'' + targetId + '\')">✕</span>';
+  tagsDiv.appendChild(tag);
+  botUpdateHidden(targetId);
+  selectEl.value = '';
+}
+
+function botRemoveTag(removeEl, targetId) {
+  removeEl.parentElement.remove();
+  botUpdateHidden(targetId);
+}
+
+function botUpdateHidden(targetId) {
+  const tagsDiv = document.getElementById('tags-' + targetId);
+  const hiddenInput = document.getElementById('hidden-' + targetId);
+  hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
 }
 </script>

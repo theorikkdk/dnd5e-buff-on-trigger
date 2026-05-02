@@ -130,7 +130,7 @@ const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","
 
 export function buildMechanicalChanges(flag) {
   if (!flag.buffs) return [];
-  const { ac, attackMode, saveMode, skillMode, skills, skillBonus, saveBonus, attackBonus } = flag.buffs;
+  const { ac, attackMode, saveMode, skillMode, skills, skillBonus, skillBonusSkills, skillBonusAll, saveBonus, attackBonus, speed, resistances, vulnerabilities, immunities } = flag.buffs;
   const changes = [];
   if (ac) changes.push({ key: "system.attributes.ac.bonus", mode: 2, value: String(ac), priority: 20 });
   if (attackMode) {
@@ -145,31 +145,38 @@ export function buildMechanicalChanges(flag) {
     const key = skillMode === "advantage" ? "flags.midi-qol.advantage.check.all" : "flags.midi-qol.disadvantage.check.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });
   }
+  // Avantage sur les compétences sélectionnées
   if (skills?.length) {
-    if (skills.includes("all")) {
-      changes.push({ key: "flags.midi-qol.advantage.skill.all", mode: 5, value: "1", priority: 20 });
-      if (skillBonus) {
-        for (const id of SKILL_IDS) {
-          changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
-        }
-      }
-    } else {
-      for (const id of skills) {
-        changes.push({ key: `flags.midi-qol.advantage.skill.${id}`, mode: 5, value: "1", priority: 20 });
-        if (skillBonus) {
-          changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
-        }
-      }
+    for (const id of skills) {
+      changes.push({ key: `flags.midi-qol.advantage.skill.${id}`, mode: 5, value: "1", priority: 20 });
     }
-  } else if (skillBonus) {
-    for (const id of SKILL_IDS) {
+  }
+  // Bonus sur les compétences sélectionnées
+  if (skillBonusSkills?.length && skillBonus) {
+    for (const id of skillBonusSkills) {
       changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
+    }
+  }
+  // Bonus sur TOUTES les compétences
+  if (skillBonusAll) {
+    for (const id of SKILL_IDS) {
+      changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonusAll), priority: 20 });
     }
   }
   if (saveBonus) changes.push({ key: "system.bonuses.abilities.save", mode: 2, value: String(saveBonus), priority: 20 });
   if (attackBonus) {
     changes.push({ key: "system.bonuses.mwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
     changes.push({ key: "system.bonuses.rwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
+  }
+  if (speed?.value) changes.push({ key: `system.attributes.movement.${speed.type ?? "walk"}`, mode: 2, value: String(speed.value), priority: 20 });
+  if (resistances?.length) {
+    for (const type of resistances) changes.push({ key: "system.traits.dr.value", mode: 2, value: type, priority: 20 });
+  }
+  if (vulnerabilities?.length) {
+    for (const type of vulnerabilities) changes.push({ key: "system.traits.dv.value", mode: 2, value: type, priority: 20 });
+  }
+  if (immunities?.length) {
+    for (const type of immunities) changes.push({ key: "system.traits.di.value", mode: 2, value: type, priority: 20 });
   }
   return changes;
 }

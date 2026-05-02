@@ -1,5 +1,8 @@
 const MODULE_ID = "dnd5e-buff-on-trigger";
 const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
+const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
+const SKILL_LABELS = { acr:"Acrobaties", ani:"Dressage", arc:"Arcanes", ath:"Athlétisme", dec:"Tromperie", his:"Histoire", ins:"Perspicacité", itm:"Intimidation", inv:"Investigation", med:"Médecine", nat:"Nature", prc:"Perception", prf:"Représentation", per:"Persuasion", rel:"Religion", slt:"Escamotage", ste:"Discrétion", sur:"Survie" };
+const DAMAGE_LABELS = { acid:"Acide", bludgeoning:"Contondant", cold:"Froid", fire:"Feu", force:"Force", lightning:"Foudre", necrotic:"Nécrotique", piercing:"Perforant", poison:"Poison", psychic:"Psychique", radiant:"Radiant", slashing:"Tranchant", thunder:"Tonnerre" };
 
 class BuffTriggerConfig extends FormApplication {
   static get defaultOptions() {
@@ -20,6 +23,11 @@ class BuffTriggerConfig extends FormApplication {
 
   getData() {
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
+    const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: SKILL_LABELS[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
+    const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: SKILL_LABELS[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
+    const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
+    const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
+    const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: DAMAGE_LABELS[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
     const flag = {
       ...raw,
       targetMode:            raw.targetMode ?? "self",
@@ -37,28 +45,17 @@ class BuffTriggerConfig extends FormApplication {
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
       buffSkillMode:             raw.buffs?.skillMode ?? "none",
-      buffSkillAll:              raw.buffs?.skills?.includes("all") ?? false,
-      buffSkill_acr:             raw.buffs?.skills?.includes("acr") ?? false,
-      buffSkill_ani:             raw.buffs?.skills?.includes("ani") ?? false,
-      buffSkill_arc:             raw.buffs?.skills?.includes("arc") ?? false,
-      buffSkill_ath:             raw.buffs?.skills?.includes("ath") ?? false,
-      buffSkill_dec:             raw.buffs?.skills?.includes("dec") ?? false,
-      buffSkill_his:             raw.buffs?.skills?.includes("his") ?? false,
-      buffSkill_ins:             raw.buffs?.skills?.includes("ins") ?? false,
-      buffSkill_itm:             raw.buffs?.skills?.includes("itm") ?? false,
-      buffSkill_inv:             raw.buffs?.skills?.includes("inv") ?? false,
-      buffSkill_med:             raw.buffs?.skills?.includes("med") ?? false,
-      buffSkill_nat:             raw.buffs?.skills?.includes("nat") ?? false,
-      buffSkill_prc:             raw.buffs?.skills?.includes("prc") ?? false,
-      buffSkill_prf:             raw.buffs?.skills?.includes("prf") ?? false,
-      buffSkill_per:             raw.buffs?.skills?.includes("per") ?? false,
-      buffSkill_rel:             raw.buffs?.skills?.includes("rel") ?? false,
-      buffSkill_slt:             raw.buffs?.skills?.includes("slt") ?? false,
-      buffSkill_ste:             raw.buffs?.skills?.includes("ste") ?? false,
-      buffSkill_sur:             raw.buffs?.skills?.includes("sur") ?? false,
       buffSkillBonus:            raw.buffs?.skillBonus ?? "",
+      buffSkillBonusAll:         raw.buffs?.skillBonusAll ?? "",
       buffSaveBonus:             raw.buffs?.saveBonus ?? "",
       buffAttackBonus:           raw.buffs?.attackBonus ?? "",
+      buffSpeed:                 raw.buffs?.speed?.value ?? "",
+      buffSpeedType:             raw.buffs?.speed?.type ?? "walk",
+      skillAdvantageOptions,
+      skillBonusOptions,
+      resistanceOptions,
+      vulnOptions,
+      immunityOptions,
       buffAttackModeNone:        (raw.buffs?.attackMode ?? "none") === "none",
       buffAttackModeAdvantage:   raw.buffs?.attackMode === "advantage",
       buffAttackModeDisadvantage: raw.buffs?.attackMode === "disadvantage",
@@ -108,18 +105,25 @@ class BuffTriggerConfig extends FormApplication {
         save: formData.saveAbility ? { ability: formData.saveAbility, dc: Number(formData.saveDC), effect: formData.saveEffect } : null,
         status: formData.statusId ? { id: formData.statusId } : null,
         charges: formData.charges ? Number(formData.charges) : null,
-        buffs: {
-          ac: formData.buffAC ? Number(formData.buffAC) : null,
-          attackMode: formData.buffAttackMode !== "none" ? formData.buffAttackMode : null,
-          saveMode: formData.buffSaveMode !== "none" ? formData.buffSaveMode : null,
-          skillMode: formData.buffSkillMode !== "none" ? formData.buffSkillMode : null,
-          skills: formData.buffSkillAll
-            ? ["all"]
-            : SKILL_IDS.filter((id) => formData[`buffSkill_${id}`]),
-          skillBonus: formData.buffSkillBonus || null,
-          saveBonus: formData.buffSaveBonus || null,
-          attackBonus: formData.buffAttackBonus || null,
-        },
+        buffs: (() => {
+          const toArray = v => v ? v.split(',').filter(Boolean) : [];
+          return {
+            ac: formData.buffAC ? Number(formData.buffAC) : null,
+            attackMode: formData.buffAttackMode !== "none" ? formData.buffAttackMode : null,
+            saveMode: formData.buffSaveMode !== "none" ? formData.buffSaveMode : null,
+            skillMode: formData.buffSkillMode !== "none" ? formData.buffSkillMode : null,
+            skills: toArray(formData.buffSkillAdvantageList),
+            skillBonusSkills: toArray(formData.buffSkillBonusList),
+            skillBonus: formData.buffSkillBonus || null,
+            skillBonusAll: formData.buffSkillBonusAll || null,
+            saveBonus: formData.buffSaveBonus || null,
+            attackBonus: formData.buffAttackBonus || null,
+            speed: formData.buffSpeed ? { value: Number(formData.buffSpeed), type: formData.buffSpeedType ?? "walk" } : null,
+            resistances: toArray(formData.buffResistancesList),
+            vulnerabilities: toArray(formData.buffVulnsList),
+            immunities: toArray(formData.buffImmunitiesList),
+          };
+        })(),
         duration: {
           rounds: formData.durationRounds ? Number(formData.durationRounds) : null,
         },
