@@ -2,7 +2,7 @@ const MODULE_ID = "dnd5e-buff-on-trigger";
 const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = []) {
-  const existing = actor.effects.find((e) => e.statuses.has("bot-active"));
+  const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
   const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
   if (existing) await existing.delete();
@@ -37,7 +37,6 @@ export async function applyTargetIndicator(targetActor, flag) {
   await targetActor.createEmbeddedDocuments("ActiveEffect", [{
     name: itemName,
     img: itemImg,
-    icon: itemImg,
     statuses: ["bot-target-" + (flag.itemName ?? "buff").slugify()],
     flags: { [MODULE_ID]: { targetIndicator: true } },
     duration: {},
@@ -227,7 +226,7 @@ export async function applyBonusDamage(workflow, flag) {
     for (const token of targets) {
       const targetActor = token.actor;
       if (!targetActor) continue;
-      const saveRoll = await targetActor.rollSavingThrow({ ability: flag.save.ability }, { targetValue: flag.save.dc });
+      const saveRoll = await targetActor.rollSavingThrow(flag.save.ability, { targetValue: flag.save.dc });
       const success = saveRoll.total >= flag.save.dc;
       console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} — ${success ? "réussite" : "échec"}`);
       if (success) {

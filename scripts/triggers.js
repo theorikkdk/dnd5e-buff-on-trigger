@@ -5,19 +5,18 @@ const MODULE_ID = "dnd5e-buff-on-trigger";
 const ATTACK_ACTION_TYPES = new Set(["mwak", "rwak", "msak", "rsak"]);
 
 export function registerTriggers() {
-  Hooks.once("ready", () => {
-    game.actors.forEach((actor) => refreshBuffIndicator(actor));
-  });
+  game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
   Hooks.on("midi-qol.RollComplete", async (workflow) => {
     if (!workflow.actor) return;
     if (!workflow.activity) return;
 
     const actionType = workflow.activity.actionType;
-    console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
 
     // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
     const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
+    const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
+    if (buffConfig || flag) console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
     if (buffConfig && !ATTACK_ACTION_TYPES.has(actionType)) {
       const targetMode = buffConfig.targetMode ?? "self";
       const activeFlag = { ...buffConfig, itemName: workflow.item?.name, itemImg: workflow.item?.img, chargesRemaining: buffConfig.charges ?? null };
@@ -80,7 +79,6 @@ export function registerTriggers() {
     }
 
     // Phase 2 : attaque → lit le marqueur sur l'acteur et déclenche l'effet
-    const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
     if (!flag) return;
 
     if (flag.type === actionType) {
@@ -123,6 +121,7 @@ export function registerTriggers() {
     }
 
     // turnEnd et targetTurnEnd : acteur dont le tour vient de se terminer
+    if (combat.turn === 0 && !changed.round) return;
     const prevTurnIndex = (combat.turn - 1 + combat.turns.length) % combat.turns.length;
     const prevCombatant = combat.turns[prevTurnIndex];
     const prevActor = prevCombatant?.actor;

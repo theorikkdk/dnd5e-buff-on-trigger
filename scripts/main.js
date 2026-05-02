@@ -1,5 +1,4 @@
 import { registerTriggers } from "./triggers.js";
-// import { registerEffects } from "./effects.js";
 import { registerItemSheetButton } from "./ui.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
