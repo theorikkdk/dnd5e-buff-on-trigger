@@ -104,206 +104,220 @@
 
   <!-- Onglet 3 : Buffs -->
   <div id="bot-tab-buffs" class="bot-tab-panel" style="display:none">
-    <div class="form-group">
-      <label>Bonus CA</label>
-      <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" style="width:56px" />
-    </div>
-    <div class="form-group">
-      <label>Jets d'attaque</label>
-      <select name="buffAttackMode">
-        <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>Normal</option>
-        <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>Avantage</option>
-        <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>Désavantage</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Jets de sauvegarde</label>
-      <select name="buffSaveMode">
-        <option value="none"         {{#if flag.buffSaveModeNone}}selected{{/if}}>Normal</option>
-        <option value="advantage"    {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>Avantage</option>
-        <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>Désavantage</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label>Jets de caractéristique</label>
-      <select name="buffSkillMode">
-        <option value="none"         {{#if flag.buffSkillModeNone}}selected{{/if}}>Normal</option>
-        <option value="advantage"    {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>Avantage</option>
-        <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>Désavantage</option>
-      </select>
-    </div>
-    <div class="bot-row">
-      <div class="form-group">
-        <label>Bonus aux attaques</label>
-        <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" style="width:56px" />
+    <div class="bot-subtabs-container">
+      <div class="bot-tabs">
+        <button type="button" class="bot-tab-btn bot-subtab-btn bot-tab-active" onclick="botShowSubTab(this,'bot-subtab-combat')">Combat</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-skills')">Compétences</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-defense')">Défense</button>
+        <button type="button" class="bot-tab-btn bot-subtab-btn" onclick="botShowSubTab(this,'bot-subtab-capacities')">Capacités</button>
       </div>
-      <div class="form-group">
-        <label>Bonus aux JdS</label>
-        <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" style="width:56px" />
-      </div>
-    </div>
 
-    <p class="bot-section-label">Compétences</p>
-    <div class="form-group">
-      <label>Avantage aux compétences</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffSkillAdvantageList">
-          {{#each flag.skillAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillAdvantageList')">✕</span></span>{{/if}}{{/each}}
+      <div id="bot-subtab-combat" class="bot-subtab-panel">
+        <div class="form-group">
+          <label>Bonus CA</label>
+          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" style="width:56px" />
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillAdvantageList')">
-          <option value="">— Ajouter une compétence —</option>
-          {{#each flag.skillAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
-      </div>
-    </div>
-    <div class="bot-row">
-      <div class="form-group" style="flex:1">
-        <label>Bonus aux compétences</label>
-        <div class="bot-tag-picker">
-          <div class="bot-tags" id="tags-buffSkillBonusList">
-            {{#each flag.skillBonusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillBonusList')">✕</span></span>{{/if}}{{/each}}
-          </div>
-          <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillBonusList')">
-            <option value="">— Ajouter une compétence —</option>
-            {{#each flag.skillBonusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+        <div class="form-group">
+          <label>Jets d'attaque</label>
+          <select name="buffAttackMode">
+            <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>Normal</option>
+            <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>Avantage</option>
+            <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>Désavantage</option>
           </select>
-          <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+        </div>
+        <div class="form-group">
+          <label>Jets de sauvegarde</label>
+          <select name="buffSaveMode">
+            <option value="none"         {{#if flag.buffSaveModeNone}}selected{{/if}}>Normal</option>
+            <option value="advantage"    {{#if flag.buffSaveModeAdvantage}}selected{{/if}}>Avantage</option>
+            <option value="disadvantage" {{#if flag.buffSaveModeDisadvantage}}selected{{/if}}>Désavantage</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Jets de caractéristique</label>
+          <select name="buffSkillMode">
+            <option value="none"         {{#if flag.buffSkillModeNone}}selected{{/if}}>Normal</option>
+            <option value="advantage"    {{#if flag.buffSkillModeAdvantage}}selected{{/if}}>Avantage</option>
+            <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>Désavantage</option>
+          </select>
+        </div>
+        <div class="bot-row">
+          <div class="form-group">
+            <label>Bonus aux attaques</label>
+            <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" style="width:56px" />
+          </div>
+          <div class="form-group">
+            <label>Bonus aux JdS</label>
+            <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" style="width:56px" />
+          </div>
         </div>
       </div>
-      <div class="form-group" style="flex:0 0 70px">
-        <label>Valeur</label>
-        <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" style="width:100%" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Bonus à toutes les compétences</label>
-      <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="ex: 1d4 ou 2" />
-    </div>
 
-    <p class="bot-section-label">Autres effets</p>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vitesse</label>
-      <input type="number" name="buffSpeed" value="{{flag.buffSpeed}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
-      <select name="buffSpeedType" style="flex:1">
-        <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>Marche</option>
-        <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>Vol</option>
-        <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>Nage</option>
-        <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>Escalade</option>
-        <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>Fouissement</option>
-      </select>
-    </div>
-    <p class="bot-section-label">Sens</p>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vision dans le noir</label>
-      <input type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vision aveugle</label>
-      <input type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vision trémie</label>
-      <input type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Vision vraie</label>
-      <input type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">pieds</label>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Sens spéciaux</label>
-      <input type="text" name="buffSensesSpecial" value="{{flag.buffSensesSpecial}}" placeholder="ex: Odorat aiguisé 30 pieds" style="flex:1" />
-    </div>
+      <div id="bot-subtab-skills" class="bot-subtab-panel" style="display:none">
+        <div class="form-group">
+          <label>Avantage aux compétences</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffSkillAdvantageList">
+              {{#each flag.skillAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillAdvantageList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillAdvantageList')">
+              <option value="">— Ajouter une compétence —</option>
+              {{#each flag.skillAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
+        </div>
+        <div class="bot-row">
+          <div class="form-group" style="flex:1">
+            <label>Bonus aux compétences</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffSkillBonusList">
+                {{#each flag.skillBonusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillBonusList')">✕</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillBonusList')">
+                <option value="">— Ajouter une compétence —</option>
+                {{#each flag.skillBonusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+            </div>
+          </div>
+          <div class="form-group" style="flex:0 0 70px">
+            <label>Valeur</label>
+            <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" style="width:100%" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Bonus à toutes les compétences</label>
+          <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="ex: 1d4 ou 2" />
+        </div>
+      </div>
 
-    <p class="bot-section-label">Capacités</p>
-    <div class="form-group">
-      <label>Maîtrises d'armes</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffWeaponProfsList">
-          {{#each flag.weaponProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffWeaponProfsList')">✕</span></span>{{/if}}{{/each}}
+      <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
+        <div class="form-group">
+          <label>Résistances</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffResistancesList">
+              {{#each flag.resistanceOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffResistancesList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffResistancesList')">
+              <option value="">— Ajouter un type —</option>
+              {{#each flag.resistanceOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffResistancesList" id="hidden-buffResistancesList" value="{{#each flag.resistanceOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffWeaponProfsList')">
-          <option value="">— Ajouter une maîtrise d'arme —</option>
-          {{#each flag.weaponProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffWeaponProfsList" id="hidden-buffWeaponProfsList" value="{{#each flag.weaponProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Maîtrises d'armures</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffArmorProfsList">
-          {{#each flag.armorProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffArmorProfsList')">✕</span></span>{{/if}}{{/each}}
+        <div class="form-group">
+          <label>Vulnérabilités</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffVulnsList">
+              {{#each flag.vulnOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffVulnsList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffVulnsList')">
+              <option value="">— Ajouter un type —</option>
+              {{#each flag.vulnOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffVulnsList" id="hidden-buffVulnsList" value="{{#each flag.vulnOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffArmorProfsList')">
-          <option value="">— Ajouter une maîtrise d'armure —</option>
-          {{#each flag.armorProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffArmorProfsList" id="hidden-buffArmorProfsList" value="{{#each flag.armorProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Langues</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffLanguagesList">
-          {{#each flag.languageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffLanguagesList')">✕</span></span>{{/if}}{{/each}}
+        <div class="form-group">
+          <label>Immunités</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffImmunitiesList">
+              {{#each flag.immunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffImmunitiesList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffImmunitiesList')">
+              <option value="">— Ajouter un type —</option>
+              {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffLanguagesList')">
-          <option value="">— Ajouter une langue —</option>
-          {{#each flag.languageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
       </div>
-    </div>
-    <div class="bot-row" style="align-items:center;gap:6px;flex-wrap:nowrap">
-      <label style="white-space:nowrap">Perception passive</label>
-      <input type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" style="width:60px;flex:0 0 60px" />
-      <label style="white-space:nowrap">(bonus)</label>
-    </div>
 
-    <p class="bot-section-label">Résistances / Vulnérabilités / Immunités</p>
-    <div class="form-group">
-      <label>Résistances</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffResistancesList">
-          {{#each flag.resistanceOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffResistancesList')">✕</span></span>{{/if}}{{/each}}
+      <div id="bot-subtab-capacities" class="bot-subtab-panel" style="display:none">
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Vitesse</label>
+          <input class="bot-capacity-input" type="number" name="buffSpeed" value="{{flag.buffSpeed}}" placeholder="±" />
+          <label class="bot-capacity-unit">pieds</label>
+          <select class="bot-capacity-text" name="buffSpeedType">
+            <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>Marche</option>
+            <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>Vol</option>
+            <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>Nage</option>
+            <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>Escalade</option>
+            <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>Fouissement</option>
+          </select>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffResistancesList')">
-          <option value="">— Ajouter un type —</option>
-          {{#each flag.resistanceOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffResistancesList" id="hidden-buffResistancesList" value="{{#each flag.resistanceOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Vulnérabilités</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffVulnsList">
-          {{#each flag.vulnOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffVulnsList')">✕</span></span>{{/if}}{{/each}}
+
+        <p class="bot-section-label">Sens</p>
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Vision dans le noir</label>
+          <input class="bot-capacity-input" type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" />
+          <label class="bot-capacity-unit">pieds</label>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffVulnsList')">
-          <option value="">— Ajouter un type —</option>
-          {{#each flag.vulnOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffVulnsList" id="hidden-buffVulnsList" value="{{#each flag.vulnOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>Immunités</label>
-      <div class="bot-tag-picker">
-        <div class="bot-tags" id="tags-buffImmunitiesList">
-          {{#each flag.immunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffImmunitiesList')">✕</span></span>{{/if}}{{/each}}
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Vision aveugle</label>
+          <input class="bot-capacity-input" type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="±" />
+          <label class="bot-capacity-unit">pieds</label>
         </div>
-        <select class="bot-tag-select" onchange="botAddTag(this,'buffImmunitiesList')">
-          <option value="">— Ajouter un type —</option>
-          {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
-        </select>
-        <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Vision trémie</label>
+          <input class="bot-capacity-input" type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="±" />
+          <label class="bot-capacity-unit">pieds</label>
+        </div>
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Vision vraie</label>
+          <input class="bot-capacity-input" type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="±" />
+          <label class="bot-capacity-unit">pieds</label>
+        </div>
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Sens spéciaux</label>
+          <input class="bot-capacity-text" type="text" name="buffSensesSpecial" value="{{flag.buffSensesSpecial}}" placeholder="ex: Odorat aiguisé 30 pieds" />
+        </div>
+
+        <div class="bot-capacity-row">
+          <label class="bot-capacity-label">Perception passive</label>
+          <input class="bot-capacity-input" type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" />
+          <label class="bot-capacity-unit">(bonus)</label>
+        </div>
+        <div class="form-group bot-capacity-picker-group">
+          <label>Maîtrises d'armes</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffWeaponProfsList">
+              {{#each flag.weaponProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffWeaponProfsList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffWeaponProfsList')">
+              <option value="">— Ajouter une maîtrise d'arme —</option>
+              {{#each flag.weaponProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffWeaponProfsList" id="hidden-buffWeaponProfsList" value="{{#each flag.weaponProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
+        </div>
+        <div class="form-group bot-capacity-picker-group">
+          <label>Maîtrises d'armures</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffArmorProfsList">
+              {{#each flag.armorProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffArmorProfsList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffArmorProfsList')">
+              <option value="">— Ajouter une maîtrise d'armure —</option>
+              {{#each flag.armorProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffArmorProfsList" id="hidden-buffArmorProfsList" value="{{#each flag.armorProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
+        </div>
+        <div class="form-group bot-capacity-picker-group">
+          <label>Langues</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffLanguagesList">
+              {{#each flag.languageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffLanguagesList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffLanguagesList')">
+              <option value="">— Ajouter une langue —</option>
+              {{#each flag.languageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -333,8 +347,19 @@
 function botShowTab(btn, tabId) {
   const form = btn.closest('form');
   form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
-  form.querySelectorAll('.bot-tab-btn').forEach(b => b.classList.remove('bot-tab-active'));
+  btn.closest('.bot-tabs').querySelectorAll('.bot-tab-btn').forEach(b => b.classList.remove('bot-tab-active'));
   document.getElementById(tabId).style.display = '';
+  btn.classList.add('bot-tab-active');
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.setPosition({ height: "auto" });
+}
+
+function botShowSubTab(btn, tabId) {
+  const container = btn.closest('.bot-subtabs-container');
+  if (!container) return;
+  container.querySelectorAll('.bot-subtab-panel').forEach(p => p.style.display = 'none');
+  btn.closest('.bot-tabs').querySelectorAll('.bot-subtab-btn').forEach(b => b.classList.remove('bot-tab-active'));
+  container.querySelector('#' + tabId).style.display = '';
   btn.classList.add('bot-tab-active');
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.setPosition({ height: "auto" });

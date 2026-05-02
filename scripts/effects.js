@@ -277,7 +277,16 @@ export async function applyBonusDamage(workflow, flag) {
     for (const token of targets) {
       const targetActor = token.actor;
       if (!targetActor) continue;
-      const saveRoll = await targetActor.rollSavingThrow(flag.save.ability, { targetValue: flag.save.dc });
+      const saveRolls = await targetActor.rollSavingThrow(
+        { ability: flag.save.ability },
+        { configure: false },
+        { create: true }
+      );
+      if (!saveRolls || saveRolls.length === 0) {
+        fullTargets.add(token);
+        continue;
+      }
+      const saveRoll = saveRolls[0];
       const success = saveRoll.total >= flag.save.dc;
       console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} — ${success ? "réussite" : "échec"}`);
       if (success) {

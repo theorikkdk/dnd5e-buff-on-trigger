@@ -123,3 +123,37 @@
   margin: 8px 0 4px;
   padding-bottom: 2px;
 }
+
+.bot-capacity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.bot-capacity-label {
+  min-width: 140px;
+  white-space: nowrap;
+}
+
+.bot-capacity-input {
+  width: 70px;
+  min-width: 70px;
+  flex: 0 0 70px;
+}
+
+.bot-capacity-unit {
+  min-width: 42px;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.bot-capacity-text {
+  flex: 1;
+}
+
+.bot-capacity-picker-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
