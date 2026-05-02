@@ -204,17 +204,11 @@ export function registerTriggers() {
       const actor = effect.parent;
       if (!actor) return;
       const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-      if (!activeBuff?.duration?.concentration) return;
+      if (!activeBuff) return;
+      const itemName = activeBuff.itemName;
       await actor.unsetFlag(MODULE_ID, "activeBuff");
-      const botEffect = actor.effects.find((e) => e.statuses?.has("bot-active"));
-      if (botEffect) await botEffect.delete();
-      for (const token of canvas.tokens.placeables) {
-        if (!token.actor) continue;
-        const tokenMechEffects = token.actor.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-        for (const e of tokenMechEffects) await e.delete();
-      }
-      await refreshBuffIndicator(actor, activeBuff.itemName);
-      console.log(`[${MODULE_ID}] Concentration brisée — buff ${activeBuff.itemName} annulé sur ${actor.name}`);
+      await refreshBuffIndicator(actor, itemName);
+      console.log(`[${MODULE_ID}] Concentration brisée — buff ${itemName} annulé sur ${actor.name}`);
     }
   });
 }
