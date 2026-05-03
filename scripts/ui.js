@@ -91,7 +91,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       contentClasses: ["standard-form"],
     },
     position: {
-      width: 400,
+      width: 480,
       height: "auto",
     },
     resizable: true,

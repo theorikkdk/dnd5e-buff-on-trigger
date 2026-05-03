@@ -38,11 +38,26 @@
   padding: 8px 0 4px;
 }
 
+.buff-on-trigger-config label {
+  white-space: nowrap;
+}
+
 .bot-row {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
+}
+
+.bot-row label {
+  min-width: 160px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.bot-row .bot-label-sm {
+  min-width: fit-content;
 }
 
 .bot-row .form-group {
@@ -78,6 +93,19 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
+}
+
+.bot-picker-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.bot-picker-group > label {
+  width: 100%;
+  min-width: 0;
 }
 
 .bot-tags {
@@ -177,4 +205,11 @@
 
 .bot-hidden {
   display: none;
+}
+
+.bot-label-sm {
+  min-width: fit-content;
+  white-space: nowrap;
+  margin-right: 4px;
+  font-size: 11px;
 }

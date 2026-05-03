@@ -47,58 +47,48 @@
   <!-- Onglet 2 : Dégâts & Effets -->
   <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
     <div class="bot-row">
-      <div class="form-group">
-        <label>{{localize "BOT.ui.damageFormula.label"}}</label>
-        <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="{{localize "BOT.ui.damageFormula.placeholder"}}" />
-      </div>
-      <div class="form-group">
-        <label>{{localize "BOT.ui.damageType.label"}}</label>
-        <select name="damageType">
-          <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
-          <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
-          <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>
-          <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>{{localize "BOT.damageTypes.fire"}}</option>
-          <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>{{localize "BOT.damageTypes.force"}}</option>
-          <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>{{localize "BOT.damageTypes.lightning"}}</option>
-          <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>{{localize "BOT.damageTypes.necrotic"}}</option>
-          <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>{{localize "BOT.damageTypes.piercing"}}</option>
-          <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>{{localize "BOT.damageTypes.poison"}}</option>
-          <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>{{localize "BOT.damageTypes.psychic"}}</option>
-          <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>{{localize "BOT.damageTypes.radiant"}}</option>
-          <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>{{localize "BOT.damageTypes.slashing"}}</option>
-          <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>{{localize "BOT.damageTypes.thunder"}}</option>
-        </select>
-      </div>
+      <label class="bot-label-sm">{{localize "BOT.ui.damageFormula.label"}}</label>
+      <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="2d6" class="bot-input-flex" />
+      <label class="bot-label-sm">{{localize "BOT.ui.damageType.label"}}</label>
+      <select name="damageType" class="bot-input-flex">
+        <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
+        <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
+        <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>
+        <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>{{localize "BOT.damageTypes.fire"}}</option>
+        <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>{{localize "BOT.damageTypes.force"}}</option>
+        <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>{{localize "BOT.damageTypes.lightning"}}</option>
+        <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>{{localize "BOT.damageTypes.necrotic"}}</option>
+        <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>{{localize "BOT.damageTypes.piercing"}}</option>
+        <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>{{localize "BOT.damageTypes.poison"}}</option>
+        <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>{{localize "BOT.damageTypes.psychic"}}</option>
+        <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>{{localize "BOT.damageTypes.radiant"}}</option>
+        <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>{{localize "BOT.damageTypes.slashing"}}</option>
+        <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>{{localize "BOT.damageTypes.thunder"}}</option>
+      </select>
     </div>
     <div class="bot-row">
-      <div class="form-group">
-        <label>{{localize "BOT.ui.save.label"}}</label>
-        <select name="saveAbility">
-          <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
-          <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
-          <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
-          <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>{{localize "BOT.abilities.con"}}</option>
-          <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>{{localize "BOT.abilities.int"}}</option>
-          <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
-          <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>{{localize "BOT.ui.dc.label"}}</label>
-        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
-      </div>
-      <div class="form-group">
-        <label>{{localize "BOT.ui.success.label"}}</label>
-        <select name="saveEffect">
-          <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
-          <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
-          <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
-        </select>
-      </div>
+      <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
+      <select name="saveAbility" class="bot-input-flex">
+        <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
+        <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
+        <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
+        <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>{{localize "BOT.abilities.con"}}</option>
+        <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>{{localize "BOT.abilities.int"}}</option>
+        <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
+        <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
+      </select>
+      <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
+      <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
+      <label class="bot-label-sm">{{localize "BOT.ui.success.label"}}</label>
+      <select name="saveEffect" class="bot-input-sm">
+        <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
+        <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
+        <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
+      </select>
     </div>
-    <div class="form-group">
-      <label>{{localize "BOT.ui.status.label"}}</label>
-      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="{{localize "BOT.ui.status.placeholder"}}" />
+    <div class="bot-row">
+      <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
+      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="frightened" class="bot-input-flex" />
     </div>
   </div>
 
@@ -154,28 +144,26 @@
       </div>
 
       <div id="bot-subtab-skills" class="bot-subtab-panel" style="display:none">
-        <div class="form-group">
+        <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.skills.advantage"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffSkillAdvantageList">
               {{#each flag.skillAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillAdvantageList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillAdvantageList')">
-              <option value="">— {{localize "BOT.ui.skills.addSkill"}} —</option>
               {{#each flag.skillAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
         <div class="bot-row">
-          <div class="form-group bot-input-flex">
+          <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.skills.bonus"}}</label>
             <div class="bot-tag-picker">
               <div class="bot-tags" id="tags-buffSkillBonusList">
                 {{#each flag.skillBonusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSkillBonusList')">✕</span></span>{{/if}}{{/each}}
               </div>
               <select class="bot-tag-select" onchange="botAddTag(this,'buffSkillBonusList')">
-                <option value="">— {{localize "BOT.ui.skills.addSkill"}} —</option>
                 {{#each flag.skillBonusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
               </select>
               <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
@@ -193,40 +181,37 @@
       </div>
 
       <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
-        <div class="form-group">
+        <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.resistances"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffResistancesList">
               {{#each flag.resistanceOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffResistancesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffResistancesList')">
-              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.resistanceOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffResistancesList" id="hidden-buffResistancesList" value="{{#each flag.resistanceOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.vulnerabilities"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffVulnsList">
               {{#each flag.vulnOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffVulnsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffVulnsList')">
-              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.vulnOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffVulnsList" id="hidden-buffVulnsList" value="{{#each flag.vulnOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.immunities"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffImmunitiesList">
               {{#each flag.immunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffImmunitiesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffImmunitiesList')">
-              <option value="">— {{localize "BOT.ui.defense.addType"}} —</option>
               {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
@@ -279,40 +264,37 @@
           <input class="bot-capacity-input" type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.capacities.passivePerceptionUnit"}}</label>
         </div>
-        <div class="form-group bot-capacity-picker-group">
+        <div class="form-group bot-picker-group bot-capacity-picker-group">
           <label>{{localize "BOT.ui.capacities.weaponProficiencies"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffWeaponProfsList">
               {{#each flag.weaponProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffWeaponProfsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffWeaponProfsList')">
-              <option value="">— {{localize "BOT.ui.capacities.addWeaponProficiency"}} —</option>
               {{#each flag.weaponProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffWeaponProfsList" id="hidden-buffWeaponProfsList" value="{{#each flag.weaponProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        <div class="form-group bot-capacity-picker-group">
+        <div class="form-group bot-picker-group bot-capacity-picker-group">
           <label>{{localize "BOT.ui.capacities.armorProficiencies"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffArmorProfsList">
               {{#each flag.armorProfOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffArmorProfsList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffArmorProfsList')">
-              <option value="">— {{localize "BOT.ui.capacities.addArmorProficiency"}} —</option>
               {{#each flag.armorProfOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffArmorProfsList" id="hidden-buffArmorProfsList" value="{{#each flag.armorProfOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        <div class="form-group bot-capacity-picker-group">
+        <div class="form-group bot-picker-group bot-capacity-picker-group">
           <label>{{localize "BOT.ui.capacities.languages"}}</label>
           <div class="bot-tag-picker">
             <div class="bot-tags" id="tags-buffLanguagesList">
               {{#each flag.languageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffLanguagesList')">✕</span></span>{{/if}}{{/each}}
             </div>
             <select class="bot-tag-select" onchange="botAddTag(this,'buffLanguagesList')">
-              <option value="">— {{localize "BOT.ui.capacities.addLanguage"}} —</option>
               {{#each flag.languageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
