@@ -117,6 +117,10 @@ function getTemporaryHpModeLabel(mode) {
   return game.i18n.localize(`BOT.ui.temporaryHp.mode.${mode ?? "keepHighest"}`);
 }
 
+function getTriggerFrequencyLabel(frequency) {
+  return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
+}
+
 function formatItemDurationSummary(rounds, fallbackRounds = null) {
   const syncedRounds = rounds ?? fallbackRounds;
   if (syncedRounds === null || syncedRounds === undefined) {
@@ -255,6 +259,11 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     value: game.i18n.localize(raw.consumeOnTrigger ?? true ? "BOT.ui.common.yes" : "BOT.ui.common.no")
   });
 
+  summary.push({
+    label: game.i18n.localize("BOT.ui.summary.triggerFrequency"),
+    value: getTriggerFrequencyLabel(raw.triggerFrequency)
+  });
+
   if (isFilled(raw.charges)) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.charges"),
@@ -352,6 +361,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       typeTargetTurnStart:   raw.type === "targetTurnStart",
       typeTargetTurnEnd:     raw.type === "targetTurnEnd",
       consumeOnTrigger:      raw.consumeOnTrigger ?? true,
+      triggerFrequencyNone:  (raw.triggerFrequency ?? "none") === "none",
+      triggerFrequencyTurn:  raw.triggerFrequency === "turn",
+      triggerFrequencyRound: raw.triggerFrequency === "round",
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
@@ -438,6 +450,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         type: data.type,
         condition: data.condition,
         consumeOnTrigger: data.consumeOnTrigger ?? true,
+        triggerFrequency: data.triggerFrequency ?? "none",
         damage: data.damageFormula ? { formula: data.damageFormula, type: data.damageType } : null,
         healing: data.healingEnabled && data.healingFormula ? {
           formula: data.healingFormula,

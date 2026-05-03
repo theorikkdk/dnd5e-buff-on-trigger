@@ -355,6 +355,14 @@
       <input type="checkbox" name="consumeOnTrigger" {{#if flag.consumeOnTrigger}}checked{{/if}} />
     </div>
     <div class="form-group">
+      <label>{{localize "BOT.ui.settings.triggerFrequency"}}</label>
+      <select name="triggerFrequency">
+        <option value="none" {{#if flag.triggerFrequencyNone}}selected{{/if}}>{{localize "BOT.ui.triggerFrequency.none"}}</option>
+        <option value="turn" {{#if flag.triggerFrequencyTurn}}selected{{/if}}>{{localize "BOT.ui.triggerFrequency.turn"}}</option>
+        <option value="round" {{#if flag.triggerFrequencyRound}}selected{{/if}}>{{localize "BOT.ui.triggerFrequency.round"}}</option>
+      </select>
+    </div>
+    <div class="form-group">
       <label>{{localize "BOT.ui.settings.charges"}}</label>
       <input type="number" name="charges" value="{{flag.charges}}" placeholder="{{localize "BOT.ui.settings.chargesPlaceholder"}}" min="1" />
     </div>

@@ -25,6 +25,52 @@ function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
 }
 
+function getCurrentTriggerUsage() {
+  if (!game.combat?.id) return null;
+  return {
+    combatId: game.combat.id,
+    round: game.combat.round ?? null,
+    turn: game.combat.turn ?? null,
+  };
+}
+
+async function shouldBlockTriggerFrequency(actor, flag) {
+  const frequency = flag.triggerFrequency ?? "none";
+  if (frequency === "none") return false;
+
+  const currentUsage = getCurrentTriggerUsage();
+  if (!currentUsage) return false;
+
+  const lastTrigger = flag.runtime?.lastTrigger ?? null;
+  if (!lastTrigger || lastTrigger.combatId !== currentUsage.combatId) return false;
+
+  if (frequency === "turn") {
+    return lastTrigger.round === currentUsage.round && lastTrigger.turn === currentUsage.turn;
+  }
+
+  if (frequency === "round") {
+    return lastTrigger.round === currentUsage.round;
+  }
+
+  return false;
+}
+
+async function markTriggerFrequencyUsage(actor) {
+  const currentUsage = getCurrentTriggerUsage();
+  if (!currentUsage || !actor?.setFlag) return;
+
+  const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+  if (!activeBuff) return;
+
+  await actor.setFlag(MODULE_ID, "activeBuff", {
+    ...activeBuff,
+    runtime: {
+      ...(activeBuff.runtime ?? {}),
+      lastTrigger: currentUsage,
+    },
+  });
+}
+
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = []) {
   try {
     const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
@@ -572,6 +618,13 @@ export async function applyEffect(workflow, flag) {
     console.log(`[${MODULE_ID}] Aucun effet configuré dans le flag`);
     return;
   }
+
+  if (await shouldBlockTriggerFrequency(workflow.actor, flag)) {
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : fréquence déjà utilisée`);
+    return;
+  }
+
+  await markTriggerFrequencyUsage(workflow.actor);
 
   if (flag.damage) await applyBonusDamage(workflow, flag);
   if (flag.status) await applyStatusEffect(workflow, flag);
