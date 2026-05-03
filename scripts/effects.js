@@ -191,6 +191,37 @@ function resolveBonusDamageTargets(workflow, flag) {
   return resolveTargets(workflow, flag);
 }
 
+function resolveStatusTargets(workflow, flag) {
+  const targetMode = flag.status?.targetMode;
+  if (!targetMode) return resolveTargets(workflow, flag);
+
+  if (targetMode === "triggerTarget") {
+    return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
+  }
+
+  if (targetMode === "self") {
+    const ownerToken = workflow.token
+      ?? workflow.actor?.getActiveTokens?.()?.[0]
+      ?? null;
+    return ownerToken ? new Set([ownerToken]) : new Set();
+  }
+
+  if (targetMode === "attacker") {
+    const attackerToken = workflow.attackerToken
+      ?? (flag.type === "damaged"
+        ? ([...(workflow.hitTargets ?? workflow.targets ?? [])].find((token) => token?.actor?.id !== workflow.actor?.id) ?? null)
+        : null);
+    return attackerToken ? new Set([attackerToken]) : new Set();
+  }
+
+  if (targetMode === "storedTarget") {
+    const token = canvas.tokens.get(flag.targetTokenId);
+    return token ? new Set([token]) : new Set();
+  }
+
+  return resolveTargets(workflow, flag);
+}
+
 function resolveHealingTargets(workflow, flag) {
   const targetMode = flag.healing?.targetMode ?? "self";
 
@@ -532,10 +563,10 @@ export async function applyBonusDamage(workflow, flag) {
 
 export async function applyStatusEffect(workflow, flag) {
   try {
-    const targets = resolveTargets(workflow, flag);
+    const targets = resolveStatusTargets(workflow, flag);
 
     if (!targets?.size) {
-      console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
+      console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible valide (mode "${flag.status?.targetMode ?? flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
       return;
     }
 

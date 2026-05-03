@@ -130,7 +130,21 @@
     </div>
     <div class="bot-row">
       <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
-      <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="frightened" class="bot-input-flex" />
+      <select name="statusId" class="bot-input-flex">
+        <option value="">{{localize "BOT.ui.status.none"}}</option>
+        {{#each flag.statusOptions}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </div>
+    <div class="bot-row">
+      <label class="bot-label-sm">{{localize "BOT.ui.status.targetMode.label"}}</label>
+      <select name="statusTargetMode" class="bot-input-flex">
+        <option value="triggerTarget" {{#if flag.statusTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.triggerTarget"}}</option>
+        <option value="self" {{#if flag.statusTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.self"}}</option>
+        <option value="attacker" {{#if flag.statusTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.attacker"}}</option>
+        <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
+      </select>
     </div>
 
     <section class="bot-inline-panel">

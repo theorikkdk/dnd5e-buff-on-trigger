@@ -125,8 +125,40 @@ function getDamageTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
 }
 
+function getStatusTargetModeLabel(targetMode) {
+  return game.i18n.localize(`BOT.ui.status.targetMode.${targetMode ?? "legacy"}`);
+}
+
 function getReceivedAttackTypeLabel(type) {
   return game.i18n.localize(`BOT.ui.receivedAttackType.${type ?? "any"}`);
+}
+
+function getStatusOptions(currentStatusId = null) {
+  const options = (CONFIG.statusEffects ?? [])
+    .map((status) => {
+      const id = status.id ?? status.statuses?.[0] ?? null;
+      if (!id || id === "bot-active") return null;
+      const rawLabel = status.name ?? status.label ?? id;
+      const label = game.i18n.localize(rawLabel);
+      return {
+        value: id,
+        label,
+        icon: status.img ?? status.icon ?? null,
+        selected: id === currentStatusId,
+      };
+    })
+    .filter(Boolean);
+
+  if (currentStatusId && !options.some((option) => option.value === currentStatusId)) {
+    options.unshift({
+      value: currentStatusId,
+      label: game.i18n.format("BOT.ui.status.unknown", { id: currentStatusId }),
+      icon: null,
+      selected: true,
+    });
+  }
+
+  return options;
 }
 
 function formatItemDurationSummary(rounds, fallbackRounds = null) {
@@ -269,7 +301,11 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (raw.status?.id) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.status"),
-      value: raw.status.id
+      value: labels.statuses?.[raw.status.id] ?? raw.status.id
+    });
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.statusTarget"),
+      value: getStatusTargetModeLabel(raw.status.targetMode)
     });
   }
 
@@ -356,12 +392,15 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const weaponProfLabels = getWeaponProfLabels();
     const armorProfLabels = getArmorProfLabels();
     const languageLabels = getLanguageLabels();
+    const statusOptions = getStatusOptions(raw.status?.id ?? null);
+    const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const labels = {
       skills: skillLabels,
       damageTypes: damageLabels,
       weaponProfs: weaponProfLabels,
       armorProfs: armorProfLabels,
       languages: languageLabels,
+      statuses: statusLabels,
     };
     const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
     const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
@@ -451,6 +490,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTargetModeSelf: raw.damage?.targetMode === "self",
       damageTargetModeAttacker: raw.damage?.targetMode === "attacker",
       damageTargetModeStoredTarget: raw.damage?.targetMode === "storedTarget",
+      statusOptions,
+      statusTargetModeTriggerTarget: (raw.status?.targetMode ?? "triggerTarget") === "triggerTarget",
+      statusTargetModeSelf: raw.status?.targetMode === "self",
+      statusTargetModeAttacker: raw.status?.targetMode === "attacker",
+      statusTargetModeStoredTarget: raw.status?.targetMode === "storedTarget",
       receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
       receivedAttackTypeMelee: raw.receivedAttackType === "melee",
       receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
@@ -484,13 +528,15 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
 
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-    if (!data.enabled) {
-      await this.item.unsetFlag(MODULE_ID, "buffTrigger");
-    } else {
-      const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
-      const submittedDamageTargetMode = data.damageTargetMode ?? "triggerTarget";
-      const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
-      const flag = {
+      if (!data.enabled) {
+        await this.item.unsetFlag(MODULE_ID, "buffTrigger");
+      } else {
+        const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
+        const submittedDamageTargetMode = data.damageTargetMode ?? "triggerTarget";
+        const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
+        const submittedStatusTargetMode = data.statusTargetMode ?? "triggerTarget";
+        const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
+        const flag = {
         targetMode: data.targetMode ?? "self",
         type: data.type,
         condition: data.condition,
@@ -506,17 +552,20 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           type: data.damageType,
           ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
         } : null,
-        healing: data.healingEnabled && data.healingFormula ? {
-          formula: data.healingFormula,
-          targetMode: data.healingTargetMode ?? "self",
-        } : null,
-        temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
-          formula: data.temporaryHpFormula,
-          targetMode: data.temporaryHpTargetMode ?? "self",
-          mode: data.temporaryHpMode ?? "keepHighest",
-        } : null,
-        save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
-        status: data.statusId ? { id: data.statusId } : null,
+          healing: data.healingEnabled && data.healingFormula ? {
+            formula: data.healingFormula,
+            targetMode: data.healingTargetMode ?? "self",
+          } : null,
+          temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
+            formula: data.temporaryHpFormula,
+            targetMode: data.temporaryHpTargetMode ?? "self",
+            mode: data.temporaryHpMode ?? "keepHighest",
+          } : null,
+          save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
+          status: data.statusId ? {
+            id: data.statusId,
+            ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {})
+          } : null,
         charges: data.charges ? Number(data.charges) : null,
         buffs: (() => {
           const toArray = v => v ? v.split(',').filter(Boolean) : [];
