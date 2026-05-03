@@ -107,6 +107,21 @@ function resolveTargets(workflow, flag) {
   }
 }
 
+function resolveHealingTargets(workflow, flag) {
+  const targetMode = flag.healing?.targetMode ?? "self";
+
+  if (targetMode === "self") {
+    const actorToken = workflow.token
+      ?? workflow.actor?.getActiveTokens?.()?.[0]
+      ?? null;
+    return actorToken ? new Set([actorToken]) : new Set();
+  }
+
+  return workflow.hitTargets?.size
+    ? new Set(workflow.hitTargets)
+    : new Set(workflow.targets ?? []);
+}
+
 async function consumeOrDecrementCharges(workflow, flag, targets) {
   try {
     if (flag.chargesRemaining !== null) {
@@ -440,12 +455,59 @@ export async function applyStatusEffect(workflow, flag) {
   }
 }
 
+export async function applyBonusHealing(workflow, flag) {
+  try {
+    const targets = resolveHealingTargets(workflow, flag);
+
+    if (!targets?.size) return;
+
+    const formula = flag.healing?.formula;
+    if (!formula) return;
+
+    const roll = await new Roll(formula).evaluate();
+    const healAmount = Math.max(0, roll.total ?? 0);
+    const healedTargets = [];
+
+    for (const token of targets) {
+      const targetActor = token.actor;
+      if (!targetActor) continue;
+
+      const currentHp = Number(targetActor.system.attributes.hp.value ?? 0);
+      const maxHp = Number(targetActor.system.attributes.hp.max ?? 0);
+      if (maxHp <= 0 || healAmount <= 0) continue;
+
+      const newHp = Math.min(maxHp, currentHp + healAmount);
+      const appliedHeal = Math.max(0, newHp - currentHp);
+      if (appliedHeal <= 0) continue;
+
+      await targetActor.update({ "system.attributes.hp.value": newHp });
+      healedTargets.push({ name: targetActor.name, amount: appliedHeal });
+      console.log(`[${MODULE_ID}] Soin bonus : ${appliedHeal} PV vers ${targetActor.name}`);
+    }
+
+    if (!healedTargets.length) return;
+
+    await ChatMessage.create({
+      content: `<div style="border-left: 3px solid #2f9e44; padding: 4px 8px;">
+        <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${healedTargets.map((target) => `${target.amount} PV vers ${target.name}`).join(", ")}
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+      rolls: [roll]
+    });
+
+    if (!flag.damage && !flag.status) await consumeOrDecrementCharges(workflow, flag, targets);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyBonusHealing :`, error);
+  }
+}
+
 export async function applyEffect(workflow, flag) {
-  if (!flag.damage && !flag.status) {
+  if (!flag.damage && !flag.status && !flag.healing) {
     console.log(`[${MODULE_ID}] Aucun effet configuré dans le flag`);
     return;
   }
 
   if (flag.damage) await applyBonusDamage(workflow, flag);
   if (flag.status) await applyStatusEffect(workflow, flag);
+  if (flag.healing) await applyBonusHealing(workflow, flag);
 }

@@ -94,6 +94,22 @@
       <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
       <input type="text" name="statusId" value="{{flag.status.id}}" placeholder="frightened" class="bot-input-flex" />
     </div>
+
+    <section class="bot-inline-panel">
+      <div class="form-group">
+        <label>{{localize "BOT.ui.healing.enabled"}}</label>
+        <input type="checkbox" name="healingEnabled" {{#if flag.healingEnabled}}checked{{/if}} />
+      </div>
+      <div class="bot-row">
+        <label class="bot-label-sm">{{localize "BOT.ui.healing.formula"}}</label>
+        <input type="text" name="healingFormula" value="{{flag.healingFormula}}" placeholder="2d6" class="bot-input-flex" />
+        <label class="bot-label-sm">{{localize "BOT.ui.healing.targetMode.label"}}</label>
+        <select name="healingTargetMode" class="bot-input-flex">
+          <option value="self" {{#if flag.healingTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.self"}}</option>
+          <option value="target" {{#if flag.healingTargetModeTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.target"}}</option>
+        </select>
+      </div>
+    </section>
   </div>
 
   <!-- Onglet 3 : Buffs -->
@@ -107,10 +123,6 @@
       </div>
 
       <div id="bot-subtab-combat" class="bot-subtab-panel">
-        <div class="form-group">
-          <label>{{localize "BOT.ui.combat.acBonus"}}</label>
-          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" class="bot-input-xs" />
-        </div>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
           <select name="buffAttackMode">
@@ -185,6 +197,10 @@
       </div>
 
       <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
+        <div class="form-group">
+          <label>{{localize "BOT.ui.combat.acBonus"}}</label>
+          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" class="bot-input-xs" />
+        </div>
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.resistances"}}</label>
           <div class="bot-tag-picker">
@@ -322,6 +338,18 @@
       <label>{{localize "BOT.ui.settings.durationRounds"}}</label>
       <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="{{localize "BOT.ui.settings.durationPlaceholder"}}" min="0" />
     </div>
+
+    <section class="bot-summary-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.summary.title"}}</h3>
+      <div class="bot-summary-list">
+        {{#each flag.configSummary}}
+          <div class="bot-summary-item">
+            <span class="bot-summary-label">{{label}}</span>
+            <span class="bot-summary-value">{{value}}</span>
+          </div>
+        {{/each}}
+      </div>
+    </section>
   </div>
 
   <footer>

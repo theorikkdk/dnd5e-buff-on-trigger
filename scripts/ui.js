@@ -79,6 +79,167 @@ const getLanguageLabels = () => ({
   deep: game.i18n.localize("BOT.languages.deep")
 });
 
+const isFilled = value => {
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.trim() !== "";
+  return value !== null && value !== undefined && value !== "";
+};
+
+const listSelectedLabels = (values, labels) => (values ?? [])
+  .map(value => labels[value] ?? value)
+  .filter(Boolean)
+  .join(", ");
+
+function getTriggerLabel(type) {
+  if (!type) return game.i18n.localize("BOT.ui.summary.notConfigured");
+  return game.i18n.localize(`BOT.ui.trigger.${type}`);
+}
+
+function getTargetModeLabel(targetMode) {
+  return game.i18n.localize(`BOT.ui.targetMode.${targetMode ?? "self"}`);
+}
+
+function getConditionLabel(condition) {
+  return game.i18n.localize(`BOT.ui.condition.${condition ?? "hit"}`);
+}
+
+function getHealingTargetModeLabel(targetMode) {
+  return game.i18n.localize(`BOT.ui.healing.targetMode.${targetMode ?? "self"}`);
+}
+
+function hasMechanicalChanges(buffs = {}) {
+  return [
+    buffs.ac,
+    buffs.attackMode,
+    buffs.saveMode,
+    buffs.skillMode,
+    buffs.skillBonus,
+    buffs.skillBonusAll,
+    buffs.saveBonus,
+    buffs.attackBonus,
+    buffs.speed?.value,
+    buffs.darkvision,
+    buffs.blindsight,
+    buffs.tremorsense,
+    buffs.truesight,
+    buffs.sensesSpecial,
+    buffs.passivePerception,
+  ].some(isFilled)
+    || (buffs.skills ?? []).length > 0
+    || (buffs.skillBonusSkills ?? []).length > 0
+    || (buffs.resistances ?? []).length > 0
+    || (buffs.vulnerabilities ?? []).length > 0
+    || (buffs.immunities ?? []).length > 0
+    || (buffs.weaponProfs ?? []).length > 0
+    || (buffs.armorProfs ?? []).length > 0
+    || (buffs.languages ?? []).length > 0;
+}
+
+function buildMechanicalSummary(raw, labels) {
+  const buffs = raw.buffs ?? {};
+  const entries = [];
+  const addEntry = (text) => {
+    if (text) entries.push(text);
+  };
+
+  if (isFilled(buffs.ac)) addEntry(`${game.i18n.localize("BOT.ui.combat.acBonus")} ${buffs.ac}`);
+  if (isFilled(buffs.attackMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.attackMode}`)}`);
+  if (isFilled(buffs.saveMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.saveMode}`)}`);
+  if (isFilled(buffs.skillMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.abilityRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.skillMode}`)}`);
+  if ((buffs.skills ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.skills.advantage")} : ${listSelectedLabels(buffs.skills, labels.skills)}`);
+  if ((buffs.skillBonusSkills ?? []).length && isFilled(buffs.skillBonus)) {
+    addEntry(`${game.i18n.localize("BOT.ui.skills.bonus")} : ${listSelectedLabels(buffs.skillBonusSkills, labels.skills)} (${buffs.skillBonus})`);
+  }
+  if (isFilled(buffs.skillBonusAll)) addEntry(`${game.i18n.localize("BOT.ui.skills.bonusAll")} : ${buffs.skillBonusAll}`);
+  if (isFilled(buffs.attackBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackBonus")} : ${buffs.attackBonus}`);
+  if (isFilled(buffs.saveBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveBonus")} : ${buffs.saveBonus}`);
+  if (isFilled(buffs.speed?.value)) {
+    addEntry(`${game.i18n.localize("BOT.ui.capacities.speed")} : ${buffs.speed.value} ${game.i18n.localize("BOT.ui.units.feet")} (${game.i18n.localize(`BOT.ui.capacities.speedTypes.${buffs.speed.type ?? "walk"}`)})`);
+  }
+  if ((buffs.resistances ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.resistances")} : ${listSelectedLabels(buffs.resistances, labels.damageTypes)}`);
+  if ((buffs.vulnerabilities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.vulnerabilities")} : ${listSelectedLabels(buffs.vulnerabilities, labels.damageTypes)}`);
+  if ((buffs.immunities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.immunities")} : ${listSelectedLabels(buffs.immunities, labels.damageTypes)}`);
+  if ((buffs.weaponProfs ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.weaponProficiencies")} : ${listSelectedLabels(buffs.weaponProfs, labels.weaponProfs)}`);
+  if ((buffs.armorProfs ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.armorProficiencies")} : ${listSelectedLabels(buffs.armorProfs, labels.armorProfs)}`);
+  if ((buffs.languages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.languages")} : ${listSelectedLabels(buffs.languages, labels.languages)}`);
+  if (isFilled(buffs.darkvision)) addEntry(`${game.i18n.localize("BOT.ui.capacities.senses.darkvision")} : ${buffs.darkvision} ${game.i18n.localize("BOT.ui.units.feet")}`);
+  if (isFilled(buffs.blindsight)) addEntry(`${game.i18n.localize("BOT.ui.capacities.senses.blindsight")} : ${buffs.blindsight} ${game.i18n.localize("BOT.ui.units.feet")}`);
+  if (isFilled(buffs.tremorsense)) addEntry(`${game.i18n.localize("BOT.ui.capacities.senses.tremorsense")} : ${buffs.tremorsense} ${game.i18n.localize("BOT.ui.units.feet")}`);
+  if (isFilled(buffs.truesight)) addEntry(`${game.i18n.localize("BOT.ui.capacities.senses.truesight")} : ${buffs.truesight} ${game.i18n.localize("BOT.ui.units.feet")}`);
+  if (isFilled(buffs.sensesSpecial)) addEntry(`${game.i18n.localize("BOT.ui.capacities.senses.special")} : ${buffs.sensesSpecial}`);
+  if (isFilled(buffs.passivePerception)) addEntry(`${game.i18n.localize("BOT.ui.capacities.passivePerception")} : ${buffs.passivePerception}`);
+
+  return entries;
+}
+
+function buildConfigSummary(raw, labels) {
+  const summary = [
+    { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
+    { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
+  ];
+
+  if (["mwak", "rwak", "msak", "rsak"].includes(raw.type)) {
+    summary.push({ label: game.i18n.localize("BOT.ui.summary.condition"), value: getConditionLabel(raw.condition) });
+  }
+
+  if (raw.damage) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.damage"),
+      value: `${raw.damage.formula ?? game.i18n.localize("BOT.ui.summary.notConfigured")} ${raw.damage.type ? `(${labels.damageTypes[raw.damage.type] ?? raw.damage.type})` : ""}`.trim()
+    });
+  }
+
+  if (raw.healing?.formula) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.healing"),
+      value: `${raw.healing.formula} (${getHealingTargetModeLabel(raw.healing.targetMode)})`
+    });
+  }
+
+  if (raw.save?.ability) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.save"),
+      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} ${game.i18n.localize("BOT.ui.dc.label")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
+    });
+  }
+
+  if (raw.status?.id) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.status"),
+      value: raw.status.id
+    });
+  }
+
+  const mechanicalSummary = buildMechanicalSummary(raw, labels);
+  if (mechanicalSummary.length) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.mechanical"),
+      value: mechanicalSummary.join(" • ")
+    });
+  }
+
+  summary.push({
+    label: game.i18n.localize("BOT.ui.summary.consumeOnTrigger"),
+    value: game.i18n.localize(raw.consumeOnTrigger ?? true ? "BOT.ui.common.yes" : "BOT.ui.common.no")
+  });
+
+  if (isFilled(raw.charges)) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.charges"),
+      value: String(raw.charges)
+    });
+  }
+
+  if (isFilled(raw.duration?.rounds)) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.durationRounds"),
+      value: String(raw.duration.rounds)
+    });
+  }
+
+  return summary;
+}
+
 class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
@@ -127,6 +288,13 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const weaponProfLabels = getWeaponProfLabels();
     const armorProfLabels = getArmorProfLabels();
     const languageLabels = getLanguageLabels();
+    const labels = {
+      skills: skillLabels,
+      damageTypes: damageLabels,
+      weaponProfs: weaponProfLabels,
+      armorProfs: armorProfLabels,
+      languages: languageLabels,
+    };
     const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
     const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
     const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
@@ -168,6 +336,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffTrueSight:             raw.buffs?.truesight ?? "",
       buffSensesSpecial:         raw.buffs?.sensesSpecial ?? "",
       buffPassivePerception:     raw.buffs?.passivePerception ?? "",
+      healingEnabled:            !!raw.healing,
+      healingFormula:            raw.healing?.formula ?? "",
+      healingTargetModeSelf:     (raw.healing?.targetMode ?? "self") === "self",
+      healingTargetModeTarget:   raw.healing?.targetMode === "target",
       skillAdvantageOptions,
       skillBonusOptions,
       resistanceOptions,
@@ -208,6 +380,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTypeRadiant:     raw.damage?.type === "radiant",
       damageTypeSlashing:    raw.damage?.type === "slashing",
       damageTypeThunder:     raw.damage?.type === "thunder",
+      configSummary:         buildConfigSummary(raw, labels),
     };
     return {
       ...await super._prepareContext(options),
@@ -226,6 +399,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         condition: data.condition,
         consumeOnTrigger: data.consumeOnTrigger ?? true,
         damage: data.damageFormula ? { formula: data.damageFormula, type: data.damageType } : null,
+        healing: data.healingEnabled && data.healingFormula ? {
+          formula: data.healingFormula,
+          targetMode: data.healingTargetMode ?? "self",
+        } : null,
         save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
         status: data.statusId ? { id: data.statusId } : null,
         charges: data.charges ? Number(data.charges) : null,

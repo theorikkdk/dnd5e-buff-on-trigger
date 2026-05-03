@@ -213,3 +213,40 @@
   margin-right: 4px;
   font-size: 11px;
 }
+
+.bot-summary-panel,
+.bot-inline-panel {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--color-border-light-tertiary, #d8d3bc);
+  border-radius: 6px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.03));
+}
+
+.bot-summary-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bot-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bot-summary-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.bot-summary-label {
+  min-width: 150px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bot-summary-value {
+  flex: 1;
+}
