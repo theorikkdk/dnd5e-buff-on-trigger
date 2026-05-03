@@ -1,6 +1,8 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES } from "./constants.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
 
+const recentConcentrationRolls = new Map();
+
 export function registerTriggers() {
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
@@ -160,6 +162,72 @@ export function registerTriggers() {
     }
   });
 
+  Hooks.on("midi-qol.isDamaged", async (token, { item, workflow, damageItem }) => {
+    try {
+      const actor = token.actor;
+      if (!actor) return;
+      if (token.actor.id !== actor.id) return;
+      const flag = actor?.getFlag(MODULE_ID, "activeBuff");
+      if (!flag || flag.type !== "damaged") return;
+      const now = Date.now();
+      const lastTriggered = actor.getFlag(MODULE_ID, "_lastDamagedTrigger") ?? 0;
+      if (now - lastTriggered < 1000) return;
+      await actor.setFlag(MODULE_ID, "_lastDamagedTrigger", now);
+      console.log(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
+      const actorUuid = actor.uuid;
+      const attackerTokenUuid = workflow?.token?.document?.uuid
+        ?? workflow?.attackingToken?.document?.uuid
+        ?? null;
+      const itemUuid = item?.uuid ?? null;
+      console.log(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
+      window.setTimeout(async () => {
+        try {
+          const delayedActor = fromUuidSync(actorUuid);
+          if (!delayedActor?.getFlag) return;
+          const delayedFlag = delayedActor.getFlag(MODULE_ID, "activeBuff");
+          if (!delayedFlag || delayedFlag.type !== "damaged") return;
+          const attackerToken = attackerTokenUuid
+            ? (fromUuidSync(attackerTokenUuid)?.object ?? null)
+            : null;
+          const delayedItem = itemUuid ? fromUuidSync(itemUuid) : null;
+          const fakeWorkflow = {
+            actor: delayedActor,
+            item: delayedItem ?? null,
+            targets: attackerToken ? new Set([attackerToken]) : new Set(),
+            hitTargets: attackerToken ? new Set([attackerToken]) : new Set(),
+            missedTargets: new Set(),
+            damageItem,
+          };
+          handleAttackTrigger(fakeWorkflow, delayedFlag);
+        } catch (error) {
+          console.error(`[${MODULE_ID}] Erreur dans midi-qol.isDamaged (différé) :`, error);
+        }
+      }, 100);
+    } catch (error) {
+      console.error(`[${MODULE_ID}] Erreur dans midi-qol.isDamaged :`, error);
+    }
+  });
+
+  Hooks.on("midi-qol.isHealed", async (token, { item, workflow, damageItem }) => {
+    try {
+      const actor = token.actor;
+      const flag = actor?.getFlag(MODULE_ID, "activeBuff");
+      if (!flag || flag.type !== "healed") return;
+      console.log(`[${MODULE_ID}] Déclencheur healed sur ${actor.name}`);
+      const fakeWorkflow = {
+        actor,
+        item: item ?? null,
+        targets: new Set(),
+        hitTargets: new Set([token]),
+        missedTargets: new Set(),
+        damageItem,
+      };
+      handleAttackTrigger(fakeWorkflow, flag);
+    } catch (error) {
+      console.error(`[${MODULE_ID}] Erreur dans midi-qol.isHealed :`, error);
+    }
+  });
+
   Hooks.on("dnd5e.preRollSkill", (config, skillId) => {
     const actor = config.subject ?? config.actor ?? null;
     if (!actor?.getFlag) return;
@@ -182,6 +250,25 @@ export function registerTriggers() {
       config.disadvantage = true;
       console.log(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
     }
+  });
+
+  Hooks.on("dnd5e.preRollConcentration", (rollConfig, dialogConfig, messageConfig) => {
+    const actor = rollConfig?.subject ?? null;
+    if (!actor?.uuid) return true;
+    const now = Date.now();
+    for (const [oldKey, oldTimestamp] of recentConcentrationRolls.entries()) {
+      if (now - oldTimestamp > 5000) recentConcentrationRolls.delete(oldKey);
+    }
+    const dc = Number(rollConfig?.target ?? 0);
+    const ability = rollConfig?.ability ?? "con";
+    const key = `${actor.uuid}|${ability}|${dc}`;
+    const lastTriggered = recentConcentrationRolls.get(key) ?? 0;
+    if (now - lastTriggered < 500) {
+      console.log(`[${MODULE_ID}] Jet de concentration doublon ignoré`);
+      return false;
+    }
+    recentConcentrationRolls.set(key, now);
+    return true;
   });
 
   Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
@@ -223,7 +310,8 @@ export function registerTriggers() {
 }
 
 function handleAttackTrigger(workflow, flag) {
-  console.log(`[${MODULE_ID}] Déclencheur ${workflow.activity.actionType} détecté sur ${workflow.actor.name}`);
+  const triggerType = workflow.activity?.actionType ?? flag.type;
+  console.log(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
   applyEffect(workflow, flag);
 }
 

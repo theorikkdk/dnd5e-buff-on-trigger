@@ -23,6 +23,8 @@
   "BOT.ui.trigger.rwak": "Attaque à distance",
   "BOT.ui.trigger.msak": "Attaque de sort mêlée",
   "BOT.ui.trigger.rsak": "Attaque de sort à distance",
+  "BOT.ui.trigger.damaged": "Dégâts reçus",
+  "BOT.ui.trigger.healed": "Soin reçu",
   "BOT.ui.trigger.turnStart": "Début de tour (lanceur)",
   "BOT.ui.trigger.targetTurnStart": "Début de tour de la cible",
   "BOT.ui.trigger.turnEnd": "Fin de tour (lanceur)",

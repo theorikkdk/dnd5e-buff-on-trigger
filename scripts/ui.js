@@ -145,6 +145,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       typeRwak:              raw.type === "rwak",
       typeMsak:              raw.type === "msak",
       typeRsak:              raw.type === "rsak",
+      typeDamaged:           raw.type === "damaged",
+      typeHealed:            raw.type === "healed",
       typeTurnStart:         raw.type === "turnStart",
       typeTurnEnd:           raw.type === "turnEnd",
       typeTargetTurnStart:   raw.type === "targetTurnStart",

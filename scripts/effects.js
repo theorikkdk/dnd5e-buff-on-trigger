@@ -115,6 +115,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       if (newCharges <= 0) {
         const actor = workflow.actor;
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
+        await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
         for (const e of mechEffects ?? []) await e.delete();
@@ -136,6 +137,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
     } else if (workflow.item !== null && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
+      await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
       console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
       for (const e of mechEffects ?? []) await e.delete();
@@ -294,14 +296,6 @@ export async function applyBonusDamage(workflow, flag) {
 
     console.log(`[${MODULE_ID}] Dégâts bonus : ${roll.total} ${damageType}`);
 
-    await ChatMessage.create({
-      content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
-        <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-        <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
-      </div>`,
-      speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-    });
-
     let fullTargets = targets;
     let halfTargets = new Set();
 
@@ -331,7 +325,36 @@ export async function applyBonusDamage(workflow, flag) {
       }
     }
 
-    if (typeof MidiQOL?.applyTokenDamage === "function") {
+    if (flag.type === "damaged") {
+      for (const token of fullTargets) {
+        if (!token.actor) continue;
+        await token.actor.applyDamage(
+          [{ value: roll.total, type: damageType }],
+          { noConcentrationCheck: true }
+        );
+      }
+      for (const token of halfTargets) {
+        if (!token.actor) continue;
+        await token.actor.applyDamage(
+          [{ value: Math.floor(roll.total / 2), type: damageType }],
+          { noConcentrationCheck: true }
+        );
+      }
+      await ChatMessage.create({
+        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px;">
+          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${roll.total} dégâts ${damageType}
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+        rolls: [roll]
+      });
+    } else if (typeof MidiQOL?.applyTokenDamage === "function") {
+      await ChatMessage.create({
+        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
+          <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
+          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+      });
       if (fullTargets.size) {
         await MidiQOL.applyTokenDamage(
           [{ damage: roll.total, type: damageType }],
@@ -339,7 +362,10 @@ export async function applyBonusDamage(workflow, flag) {
           fullTargets,
           workflow.item ?? null,
           new Set(),
-          { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
+          {
+            flavor: flag.itemName ?? localize("BOT.fallback.effectName"),
+            noConcentrationCheck: true
+          }
         );
       }
       if (halfTargets.size) {
@@ -350,10 +376,20 @@ export async function applyBonusDamage(workflow, flag) {
           halfTargets,
           workflow.item ?? null,
           new Set(),
-          { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
+          {
+            flavor: flag.itemName ?? localize("BOT.fallback.effectName"),
+            noConcentrationCheck: true
+          }
         );
       }
     } else {
+      await ChatMessage.create({
+        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
+          <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
+          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
+        </div>`,
+        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+      });
       for (const token of fullTargets) {
         await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
       }
