@@ -121,6 +121,10 @@ function getTriggerFrequencyLabel(frequency) {
   return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
 }
 
+function getReceivedAttackTypeLabel(type) {
+  return game.i18n.localize(`BOT.ui.receivedAttackType.${type ?? "any"}`);
+}
+
 function formatItemDurationSummary(rounds, fallbackRounds = null) {
   const syncedRounds = rounds ?? fallbackRounds;
   if (syncedRounds === null || syncedRounds === undefined) {
@@ -209,6 +213,21 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
 
   if (["mwak", "rwak", "msak", "rsak"].includes(raw.type)) {
     summary.push({ label: game.i18n.localize("BOT.ui.summary.condition"), value: getConditionLabel(raw.condition) });
+  }
+
+  if (raw.type === "damaged") {
+    if ((raw.receivedAttackType ?? "any") !== "any") {
+      summary.push({
+        label: game.i18n.localize("BOT.ui.summary.receivedAttackType"),
+        value: getReceivedAttackTypeLabel(raw.receivedAttackType)
+      });
+    }
+    if ((raw.receivedDamageTypes ?? []).length) {
+      summary.push({
+        label: game.i18n.localize("BOT.ui.summary.receivedDamageTypes"),
+        value: listSelectedLabels(raw.receivedDamageTypes, labels.damageTypes)
+      });
+    }
   }
 
   if (raw.damage) {
@@ -341,6 +360,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
     const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
     const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
+    const receivedDamageTypeOptions = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.receivedDamageTypes ?? []).includes(t) }));
     const weaponProfOptions     = WEAPON_PROF_IDS.map(value => ({ value, label: weaponProfLabels[value], selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
     const armorProfOptions      = ARMOR_PROF_IDS.map(value => ({ value, label: armorProfLabels[value], selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
     const languageOptions       = LANGUAGE_IDS.map(value => ({ value, label: languageLabels[value], selected: (raw.buffs?.languages ?? []).includes(value) }));
@@ -419,6 +439,16 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
+      receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
+      receivedAttackTypeMelee: raw.receivedAttackType === "melee",
+      receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
+      receivedAttackTypeWeapon: raw.receivedAttackType === "weapon",
+      receivedAttackTypeSpell: raw.receivedAttackType === "spell",
+      receivedAttackTypeMwak: raw.receivedAttackType === "mwak",
+      receivedAttackTypeRwak: raw.receivedAttackType === "rwak",
+      receivedAttackTypeMsak: raw.receivedAttackType === "msak",
+      receivedAttackTypeRsak: raw.receivedAttackType === "rsak",
+      receivedDamageTypeOptions,
       damageTypeAcid:        raw.damage?.type === "acid",
       damageTypeBludgeoning: raw.damage?.type === "bludgeoning",
       damageTypeCold:        raw.damage?.type === "cold",
@@ -449,6 +479,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         targetMode: data.targetMode ?? "self",
         type: data.type,
         condition: data.condition,
+        receivedAttackType: data.receivedAttackType ?? "any",
+        receivedDamageTypes: (() => {
+          const toArray = v => v ? v.split(',').filter(Boolean) : [];
+          return toArray(data.receivedDamageTypesList);
+        })(),
         consumeOnTrigger: data.consumeOnTrigger ?? true,
         triggerFrequency: data.triggerFrequency ?? "none",
         damage: data.damageFormula ? { formula: data.damageFormula, type: data.damageType } : null,

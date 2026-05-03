@@ -46,6 +46,35 @@
         <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>{{localize "BOT.ui.condition.always"}}</option>
       </select>
     </div>
+    <section class="bot-inline-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.receivedConditions.title"}}</h3>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.receivedAttackType.label"}}</label>
+        <select name="receivedAttackType">
+          <option value="any" {{#if flag.receivedAttackTypeAny}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.any"}}</option>
+          <option value="melee" {{#if flag.receivedAttackTypeMelee}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.melee"}}</option>
+          <option value="ranged" {{#if flag.receivedAttackTypeRanged}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.ranged"}}</option>
+          <option value="weapon" {{#if flag.receivedAttackTypeWeapon}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.weapon"}}</option>
+          <option value="spell" {{#if flag.receivedAttackTypeSpell}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.spell"}}</option>
+          <option value="mwak" {{#if flag.receivedAttackTypeMwak}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.mwak"}}</option>
+          <option value="rwak" {{#if flag.receivedAttackTypeRwak}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.rwak"}}</option>
+          <option value="msak" {{#if flag.receivedAttackTypeMsak}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.msak"}}</option>
+          <option value="rsak" {{#if flag.receivedAttackTypeRsak}}selected{{/if}}>{{localize "BOT.ui.receivedAttackType.rsak"}}</option>
+        </select>
+      </div>
+      <div class="form-group bot-picker-group">
+        <label>{{localize "BOT.ui.receivedDamageTypes.label"}}</label>
+        <div class="bot-tag-picker">
+          <div class="bot-tags" id="tags-receivedDamageTypesList">
+            {{#each flag.receivedDamageTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'receivedDamageTypesList')">✕</span></span>{{/if}}{{/each}}
+          </div>
+          <select class="bot-tag-select" onchange="botAddTag(this,'receivedDamageTypesList')">
+            {{#each flag.receivedDamageTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+          </select>
+          <input type="hidden" name="receivedDamageTypesList" id="hidden-receivedDamageTypesList" value="{{#each flag.receivedDamageTypeOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Onglet 2 : Dégâts & Effets -->

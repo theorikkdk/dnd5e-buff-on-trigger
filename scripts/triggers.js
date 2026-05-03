@@ -4,6 +4,59 @@ import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffI
 
 const recentConcentrationRolls = new Map();
 
+function getReceivedAttackCategories(workflow, item) {
+  const actionType = workflow?.activity?.actionType
+    ?? item?.system?.actionType
+    ?? workflow?.item?.system?.actionType
+    ?? null;
+
+  const categories = new Set();
+  if (actionType === "mwak") {
+    categories.add("melee");
+    categories.add("weapon");
+    categories.add("mwak");
+  }
+  if (actionType === "rwak") {
+    categories.add("ranged");
+    categories.add("weapon");
+    categories.add("rwak");
+  }
+  if (actionType === "msak") {
+    categories.add("melee");
+    categories.add("spell");
+    categories.add("msak");
+  }
+  if (actionType === "rsak") {
+    categories.add("ranged");
+    categories.add("spell");
+    categories.add("rsak");
+  }
+  return categories;
+}
+
+function collectDamageTypes(value, types = new Set()) {
+  if (!value) return types;
+  if (Array.isArray(value)) {
+    for (const entry of value) collectDamageTypes(entry, types);
+    return types;
+  }
+  if (typeof value === "object") {
+    const candidate = value.type ?? value.damageType ?? value.damage?.type ?? null;
+    if (typeof candidate === "string" && candidate.trim()) types.add(candidate);
+    for (const nested of Object.values(value)) collectDamageTypes(nested, types);
+  }
+  return types;
+}
+
+function getReceivedDamageTypes(damageItem, workflow) {
+  const types = new Set();
+  collectDamageTypes(damageItem, types);
+  collectDamageTypes(workflow?.damageItem, types);
+  collectDamageTypes(workflow?.damageDetail, types);
+  collectDamageTypes(workflow?.damageList, types);
+  return [...types];
+}
+
 export function registerTriggers() {
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
@@ -176,12 +229,43 @@ export function registerTriggers() {
       if (!actor) return;
       if (token.actor.id !== actor.id) return;
       const flag = actor?.getFlag(MODULE_ID, "activeBuff");
-      if (!flag || flag.type !== "damaged") return;
+      if (!flag) {
+        console.log(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);
+        return;
+      }
+      if (flag.type !== "damaged") {
+        console.log(`[${MODULE_ID}] midi-qol.isDamaged : buff actif trouvé mais type différent de damaged (${flag.type})`);
+        return;
+      }
+
+      console.log(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
+
+      const expectedAttackType = typeof flag.receivedAttackType === "string" ? flag.receivedAttackType : "any";
+      if (expectedAttackType !== "any") {
+        const receivedAttackTypes = getReceivedAttackCategories(workflow, item);
+        if (!receivedAttackTypes.has(expectedAttackType)) {
+          console.log(`[${MODULE_ID}] damaged bloqué par type d’attaque`);
+          return;
+        }
+      }
+
+      const expectedDamageTypes = Array.isArray(flag.receivedDamageTypes) ? flag.receivedDamageTypes.filter(Boolean) : [];
+      if (expectedDamageTypes.length > 0) {
+        const receivedDamageTypes = getReceivedDamageTypes(damageItem, workflow);
+        if (!receivedDamageTypes.length) {
+          console.log(`[${MODULE_ID}] Types de dégâts reçus indisponibles pour le filtre damaged`);
+        } else if (!receivedDamageTypes.some(type => expectedDamageTypes.includes(type))) {
+          console.log(`[${MODULE_ID}] damaged bloqué par type de dégâts`);
+          return;
+        }
+      }
+
+      console.log(`[${MODULE_ID}] damaged autorisé`);
+
       const now = Date.now();
       const lastTriggered = actor.getFlag(MODULE_ID, "_lastDamagedTrigger") ?? 0;
       if (now - lastTriggered < 1000) return;
       await actor.setFlag(MODULE_ID, "_lastDamagedTrigger", now);
-      console.log(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
       const actorUuid = actor.uuid;
       const attackerTokenUuid = workflow?.token?.document?.uuid
         ?? workflow?.attackingToken?.document?.uuid
