@@ -1,4 +1,5 @@
 import { MODULE_ID, BUFF_ICON, SKILL_IDS } from "./constants.js";
+import { getFlagDurationInRounds } from "./duration.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -38,7 +39,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
     }
 
     if (activeBuff) {
-      const durationRounds = activeBuff.duration?.rounds ?? null;
+      const durationRounds = getFlagDurationInRounds(activeBuff);
       await actor.createEmbeddedDocuments("ActiveEffect", [{
         name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " ⚡",
         img: activeBuff.itemImg ?? BUFF_ICON,
@@ -109,6 +110,21 @@ function resolveTargets(workflow, flag) {
 
 function resolveHealingTargets(workflow, flag) {
   const targetMode = flag.healing?.targetMode ?? "self";
+
+  if (targetMode === "self") {
+    const actorToken = workflow.token
+      ?? workflow.actor?.getActiveTokens?.()?.[0]
+      ?? null;
+    return actorToken ? new Set([actorToken]) : new Set();
+  }
+
+  return workflow.hitTargets?.size
+    ? new Set(workflow.hitTargets)
+    : new Set(workflow.targets ?? []);
+}
+
+function resolveTemporaryHpTargets(workflow, flag) {
+  const targetMode = flag.temporaryHp?.targetMode ?? "self";
 
   if (targetMode === "self") {
     const actorToken = workflow.token
@@ -281,11 +297,12 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
   try {
     const changes = buildMechanicalChanges(flag);
     if (!changes.length) return;
+    const resolvedDurationRounds = getFlagDurationInRounds(flag) ?? durationRounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name: flag.itemName ?? localize("BOT.fallback.effectName"),
       img: flag.itemImg ?? BUFF_ICON,
       changes,
-      duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+      duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
       flags: { [MODULE_ID]: { mechanicalBuff: true } },
     }]);
     console.log(`[${MODULE_ID}] Buffs mécaniques appliqués sur ${actor.name}`);
@@ -501,8 +518,57 @@ export async function applyBonusHealing(workflow, flag) {
   }
 }
 
+export async function applyTemporaryHp(workflow, flag) {
+  try {
+    const targets = resolveTemporaryHpTargets(workflow, flag);
+    if (!targets?.size) return;
+
+    const formula = flag.temporaryHp?.formula;
+    if (!formula) return;
+
+    const roll = await new Roll(formula).evaluate();
+    const tempHpAmount = Math.max(0, roll.total ?? 0);
+    if (tempHpAmount <= 0) return;
+
+    const mode = flag.temporaryHp?.mode ?? "keepHighest";
+    const updatedTargets = [];
+
+    for (const token of targets) {
+      const targetActor = token.actor;
+      if (!targetActor) continue;
+
+      const currentTemp = Number(targetActor.system.attributes.hp.temp ?? 0);
+      let newTempHp = currentTemp;
+
+      if (mode === "replace") newTempHp = tempHpAmount;
+      else if (mode === "add") newTempHp = currentTemp + tempHpAmount;
+      else newTempHp = Math.max(currentTemp, tempHpAmount);
+
+      if (newTempHp === currentTemp) continue;
+
+      await targetActor.update({ "system.attributes.hp.temp": newTempHp });
+      updatedTargets.push({ name: targetActor.name, amount: newTempHp });
+      console.log(`[${MODULE_ID}] PV temporaires : ${newTempHp} vers ${targetActor.name}`);
+    }
+
+    if (!updatedTargets.length) return;
+
+    await ChatMessage.create({
+      content: `<div style="border-left: 3px solid #4c6ef5; padding: 4px 8px;">
+        <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${updatedTargets.map((target) => `${target.amount} PV temporaires vers ${target.name}`).join(", ")}
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+      rolls: [roll]
+    });
+
+    if (!flag.damage && !flag.status && !flag.healing) await consumeOrDecrementCharges(workflow, flag, targets);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyTemporaryHp :`, error);
+  }
+}
+
 export async function applyEffect(workflow, flag) {
-  if (!flag.damage && !flag.status && !flag.healing) {
+  if (!flag.damage && !flag.status && !flag.healing && !flag.temporaryHp) {
     console.log(`[${MODULE_ID}] Aucun effet configuré dans le flag`);
     return;
   }
@@ -510,4 +576,5 @@ export async function applyEffect(workflow, flag) {
   if (flag.damage) await applyBonusDamage(workflow, flag);
   if (flag.status) await applyStatusEffect(workflow, flag);
   if (flag.healing) await applyBonusHealing(workflow, flag);
+  if (flag.temporaryHp) await applyTemporaryHp(workflow, flag);
 }

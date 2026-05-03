@@ -110,6 +110,30 @@
         </select>
       </div>
     </section>
+
+    <section class="bot-inline-panel">
+      <div class="form-group">
+        <label>{{localize "BOT.ui.temporaryHp.enabled"}}</label>
+        <input type="checkbox" name="temporaryHpEnabled" {{#if flag.temporaryHpEnabled}}checked{{/if}} />
+      </div>
+      <div class="bot-row">
+        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.formula"}}</label>
+        <input type="text" name="temporaryHpFormula" value="{{flag.temporaryHpFormula}}" placeholder="1d6" class="bot-input-flex" />
+        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.targetMode.label"}}</label>
+        <select name="temporaryHpTargetMode" class="bot-input-flex">
+          <option value="self" {{#if flag.temporaryHpTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.self"}}</option>
+          <option value="target" {{#if flag.temporaryHpTargetModeTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.target"}}</option>
+        </select>
+      </div>
+      <div class="bot-row">
+        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.mode.label"}}</label>
+        <select name="temporaryHpMode" class="bot-input-flex">
+          <option value="keepHighest" {{#if flag.temporaryHpModeKeepHighest}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.keepHighest"}}</option>
+          <option value="replace" {{#if flag.temporaryHpModeReplace}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.replace"}}</option>
+          <option value="add" {{#if flag.temporaryHpModeAdd}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.add"}}</option>
+        </select>
+      </div>
+    </section>
   </div>
 
   <!-- Onglet 3 : Buffs -->
@@ -336,7 +360,7 @@
     </div>
     <div class="form-group">
       <label>{{localize "BOT.ui.settings.durationRounds"}}</label>
-      <input type="number" name="durationRounds" value="{{flag.durationRounds}}" placeholder="{{localize "BOT.ui.settings.durationPlaceholder"}}" min="0" />
+      <p class="bot-duration-info">{{flag.itemDurationLabel}}</p>
     </div>
 
     <section class="bot-summary-panel">

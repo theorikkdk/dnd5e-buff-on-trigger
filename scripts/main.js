@@ -1,4 +1,5 @@
 import { MODULE_ID, BUFF_ICON } from "./constants.js";
+import { syncItemDurationFlag } from "./duration.js";
 import { registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 
@@ -19,4 +20,8 @@ Hooks.once("ready", () => {
   console.log(`[${MODULE_ID}] Module ready`);
   registerTriggers();
   registerItemSheetButton();
+
+  Hooks.on("updateItem", async (item, changed, options, userId) => {
+    await syncItemDurationFlag(item, options);
+  });
 });

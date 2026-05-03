@@ -250,3 +250,11 @@
 .bot-summary-value {
   flex: 1;
 }
+
+.bot-duration-info {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.03));
+  color: var(--color-text-dark-secondary, #4b4a44);
+}

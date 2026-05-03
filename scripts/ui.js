@@ -1,5 +1,7 @@
 ﻿import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS } from "./constants.js";
 
+import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
+
 const getSkillLabels = () => ({
   acr: game.i18n.localize("BOT.skills.acr"),
   ani: game.i18n.localize("BOT.skills.ani"),
@@ -107,6 +109,28 @@ function getHealingTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.healing.targetMode.${targetMode ?? "self"}`);
 }
 
+function getTemporaryHpTargetModeLabel(targetMode) {
+  return game.i18n.localize(`BOT.ui.temporaryHp.targetMode.${targetMode ?? "self"}`);
+}
+
+function getTemporaryHpModeLabel(mode) {
+  return game.i18n.localize(`BOT.ui.temporaryHp.mode.${mode ?? "keepHighest"}`);
+}
+
+function formatItemDurationSummary(rounds, fallbackRounds = null) {
+  const syncedRounds = rounds ?? fallbackRounds;
+  if (syncedRounds === null || syncedRounds === undefined) {
+    return game.i18n.localize("BOT.ui.duration.none");
+  }
+  return game.i18n.format("BOT.ui.duration.syncedValue", { rounds: syncedRounds });
+}
+
+function getLegacyDurationFallback(raw, itemDurationRounds) {
+  if (itemDurationRounds !== null) return null;
+  if (raw.duration?.source === "item") return null;
+  return raw.duration?.rounds ?? null;
+}
+
 function hasMechanicalChanges(buffs = {}) {
   return [
     buffs.ac,
@@ -172,7 +196,8 @@ function buildMechanicalSummary(raw, labels) {
   return entries;
 }
 
-function buildConfigSummary(raw, labels) {
+function buildConfigSummary(raw, labels, itemDurationRounds) {
+  const legacyDurationFallback = getLegacyDurationFallback(raw, itemDurationRounds);
   const summary = [
     { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
@@ -193,6 +218,13 @@ function buildConfigSummary(raw, labels) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.healing"),
       value: `${raw.healing.formula} (${getHealingTargetModeLabel(raw.healing.targetMode)})`
+    });
+  }
+
+  if (raw.temporaryHp?.formula) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.temporaryHp"),
+      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(raw.temporaryHp.targetMode)} • ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
     });
   }
 
@@ -230,12 +262,10 @@ function buildConfigSummary(raw, labels) {
     });
   }
 
-  if (isFilled(raw.duration?.rounds)) {
-    summary.push({
-      label: game.i18n.localize("BOT.ui.summary.durationRounds"),
-      value: String(raw.duration.rounds)
-    });
-  }
+  summary.push({
+    label: game.i18n.localize("BOT.ui.summary.durationRounds"),
+    value: formatItemDurationSummary(itemDurationRounds, legacyDurationFallback)
+  });
 
   return summary;
 }
@@ -283,6 +313,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
 
   async _prepareContext(options) {
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
+    const itemDurationRounds = getItemDurationInRounds(this.item);
+    const legacyDurationFallback = getLegacyDurationFallback(raw, itemDurationRounds);
     const skillLabels = getSkillLabels();
     const damageLabels = getDamageLabels();
     const weaponProfLabels = getWeaponProfLabels();
@@ -340,6 +372,13 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       healingFormula:            raw.healing?.formula ?? "",
       healingTargetModeSelf:     (raw.healing?.targetMode ?? "self") === "self",
       healingTargetModeTarget:   raw.healing?.targetMode === "target",
+      temporaryHpEnabled:        !!raw.temporaryHp,
+      temporaryHpFormula:        raw.temporaryHp?.formula ?? "",
+      temporaryHpTargetModeSelf: (raw.temporaryHp?.targetMode ?? "self") === "self",
+      temporaryHpTargetModeTarget: raw.temporaryHp?.targetMode === "target",
+      temporaryHpModeKeepHighest: (raw.temporaryHp?.mode ?? "keepHighest") === "keepHighest",
+      temporaryHpModeReplace:    raw.temporaryHp?.mode === "replace",
+      temporaryHpModeAdd:        raw.temporaryHp?.mode === "add",
       skillAdvantageOptions,
       skillBonusOptions,
       resistanceOptions,
@@ -358,7 +397,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffSkillModeAdvantage:    raw.buffs?.skillMode === "advantage",
       buffSkillModeDisadvantage: raw.buffs?.skillMode === "disadvantage",
       charges:               raw.charges ?? "",
-      durationRounds:        raw.duration?.rounds ?? "",
+      itemDurationRounds,
+      itemDurationLabel:     formatItemDurationSummary(itemDurationRounds, legacyDurationFallback),
       saveAbility:           raw.save?.ability ?? "",
       saveDC:                raw.save?.dc ?? 15,
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
@@ -380,7 +420,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTypeRadiant:     raw.damage?.type === "radiant",
       damageTypeSlashing:    raw.damage?.type === "slashing",
       damageTypeThunder:     raw.damage?.type === "thunder",
-      configSummary:         buildConfigSummary(raw, labels),
+      configSummary:         buildConfigSummary(raw, labels, itemDurationRounds),
     };
     return {
       ...await super._prepareContext(options),
@@ -402,6 +442,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         healing: data.healingEnabled && data.healingFormula ? {
           formula: data.healingFormula,
           targetMode: data.healingTargetMode ?? "self",
+        } : null,
+        temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
+          formula: data.temporaryHpFormula,
+          targetMode: data.temporaryHpTargetMode ?? "self",
+          mode: data.temporaryHpMode ?? "keepHighest",
         } : null,
         save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
         status: data.statusId ? { id: data.statusId } : null,
@@ -434,11 +479,20 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             immunities: toArray(data.buffImmunitiesList),
           };
         })(),
-        duration: {
-          rounds: data.durationRounds ? Number(data.durationRounds) : null,
-        },
       };
-      await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
+      const itemDuration = buildItemDurationData(this.item);
+      if (itemDuration) {
+        flag.duration = itemDuration;
+        await this.item.update({
+          [`flags.${MODULE_ID}.buffTrigger`]: flag,
+        });
+      } else {
+        delete flag.duration;
+        await this.item.update({
+          [`flags.${MODULE_ID}.buffTrigger`]: flag,
+          [`flags.${MODULE_ID}.buffTrigger.-=duration`]: null,
+        });
+      }
     }
     console.log(`[${MODULE_ID}] Configuration sauvegardée sur ${this.item.name}`);
   }

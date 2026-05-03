@@ -1,4 +1,5 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES } from "./constants.js";
+import { buildItemDurationData } from "./duration.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
@@ -19,7 +20,14 @@ export function registerTriggers() {
       if (buffConfig || flag) console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
       if (buffConfig && !ATTACK_ACTION_TYPES.includes(actionType)) {
         const targetMode = buffConfig.targetMode ?? "self";
-        const activeFlag = { ...buffConfig, itemName: workflow.item?.name, itemImg: workflow.item?.img, chargesRemaining: buffConfig.charges ?? null };
+        const activeFlag = {
+          ...buffConfig,
+          itemName: workflow.item?.name,
+          itemImg: workflow.item?.img,
+          itemUuid: workflow.item?.uuid ?? null,
+          duration: buildItemDurationData(workflow.item) ?? buffConfig.duration,
+          chargesRemaining: buffConfig.charges ?? null
+        };
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
 
         if (targetMode === "ally") {
