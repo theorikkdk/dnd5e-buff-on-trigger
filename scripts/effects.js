@@ -25,6 +25,18 @@ function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
 }
 
+function getWorkflowConditionTargets(workflow, condition = "hit") {
+  const hitIds = new Set((workflow.hitTargets ?? []).map((t) => t.id));
+
+  if (condition === "miss") {
+    return new Set([...(workflow.targets ?? [])].filter((t) => !hitIds.has(t.id)));
+  }
+  if (condition === "always") {
+    return workflow.targets ?? new Set();
+  }
+  return workflow.hitTargets ?? new Set();
+}
+
 function getCurrentTriggerUsage() {
   if (!game.combat?.id) return null;
   return {
@@ -145,13 +157,38 @@ function resolveTargets(workflow, flag) {
   }
 
   // "self" et "ally" : même logique, les cibles viennent du workflow
-  if (condition === "miss") {
-    return new Set([...(workflow.targets ?? [])].filter((t) => !hitIds.has(t.id)));
-  } else if (condition === "always") {
-    return workflow.targets ?? new Set();
-  } else {
-    return workflow.hitTargets ?? new Set();
+  return getWorkflowConditionTargets(workflow, condition);
+}
+
+function resolveBonusDamageTargets(workflow, flag) {
+  const targetMode = flag.damage?.targetMode;
+  if (!targetMode) return resolveTargets(workflow, flag);
+
+  if (targetMode === "triggerTarget") {
+    return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
   }
+
+  if (targetMode === "self") {
+    const ownerToken = workflow.token
+      ?? workflow.actor?.getActiveTokens?.()?.[0]
+      ?? null;
+    return ownerToken ? new Set([ownerToken]) : new Set();
+  }
+
+  if (targetMode === "attacker") {
+    const attackerToken = workflow.attackerToken
+      ?? (flag.type === "damaged"
+        ? ([...(workflow.hitTargets ?? workflow.targets ?? [])].find((token) => token?.actor?.id !== workflow.actor?.id) ?? null)
+        : null);
+    return attackerToken ? new Set([attackerToken]) : new Set();
+  }
+
+  if (targetMode === "storedTarget") {
+    const token = canvas.tokens.get(flag.targetTokenId);
+    return token ? new Set([token]) : new Set();
+  }
+
+  return resolveTargets(workflow, flag);
 }
 
 function resolveHealingTargets(workflow, flag) {
@@ -359,10 +396,10 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
 
 export async function applyBonusDamage(workflow, flag) {
   try {
-    const targets = resolveTargets(workflow, flag);
+    const targets = resolveBonusDamageTargets(workflow, flag);
 
     if (!targets?.size) {
-      console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
+      console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible valide (mode "${flag.damage?.targetMode ?? flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
       return;
     }
 

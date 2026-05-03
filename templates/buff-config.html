@@ -100,6 +100,15 @@
       </select>
     </div>
     <div class="bot-row">
+      <label class="bot-label-sm">{{localize "BOT.ui.damage.targetMode.label"}}</label>
+      <select name="damageTargetMode" class="bot-input-flex">
+        <option value="triggerTarget" {{#if flag.damageTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.triggerTarget"}}</option>
+        <option value="self" {{#if flag.damageTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.self"}}</option>
+        <option value="attacker" {{#if flag.damageTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.attacker"}}</option>
+        <option value="storedTarget" {{#if flag.damageTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.storedTarget"}}</option>
+      </select>
+    </div>
+    <div class="bot-row">
       <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
       <select name="saveAbility" class="bot-input-flex">
         <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>

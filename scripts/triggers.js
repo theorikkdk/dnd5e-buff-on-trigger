@@ -285,6 +285,7 @@ export function registerTriggers() {
           const fakeWorkflow = {
             actor: delayedActor,
             item: delayedItem ?? null,
+            attackerToken: attackerToken ?? null,
             targets: attackerToken ? new Set([attackerToken]) : new Set(),
             hitTargets: attackerToken ? new Set([attackerToken]) : new Set(),
             missedTargets: new Set(),

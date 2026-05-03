@@ -121,6 +121,10 @@ function getTriggerFrequencyLabel(frequency) {
   return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
 }
 
+function getDamageTargetModeLabel(targetMode) {
+  return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
+}
+
 function getReceivedAttackTypeLabel(type) {
   return game.i18n.localize(`BOT.ui.receivedAttackType.${type ?? "any"}`);
 }
@@ -234,6 +238,10 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.damage"),
       value: `${raw.damage.formula ?? game.i18n.localize("BOT.ui.summary.notConfigured")} ${raw.damage.type ? `(${labels.damageTypes[raw.damage.type] ?? raw.damage.type})` : ""}`.trim()
+    });
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.damageTarget"),
+      value: getDamageTargetModeLabel(raw.damage.targetMode)
     });
   }
 
@@ -439,6 +447,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
+      damageTargetModeTriggerTarget: (raw.damage?.targetMode ?? "triggerTarget") === "triggerTarget",
+      damageTargetModeSelf: raw.damage?.targetMode === "self",
+      damageTargetModeAttacker: raw.damage?.targetMode === "attacker",
+      damageTargetModeStoredTarget: raw.damage?.targetMode === "storedTarget",
       receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
       receivedAttackTypeMelee: raw.receivedAttackType === "melee",
       receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
@@ -475,6 +487,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (!data.enabled) {
       await this.item.unsetFlag(MODULE_ID, "buffTrigger");
     } else {
+      const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
+      const submittedDamageTargetMode = data.damageTargetMode ?? "triggerTarget";
+      const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
       const flag = {
         targetMode: data.targetMode ?? "self",
         type: data.type,
@@ -486,7 +501,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         })(),
         consumeOnTrigger: data.consumeOnTrigger ?? true,
         triggerFrequency: data.triggerFrequency ?? "none",
-        damage: data.damageFormula ? { formula: data.damageFormula, type: data.damageType } : null,
+        damage: data.damageFormula ? {
+          formula: data.damageFormula,
+          type: data.damageType,
+          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
+        } : null,
         healing: data.healingEnabled && data.healingFormula ? {
           formula: data.healingFormula,
           targetMode: data.healingTargetMode ?? "self",
