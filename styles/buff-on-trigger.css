@@ -157,3 +157,24 @@
   flex-direction: column;
   gap: 4px;
 }
+
+.bot-input-xs {
+  width: 56px;
+}
+
+.bot-input-sm {
+  width: 70px;
+  flex: 0 0 70px;
+}
+
+.bot-input-flex {
+  flex: 1;
+}
+
+.bot-input-full {
+  width: 100%;
+}
+
+.bot-hidden {
+  display: none;
+}

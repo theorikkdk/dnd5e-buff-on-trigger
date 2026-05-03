@@ -1,6 +1,4 @@
-const MODULE_ID = "dnd5e-buff-on-trigger";
-const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
-const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
+﻿import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS } from "./constants.js";
 
 const getSkillLabels = () => ({
   acr: game.i18n.localize("BOT.skills.acr"),
@@ -81,24 +79,46 @@ const getLanguageLabels = () => ({
   deep: game.i18n.localize("BOT.languages.deep")
 });
 
-class BuffTriggerConfig extends FormApplication {
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      title: game.i18n.localize("BOT.ui.configTitle"),
-      template: "modules/dnd5e-buff-on-trigger/templates/buff-config.html",
+class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    tag: "form",
+    form: {
+      handler: BuffTriggerConfig.#onSubmit,
+      closeOnSubmit: true,
+    },
+    window: {
+      title: "BOT.ui.configTitle",
+      contentClasses: ["standard-form"],
+    },
+    position: {
       width: 400,
       height: "auto",
-      resizable: true,
-      closeOnSubmit: true,
-    });
-  }
+    },
+    resizable: true,
+  };
 
-  constructor(item, options) {
+  static PARTS = {
+    form: {
+      template: "modules/dnd5e-buff-on-trigger/templates/buff-config.html",
+    },
+  };
+
+  constructor(item, options = {}) {
     super(options);
     this.item = item;
   }
 
-  getData() {
+  resizeToContent() {
+    this.setPosition({ height: "auto" });
+  }
+
+  _onRender(context, options) {
+    super._onRender(context, options);
+    const form = this.element.matches?.("form") ? this.element : this.element.querySelector?.("form");
+    if (form) form.__botApp = this;
+  }
+
+  async _prepareContext(options) {
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
     const skillLabels = getSkillLabels();
     const damageLabels = getDamageLabels();
@@ -110,9 +130,9 @@ class BuffTriggerConfig extends FormApplication {
     const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
     const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
     const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
-    const weaponProfOptions     = Object.entries(weaponProfLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
-    const armorProfOptions      = Object.entries(armorProfLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
-    const languageOptions       = Object.entries(languageLabels).map(([value, label]) => ({ value, label, selected: (raw.buffs?.languages ?? []).includes(value) }));
+    const weaponProfOptions     = WEAPON_PROF_IDS.map(value => ({ value, label: weaponProfLabels[value], selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
+    const armorProfOptions      = ARMOR_PROF_IDS.map(value => ({ value, label: armorProfLabels[value], selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
+    const languageOptions       = LANGUAGE_IDS.map(value => ({ value, label: languageLabels[value], selected: (raw.buffs?.languages ?? []).includes(value) }));
     const flag = {
       ...raw,
       targetMode:            raw.targetMode ?? "self",
@@ -183,52 +203,56 @@ class BuffTriggerConfig extends FormApplication {
       damageTypeSlashing:    raw.damage?.type === "slashing",
       damageTypeThunder:     raw.damage?.type === "thunder",
     };
-    return { flag };
+    return {
+      ...await super._prepareContext(options),
+      flag,
+    };
   }
 
-  async _updateObject(event, formData) {
-    if (!formData.enabled) {
+  static async #onSubmit(event, form, formData) {
+    const data = foundry.utils.expandObject(formData.object);
+    if (!data.enabled) {
       await this.item.unsetFlag(MODULE_ID, "buffTrigger");
     } else {
       const flag = {
-        targetMode: formData.targetMode ?? "self",
-        type: formData.type,
-        condition: formData.condition,
-        consumeOnTrigger: formData.consumeOnTrigger ?? true,
-        damage: formData.damageFormula ? { formula: formData.damageFormula, type: formData.damageType } : null,
-        save: formData.saveAbility ? { ability: formData.saveAbility, dc: Number(formData.saveDC), effect: formData.saveEffect } : null,
-        status: formData.statusId ? { id: formData.statusId } : null,
-        charges: formData.charges ? Number(formData.charges) : null,
+        targetMode: data.targetMode ?? "self",
+        type: data.type,
+        condition: data.condition,
+        consumeOnTrigger: data.consumeOnTrigger ?? true,
+        damage: data.damageFormula ? { formula: data.damageFormula, type: data.damageType } : null,
+        save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
+        status: data.statusId ? { id: data.statusId } : null,
+        charges: data.charges ? Number(data.charges) : null,
         buffs: (() => {
           const toArray = v => v ? v.split(',').filter(Boolean) : [];
           return {
-            ac: formData.buffAC ? Number(formData.buffAC) : null,
-            attackMode: formData.buffAttackMode !== "none" ? formData.buffAttackMode : null,
-            saveMode: formData.buffSaveMode !== "none" ? formData.buffSaveMode : null,
-            skillMode: formData.buffSkillMode !== "none" ? formData.buffSkillMode : null,
-            skills: toArray(formData.buffSkillAdvantageList),
-            skillBonusSkills: toArray(formData.buffSkillBonusList),
-            skillBonus: formData.buffSkillBonus || null,
-            skillBonusAll: formData.buffSkillBonusAll || null,
-            saveBonus: formData.buffSaveBonus || null,
-            attackBonus: formData.buffAttackBonus || null,
-            speed: formData.buffSpeed ? { value: Number(formData.buffSpeed), type: formData.buffSpeedType ?? "walk" } : null,
-            weaponProfs: toArray(formData.buffWeaponProfsList),
-            armorProfs: toArray(formData.buffArmorProfsList),
-            languages: toArray(formData.buffLanguagesList),
-            darkvision: formData.buffDarkvision ? Number(formData.buffDarkvision) : null,
-            blindsight: formData.buffBlindSight ? Number(formData.buffBlindSight) : null,
-            tremorsense: formData.buffTremorSense ? Number(formData.buffTremorSense) : null,
-            truesight: formData.buffTrueSight ? Number(formData.buffTrueSight) : null,
-            sensesSpecial: formData.buffSensesSpecial || null,
-            passivePerception: formData.buffPassivePerception ? Number(formData.buffPassivePerception) : null,
-            resistances: toArray(formData.buffResistancesList),
-            vulnerabilities: toArray(formData.buffVulnsList),
-            immunities: toArray(formData.buffImmunitiesList),
+            ac: data.buffAC ? Number(data.buffAC) : null,
+            attackMode: data.buffAttackMode !== "none" ? data.buffAttackMode : null,
+            saveMode: data.buffSaveMode !== "none" ? data.buffSaveMode : null,
+            skillMode: data.buffSkillMode !== "none" ? data.buffSkillMode : null,
+            skills: toArray(data.buffSkillAdvantageList),
+            skillBonusSkills: toArray(data.buffSkillBonusList),
+            skillBonus: data.buffSkillBonus || null,
+            skillBonusAll: data.buffSkillBonusAll || null,
+            saveBonus: data.buffSaveBonus || null,
+            attackBonus: data.buffAttackBonus || null,
+            speed: data.buffSpeed ? { value: Number(data.buffSpeed), type: data.buffSpeedType ?? "walk" } : null,
+            weaponProfs: toArray(data.buffWeaponProfsList),
+            armorProfs: toArray(data.buffArmorProfsList),
+            languages: toArray(data.buffLanguagesList),
+            darkvision: data.buffDarkvision ? Number(data.buffDarkvision) : null,
+            blindsight: data.buffBlindSight ? Number(data.buffBlindSight) : null,
+            tremorsense: data.buffTremorSense ? Number(data.buffTremorSense) : null,
+            truesight: data.buffTrueSight ? Number(data.buffTrueSight) : null,
+            sensesSpecial: data.buffSensesSpecial || null,
+            passivePerception: data.buffPassivePerception ? Number(data.buffPassivePerception) : null,
+            resistances: toArray(data.buffResistancesList),
+            vulnerabilities: toArray(data.buffVulnsList),
+            immunities: toArray(data.buffImmunitiesList),
           };
         })(),
         duration: {
-          rounds: formData.durationRounds ? Number(formData.durationRounds) : null,
+          rounds: data.durationRounds ? Number(data.durationRounds) : null,
         },
       };
       await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
@@ -236,6 +260,58 @@ class BuffTriggerConfig extends FormApplication {
     console.log(`[${MODULE_ID}] Configuration sauvegardée sur ${this.item.name}`);
   }
 }
+
+window.botShowTab = function(btn, tabId) {
+  const form = btn.closest('form');
+  form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
+  btn.closest('.bot-tabs').querySelectorAll('.bot-tab-btn').forEach(b => b.classList.remove('bot-tab-active'));
+  form.querySelector('#' + tabId).style.display = '';
+  btn.classList.add('bot-tab-active');
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botShowSubTab = function(btn, tabId) {
+  const container = btn.closest('.bot-subtabs-container');
+  if (!container) return;
+  container.querySelectorAll('.bot-subtab-panel').forEach(p => p.style.display = 'none');
+  btn.closest('.bot-tabs').querySelectorAll('.bot-subtab-btn').forEach(b => b.classList.remove('bot-tab-active'));
+  container.querySelector('#' + tabId).style.display = '';
+  btn.classList.add('bot-tab-active');
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botAddTag = function(selectEl, targetId) {
+  const value = selectEl.value;
+  if (!value) return;
+  const label = selectEl.options[selectEl.selectedIndex].text;
+  const tagsDiv = document.getElementById('tags-' + targetId);
+  if ([...tagsDiv.querySelectorAll('.bot-tag')].some(t => t.dataset.value === value)) {
+    selectEl.value = '';
+    return;
+  }
+  const tag = document.createElement('span');
+  tag.className = 'bot-tag';
+  tag.dataset.value = value;
+  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this, \'' + targetId + '\')">✕</span>';
+  tagsDiv.appendChild(tag);
+  botUpdateHidden(targetId);
+  selectEl.value = '';
+};
+
+window.botRemoveTag = function(removeEl, targetId) {
+  removeEl.parentElement.remove();
+  botUpdateHidden(targetId);
+};
+
+window.botUpdateHidden = function(targetId) {
+  const tagsDiv = document.getElementById('tags-' + targetId);
+  const hiddenInput = document.getElementById('hidden-' + targetId);
+  hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
+};
 
 export function registerItemSheetButton() {
   console.log(`[${MODULE_ID}] registerItemSheetButton enregistré`);
@@ -274,7 +350,7 @@ export function registerItemSheetButton() {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      new BuffTriggerConfig(item).render(true);
+      new BuffTriggerConfig(item).render({ force: true });
     });
 
     if (closeControl) {
@@ -284,3 +360,6 @@ export function registerItemSheetButton() {
     }
   });
 }
+
+
+

@@ -1,5 +1,5 @@
-const MODULE_ID = "dnd5e-buff-on-trigger";
-const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
+import { MODULE_ID, BUFF_ICON, SKILL_IDS } from "./constants.js";
+
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
   bludgeoning: "BOT.damageTypes.bludgeoning",
@@ -25,27 +25,31 @@ function localizeDamageType(type) {
 }
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = []) {
-  const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
-  const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+  try {
+    const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
+    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
-  if (existing) await existing.delete();
+    if (existing) await existing.delete();
 
-  if (!activeBuff && itemName) {
-    for (const token of canvas.tokens.placeables) {
-      if (token.actor) await removeTargetIndicator(token.actor, itemName);
+    if (!activeBuff && itemName) {
+      for (const token of canvas.tokens.placeables) {
+        if (token.actor) await removeTargetIndicator(token.actor, itemName);
+      }
     }
-  }
 
-  if (activeBuff) {
-    const durationRounds = activeBuff.duration?.rounds ?? null;
-    await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " ⚡",
-      img: activeBuff.itemImg ?? BUFF_ICON,
-      statuses: ["bot-active"],
-      changes: extraChanges,
-      duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
-      flags: { [MODULE_ID]: { indicator: true } },
-    }]);
+    if (activeBuff) {
+      const durationRounds = activeBuff.duration?.rounds ?? null;
+      await actor.createEmbeddedDocuments("ActiveEffect", [{
+        name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " ⚡",
+        img: activeBuff.itemImg ?? BUFF_ICON,
+        statuses: ["bot-active"],
+        changes: extraChanges,
+        duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+        flags: { [MODULE_ID]: { indicator: true } },
+      }]);
+    }
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans refreshBuffIndicator :`, error);
   }
 }
 
@@ -104,13 +108,35 @@ function resolveTargets(workflow, flag) {
 }
 
 async function consumeOrDecrementCharges(workflow, flag, targets) {
-  if (flag.chargesRemaining !== null) {
-    const newCharges = flag.chargesRemaining - 1;
-    console.log(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
-    if (newCharges <= 0) {
+  try {
+    if (flag.chargesRemaining !== null) {
+      const newCharges = flag.chargesRemaining - 1;
+      console.log(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
+      if (newCharges <= 0) {
+        const actor = workflow.actor;
+        await actor?.unsetFlag(MODULE_ID, "activeBuff");
+        console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
+        const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
+        for (const e of mechEffects ?? []) await e.delete();
+        const concentrationEffect = actor?.effects.find(
+          (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
+        );
+        if (concentrationEffect) {
+          await concentrationEffect.delete();
+          console.log(`[${MODULE_ID}] Concentration retirée (charges épuisées) sur ${actor.name}`);
+        }
+        await refreshBuffIndicator(actor, flag.itemName);
+        for (const token of targets) {
+          if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
+        }
+      } else {
+        await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
+        console.log(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
+      }
+    } else if (workflow.item !== null && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
-      console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
+      console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
       for (const e of mechEffects ?? []) await e.delete();
       const concentrationEffect = actor?.effects.find(
@@ -118,37 +144,17 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       );
       if (concentrationEffect) {
         await concentrationEffect.delete();
-        console.log(`[${MODULE_ID}] Concentration retirée (charges épuisées) sur ${actor.name}`);
+        console.log(`[${MODULE_ID}] Concentration retirée sur ${actor?.name}`);
       }
       await refreshBuffIndicator(actor, flag.itemName);
       for (const token of targets) {
         if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
       }
-    } else {
-      await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
-      console.log(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
     }
-  } else if (workflow.item !== null && flag.consumeOnTrigger !== false) {
-    const actor = workflow.actor;
-    await actor?.unsetFlag(MODULE_ID, "activeBuff");
-    console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
-    const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-    for (const e of mechEffects ?? []) await e.delete();
-    const concentrationEffect = actor?.effects.find(
-      (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
-    );
-    if (concentrationEffect) {
-      await concentrationEffect.delete();
-      console.log(`[${MODULE_ID}] Concentration retirée sur ${actor?.name}`);
-    }
-    await refreshBuffIndicator(actor, flag.itemName);
-    for (const token of targets) {
-      if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
-    }
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans consumeOrDecrementCharges :`, error);
   }
 }
-
-const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
 
 export function buildMechanicalChanges(flag) {
   if (!flag.buffs) return [];
@@ -255,135 +261,147 @@ export function buildMechanicalChanges(flag) {
 }
 
 export async function applyMechanicalBuffs(actor, flag, durationRounds) {
-  const changes = buildMechanicalChanges(flag);
-  if (!changes.length) return;
-  await actor.createEmbeddedDocuments("ActiveEffect", [{
-    name: flag.itemName ?? localize("BOT.fallback.effectName"),
-    img: flag.itemImg ?? BUFF_ICON,
-    changes,
-    duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
-    flags: { [MODULE_ID]: { mechanicalBuff: true } },
-  }]);
-  console.log(`[${MODULE_ID}] Buffs mécaniques appliqués sur ${actor.name}`);
+  try {
+    const changes = buildMechanicalChanges(flag);
+    if (!changes.length) return;
+    await actor.createEmbeddedDocuments("ActiveEffect", [{
+      name: flag.itemName ?? localize("BOT.fallback.effectName"),
+      img: flag.itemImg ?? BUFF_ICON,
+      changes,
+      duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+      flags: { [MODULE_ID]: { mechanicalBuff: true } },
+    }]);
+    console.log(`[${MODULE_ID}] Buffs mécaniques appliqués sur ${actor.name}`);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyMechanicalBuffs :`, error);
+  }
 }
 
 export async function applyBonusDamage(workflow, flag) {
-  const targets = resolveTargets(workflow, flag);
+  try {
+    const targets = resolveTargets(workflow, flag);
 
-  if (!targets?.size) {
-    console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
-    return;
-  }
+    if (!targets?.size) {
+      console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
+      return;
+    }
 
-  console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} — cibles : ${targets.size}`);
+    console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} — cibles : ${targets.size}`);
 
-  const formula = flag.damage.formula;
-  const damageType = flag.damage.type;
-  const roll = await new Roll(formula).evaluate();
+    const formula = flag.damage.formula;
+    const damageType = flag.damage.type;
+    const roll = await new Roll(formula).evaluate();
 
-  console.log(`[${MODULE_ID}] Dégâts bonus : ${roll.total} ${damageType}`);
+    console.log(`[${MODULE_ID}] Dégâts bonus : ${roll.total} ${damageType}`);
 
-  await ChatMessage.create({
-    content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
-      <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-      <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
-    </div>`,
-    speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-  });
+    await ChatMessage.create({
+      content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
+        <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
+        <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
+      </div>`,
+      speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+    });
 
-  let fullTargets = targets;
-  let halfTargets = new Set();
+    let fullTargets = targets;
+    let halfTargets = new Set();
 
-  if (flag.save?.ability) {
-    fullTargets = new Set();
-    halfTargets = new Set();
-    for (const token of targets) {
-      const targetActor = token.actor;
-      if (!targetActor) continue;
-      const saveRolls = await targetActor.rollSavingThrow(
-        { ability: flag.save.ability },
-        { configure: false },
-        { create: true }
-      );
-      if (!saveRolls || saveRolls.length === 0) {
+    if (flag.save?.ability) {
+      fullTargets = new Set();
+      halfTargets = new Set();
+      for (const token of targets) {
+        const targetActor = token.actor;
+        if (!targetActor) continue;
+        const saveRolls = await targetActor.rollSavingThrow(
+          { ability: flag.save.ability },
+          { configure: false },
+          { create: true }
+        );
+        if (!saveRolls || saveRolls.length === 0) {
+          fullTargets.add(token);
+          continue;
+        }
+        const saveRoll = saveRolls[0];
+        const success = saveRoll.total >= flag.save.dc;
+        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} — ${success ? "réussite" : "échec"}`);
+        if (success) {
+          if (flag.save.effect === "none") continue;
+          if (flag.save.effect === "half") { halfTargets.add(token); continue; }
+        }
         fullTargets.add(token);
-        continue;
       }
-      const saveRoll = saveRolls[0];
-      const success = saveRoll.total >= flag.save.dc;
-      console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} — ${success ? "réussite" : "échec"}`);
-      if (success) {
-        if (flag.save.effect === "none") continue;
-        if (flag.save.effect === "half") { halfTargets.add(token); continue; }
+    }
+
+    if (typeof MidiQOL?.applyTokenDamage === "function") {
+      if (fullTargets.size) {
+        await MidiQOL.applyTokenDamage(
+          [{ damage: roll.total, type: damageType }],
+          roll.total,
+          fullTargets,
+          workflow.item ?? null,
+          new Set(),
+          { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
+        );
       }
-      fullTargets.add(token);
+      if (halfTargets.size) {
+        const half = Math.floor(roll.total / 2);
+        await MidiQOL.applyTokenDamage(
+          [{ damage: half, type: damageType }],
+          half,
+          halfTargets,
+          workflow.item ?? null,
+          new Set(),
+          { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
+        );
+      }
+    } else {
+      for (const token of fullTargets) {
+        await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
+      }
+      for (const token of halfTargets) {
+        await token.actor?.applyDamage([{ value: Math.floor(roll.total / 2), type: damageType }]);
+      }
+      if (fullTargets.size || halfTargets.size) {
+        await ChatMessage.create({
+          content: game.i18n.format("BOT.chat.damageResult", {
+            name: flag.itemName ?? localize("BOT.fallback.effectName"),
+            total: roll.total,
+            type: localizeDamageType(damageType)
+          }),
+          speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+          rolls: [roll],
+        });
+      }
     }
-  }
 
-  if (typeof MidiQOL?.applyTokenDamage === "function") {
-    if (fullTargets.size) {
-      await MidiQOL.applyTokenDamage(
-        [{ damage: roll.total, type: damageType }],
-        roll.total,
-        fullTargets,
-        workflow.item ?? null,
-        new Set(),
-        { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
-      );
-    }
-    if (halfTargets.size) {
-      const half = Math.floor(roll.total / 2);
-      await MidiQOL.applyTokenDamage(
-        [{ damage: half, type: damageType }],
-        half,
-        halfTargets,
-        workflow.item ?? null,
-        new Set(),
-        { flavor: flag.itemName ?? localize("BOT.fallback.effectName") }
-      );
-    }
-  } else {
-    for (const token of fullTargets) {
-      await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
-    }
-    for (const token of halfTargets) {
-      await token.actor?.applyDamage([{ value: Math.floor(roll.total / 2), type: damageType }]);
-    }
-    if (fullTargets.size || halfTargets.size) {
-      await ChatMessage.create({
-        content: game.i18n.format("BOT.chat.damageResult", {
-          name: flag.itemName ?? localize("BOT.fallback.effectName"),
-          total: roll.total,
-          type: localizeDamageType(damageType)
-        }),
-        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-        rolls: [roll],
-      });
-    }
+    await consumeOrDecrementCharges(workflow, flag, targets);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyBonusDamage :`, error);
   }
-
-  await consumeOrDecrementCharges(workflow, flag, targets);
 }
 
 export async function applyStatusEffect(workflow, flag) {
-  const targets = resolveTargets(workflow, flag);
+  try {
+    const targets = resolveTargets(workflow, flag);
 
-  if (!targets?.size) {
-    console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
-    return;
+    if (!targets?.size) {
+      console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible (mode "${flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
+      return;
+    }
+
+    const statusId = flag.status.id;
+
+    for (const token of targets) {
+      const targetActor = token.actor;
+      if (!targetActor) continue;
+
+      await targetActor.toggleStatusEffect(statusId, { active: true });
+      console.log(`[${MODULE_ID}] Statut ${statusId} appliqué sur ${targetActor.name}`);
+    }
+
+    if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyStatusEffect :`, error);
   }
-
-  const statusId = flag.status.id;
-
-  for (const token of targets) {
-    const targetActor = token.actor;
-    if (!targetActor) continue;
-
-    await targetActor.toggleStatusEffect(statusId, { active: true });
-    console.log(`[${MODULE_ID}] Statut ${statusId} appliqué sur ${targetActor.name}`);
-  }
-
-  if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
 }
 
 export async function applyEffect(workflow, flag) {

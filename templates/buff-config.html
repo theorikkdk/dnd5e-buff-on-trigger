@@ -1,5 +1,5 @@
-<form>
-  <!-- En-tête toujours visible -->
+﻿  <!-- En-tête toujours visible -->
+<div class="buff-on-trigger-config">
   <div class="form-group">
     <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
@@ -85,7 +85,7 @@
       </div>
       <div class="form-group">
         <label>{{localize "BOT.ui.dc.label"}}</label>
-        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" style="width:56px" />
+        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
       </div>
       <div class="form-group">
         <label>{{localize "BOT.ui.success.label"}}</label>
@@ -115,7 +115,7 @@
       <div id="bot-subtab-combat" class="bot-subtab-panel">
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.acBonus"}}</label>
-          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" style="width:56px" />
+          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" class="bot-input-xs" />
         </div>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
@@ -144,11 +144,11 @@
         <div class="bot-row">
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
-            <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" style="width:56px" />
+            <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" class="bot-input-xs" />
           </div>
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.saveBonus"}}</label>
-            <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" style="width:56px" />
+            <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" class="bot-input-xs" />
           </div>
         </div>
       </div>
@@ -168,7 +168,7 @@
           </div>
         </div>
         <div class="bot-row">
-          <div class="form-group" style="flex:1">
+          <div class="form-group bot-input-flex">
             <label>{{localize "BOT.ui.skills.bonus"}}</label>
             <div class="bot-tag-picker">
               <div class="bot-tags" id="tags-buffSkillBonusList">
@@ -181,9 +181,9 @@
               <input type="hidden" name="buffSkillBonusList" id="hidden-buffSkillBonusList" value="{{#each flag.skillBonusOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
             </div>
           </div>
-          <div class="form-group" style="flex:0 0 70px">
+          <div class="form-group bot-input-sm">
             <label>{{localize "BOT.ui.common.value"}}</label>
-            <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" style="width:100%" />
+            <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" class="bot-input-full" />
           </div>
         </div>
         <div class="form-group">
@@ -341,56 +341,7 @@
   <footer>
     <button type="submit">{{localize "BOT.ui.actions.save"}}</button>
   </footer>
-</form>
+</div>
 
-<script>
-function botShowTab(btn, tabId) {
-  const form = btn.closest('form');
-  form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
-  btn.closest('.bot-tabs').querySelectorAll('.bot-tab-btn').forEach(b => b.classList.remove('bot-tab-active'));
-  document.getElementById(tabId).style.display = '';
-  btn.classList.add('bot-tab-active');
-  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
-  if (app) app.setPosition({ height: "auto" });
-}
 
-function botShowSubTab(btn, tabId) {
-  const container = btn.closest('.bot-subtabs-container');
-  if (!container) return;
-  container.querySelectorAll('.bot-subtab-panel').forEach(p => p.style.display = 'none');
-  btn.closest('.bot-tabs').querySelectorAll('.bot-subtab-btn').forEach(b => b.classList.remove('bot-tab-active'));
-  container.querySelector('#' + tabId).style.display = '';
-  btn.classList.add('bot-tab-active');
-  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig");
-  if (app) app.setPosition({ height: "auto" });
-}
 
-function botAddTag(selectEl, targetId) {
-  const value = selectEl.value;
-  if (!value) return;
-  const label = selectEl.options[selectEl.selectedIndex].text;
-  const tagsDiv = document.getElementById('tags-' + targetId);
-  if ([...tagsDiv.querySelectorAll('.bot-tag')].some(t => t.dataset.value === value)) {
-    selectEl.value = '';
-    return;
-  }
-  const tag = document.createElement('span');
-  tag.className = 'bot-tag';
-  tag.dataset.value = value;
-  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this,\'' + targetId + '\')">✕</span>';
-  tagsDiv.appendChild(tag);
-  botUpdateHidden(targetId);
-  selectEl.value = '';
-}
-
-function botRemoveTag(removeEl, targetId) {
-  removeEl.parentElement.remove();
-  botUpdateHidden(targetId);
-}
-
-function botUpdateHidden(targetId) {
-  const tagsDiv = document.getElementById('tags-' + targetId);
-  const hiddenInput = document.getElementById('hidden-' + targetId);
-  hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
-}
-</script>
