@@ -157,8 +157,10 @@
         <input type="text" name="healingFormula" value="{{flag.healingFormula}}" placeholder="2d6" class="bot-input-flex" />
         <label class="bot-label-sm">{{localize "BOT.ui.healing.targetMode.label"}}</label>
         <select name="healingTargetMode" class="bot-input-flex">
+          <option value="triggerTarget" {{#if flag.healingTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.triggerTarget"}}</option>
           <option value="self" {{#if flag.healingTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.self"}}</option>
-          <option value="target" {{#if flag.healingTargetModeTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.target"}}</option>
+          <option value="attacker" {{#if flag.healingTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.attacker"}}</option>
+          <option value="storedTarget" {{#if flag.healingTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.storedTarget"}}</option>
         </select>
       </div>
     </section>
@@ -173,8 +175,10 @@
         <input type="text" name="temporaryHpFormula" value="{{flag.temporaryHpFormula}}" placeholder="1d6" class="bot-input-flex" />
         <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.targetMode.label"}}</label>
         <select name="temporaryHpTargetMode" class="bot-input-flex">
+          <option value="triggerTarget" {{#if flag.temporaryHpTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.triggerTarget"}}</option>
           <option value="self" {{#if flag.temporaryHpTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.self"}}</option>
-          <option value="target" {{#if flag.temporaryHpTargetModeTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.target"}}</option>
+          <option value="attacker" {{#if flag.temporaryHpTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.attacker"}}</option>
+          <option value="storedTarget" {{#if flag.temporaryHpTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.storedTarget"}}</option>
         </select>
       </div>
       <div class="bot-row">

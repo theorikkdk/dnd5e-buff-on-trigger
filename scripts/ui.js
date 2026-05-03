@@ -129,6 +129,14 @@ function getStatusTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.status.targetMode.${targetMode ?? "legacy"}`);
 }
 
+function normalizeHealingTargetMode(targetMode) {
+  return targetMode === "target" ? "triggerTarget" : (targetMode ?? "self");
+}
+
+function normalizeTemporaryHpTargetMode(targetMode) {
+  return targetMode === "target" ? "triggerTarget" : (targetMode ?? "self");
+}
+
 function getReceivedAttackTypeLabel(type) {
   return game.i18n.localize(`BOT.ui.receivedAttackType.${type ?? "any"}`);
 }
@@ -242,6 +250,8 @@ function buildMechanicalSummary(raw, labels) {
 
 function buildConfigSummary(raw, labels, itemDurationRounds) {
   const legacyDurationFallback = getLegacyDurationFallback(raw, itemDurationRounds);
+  const healingTargetMode = normalizeHealingTargetMode(raw.healing?.targetMode);
+  const temporaryHpTargetMode = normalizeTemporaryHpTargetMode(raw.temporaryHp?.targetMode);
   const summary = [
     { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
@@ -280,14 +290,14 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (raw.healing?.formula) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.healing"),
-      value: `${raw.healing.formula} (${getHealingTargetModeLabel(raw.healing.targetMode)})`
+      value: `${raw.healing.formula} (${getHealingTargetModeLabel(healingTargetMode)})`
     });
   }
 
   if (raw.temporaryHp?.formula) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.temporaryHp"),
-      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(raw.temporaryHp.targetMode)} • ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
+      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(temporaryHpTargetMode)} • ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
     });
   }
 
@@ -387,6 +397,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const raw = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
     const itemDurationRounds = getItemDurationInRounds(this.item);
     const legacyDurationFallback = getLegacyDurationFallback(raw, itemDurationRounds);
+    const healingTargetMode = normalizeHealingTargetMode(raw.healing?.targetMode);
+    const temporaryHpTargetMode = normalizeTemporaryHpTargetMode(raw.temporaryHp?.targetMode);
     const skillLabels = getSkillLabels();
     const damageLabels = getDamageLabels();
     const weaponProfLabels = getWeaponProfLabels();
@@ -449,12 +461,16 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffPassivePerception:     raw.buffs?.passivePerception ?? "",
       healingEnabled:            !!raw.healing,
       healingFormula:            raw.healing?.formula ?? "",
-      healingTargetModeSelf:     (raw.healing?.targetMode ?? "self") === "self",
-      healingTargetModeTarget:   raw.healing?.targetMode === "target",
+      healingTargetModeTriggerTarget: healingTargetMode === "triggerTarget",
+      healingTargetModeSelf:     healingTargetMode === "self",
+      healingTargetModeAttacker: healingTargetMode === "attacker",
+      healingTargetModeStoredTarget: healingTargetMode === "storedTarget",
       temporaryHpEnabled:        !!raw.temporaryHp,
       temporaryHpFormula:        raw.temporaryHp?.formula ?? "",
-      temporaryHpTargetModeSelf: (raw.temporaryHp?.targetMode ?? "self") === "self",
-      temporaryHpTargetModeTarget: raw.temporaryHp?.targetMode === "target",
+      temporaryHpTargetModeTriggerTarget: temporaryHpTargetMode === "triggerTarget",
+      temporaryHpTargetModeSelf: temporaryHpTargetMode === "self",
+      temporaryHpTargetModeAttacker: temporaryHpTargetMode === "attacker",
+      temporaryHpTargetModeStoredTarget: temporaryHpTargetMode === "storedTarget",
       temporaryHpModeKeepHighest: (raw.temporaryHp?.mode ?? "keepHighest") === "keepHighest",
       temporaryHpModeReplace:    raw.temporaryHp?.mode === "replace",
       temporaryHpModeAdd:        raw.temporaryHp?.mode === "add",
@@ -552,15 +568,15 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           type: data.damageType,
           ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
         } : null,
-          healing: data.healingEnabled && data.healingFormula ? {
-            formula: data.healingFormula,
-            targetMode: data.healingTargetMode ?? "self",
-          } : null,
-          temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
-            formula: data.temporaryHpFormula,
-            targetMode: data.temporaryHpTargetMode ?? "self",
-            mode: data.temporaryHpMode ?? "keepHighest",
-          } : null,
+        healing: data.healingEnabled && data.healingFormula ? {
+          formula: data.healingFormula,
+          targetMode: normalizeHealingTargetMode(data.healingTargetMode),
+        } : null,
+        temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
+          formula: data.temporaryHpFormula,
+          targetMode: normalizeTemporaryHpTargetMode(data.temporaryHpTargetMode),
+          mode: data.temporaryHpMode ?? "keepHighest",
+        } : null,
           save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
           status: data.statusId ? {
             id: data.statusId,

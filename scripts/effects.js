@@ -222,8 +222,17 @@ function resolveStatusTargets(workflow, flag) {
   return resolveTargets(workflow, flag);
 }
 
+function inferAttackerToken(workflow, actor, type) {
+  return workflow.attackerToken
+    ?? (type === "damaged"
+      ? ([...(workflow.hitTargets ?? workflow.targets ?? [])].find((token) => token?.actor?.id !== actor?.id) ?? null)
+      : null);
+}
+
 function resolveHealingTargets(workflow, flag) {
-  const targetMode = flag.healing?.targetMode ?? "self";
+  const targetMode = flag.healing?.targetMode === "target"
+    ? "triggerTarget"
+    : (flag.healing?.targetMode ?? "self");
 
   if (targetMode === "self") {
     const actorToken = workflow.token
@@ -232,13 +241,29 @@ function resolveHealingTargets(workflow, flag) {
     return actorToken ? new Set([actorToken]) : new Set();
   }
 
-  return workflow.hitTargets?.size
-    ? new Set(workflow.hitTargets)
-    : new Set(workflow.targets ?? []);
+  if (targetMode === "triggerTarget") {
+    return workflow.hitTargets?.size
+      ? new Set(workflow.hitTargets)
+      : new Set(workflow.targets ?? []);
+  }
+
+  if (targetMode === "attacker") {
+    const attackerToken = inferAttackerToken(workflow, workflow.actor, flag.type);
+    return attackerToken ? new Set([attackerToken]) : new Set();
+  }
+
+  if (targetMode === "storedTarget") {
+    const token = canvas.tokens.get(flag.targetTokenId);
+    return token ? new Set([token]) : new Set();
+  }
+
+  return new Set();
 }
 
 function resolveTemporaryHpTargets(workflow, flag) {
-  const targetMode = flag.temporaryHp?.targetMode ?? "self";
+  const targetMode = flag.temporaryHp?.targetMode === "target"
+    ? "triggerTarget"
+    : (flag.temporaryHp?.targetMode ?? "self");
 
   if (targetMode === "self") {
     const actorToken = workflow.token
@@ -247,9 +272,23 @@ function resolveTemporaryHpTargets(workflow, flag) {
     return actorToken ? new Set([actorToken]) : new Set();
   }
 
-  return workflow.hitTargets?.size
-    ? new Set(workflow.hitTargets)
-    : new Set(workflow.targets ?? []);
+  if (targetMode === "triggerTarget") {
+    return workflow.hitTargets?.size
+      ? new Set(workflow.hitTargets)
+      : new Set(workflow.targets ?? []);
+  }
+
+  if (targetMode === "attacker") {
+    const attackerToken = inferAttackerToken(workflow, workflow.actor, flag.type);
+    return attackerToken ? new Set([attackerToken]) : new Set();
+  }
+
+  if (targetMode === "storedTarget") {
+    const token = canvas.tokens.get(flag.targetTokenId);
+    return token ? new Set([token]) : new Set();
+  }
+
+  return new Set();
 }
 
 async function consumeOrDecrementCharges(workflow, flag, targets) {
@@ -590,7 +629,10 @@ export async function applyBonusHealing(workflow, flag) {
   try {
     const targets = resolveHealingTargets(workflow, flag);
 
-    if (!targets?.size) return;
+    if (!targets?.size) {
+      console.warn(`[${MODULE_ID}] applyBonusHealing : aucune cible valide (mode "${flag.healing?.targetMode ?? "self"}")`);
+      return;
+    }
 
     const formula = flag.healing?.formula;
     if (!formula) return;
@@ -635,7 +677,10 @@ export async function applyBonusHealing(workflow, flag) {
 export async function applyTemporaryHp(workflow, flag) {
   try {
     const targets = resolveTemporaryHpTargets(workflow, flag);
-    if (!targets?.size) return;
+    if (!targets?.size) {
+      console.warn(`[${MODULE_ID}] applyTemporaryHp : aucune cible valide (mode "${flag.temporaryHp?.targetMode ?? "self"}")`);
+      return;
+    }
 
     const formula = flag.temporaryHp?.formula;
     if (!formula) return;
