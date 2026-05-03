@@ -21,6 +21,8 @@
   "BOT.ui.trigger.label": "Déclencheur",
   "BOT.ui.trigger.mwak": "Attaque corps à corps",
   "BOT.ui.trigger.rwak": "Attaque à distance",
+  "BOT.ui.trigger.msak": "Attaque de sort mêlée",
+  "BOT.ui.trigger.rsak": "Attaque de sort à distance",
   "BOT.ui.trigger.turnStart": "Début de tour (lanceur)",
   "BOT.ui.trigger.targetTurnStart": "Début de tour de la cible",
   "BOT.ui.trigger.turnEnd": "Fin de tour (lanceur)",

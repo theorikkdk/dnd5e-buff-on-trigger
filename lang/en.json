@@ -21,6 +21,8 @@
   "BOT.ui.trigger.label": "Trigger",
   "BOT.ui.trigger.mwak": "Melee attack",
   "BOT.ui.trigger.rwak": "Ranged attack",
+  "BOT.ui.trigger.msak": "Melee spell attack",
+  "BOT.ui.trigger.rsak": "Ranged spell attack",
   "BOT.ui.trigger.turnStart": "Start of turn (caster)",
   "BOT.ui.trigger.targetTurnStart": "Start of target's turn",
   "BOT.ui.trigger.turnEnd": "End of turn (caster)",

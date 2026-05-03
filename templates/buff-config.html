@@ -25,16 +25,18 @@
   <div id="bot-tab-trigger" class="bot-tab-panel">
     <div class="form-group">
       <label>{{localize "BOT.ui.trigger.label"}}</label>
-      <select name="type">
+      <select name="type" onchange="botUpdateTriggerUI(this)">
         <option value="mwak"            {{#if flag.typeMwak}}selected{{/if}}>{{localize "BOT.ui.trigger.mwak"}}</option>
         <option value="rwak"            {{#if flag.typeRwak}}selected{{/if}}>{{localize "BOT.ui.trigger.rwak"}}</option>
+        <option value="msak"            {{#if flag.typeMsak}}selected{{/if}}>{{localize "BOT.ui.trigger.msak"}}</option>
+        <option value="rsak"            {{#if flag.typeRsak}}selected{{/if}}>{{localize "BOT.ui.trigger.rsak"}}</option>
         <option value="turnStart"       {{#if flag.typeTurnStart}}selected{{/if}}>{{localize "BOT.ui.trigger.turnStart"}}</option>
         <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnStart"}}</option>
         <option value="turnEnd"         {{#if flag.typeTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.turnEnd"}}</option>
         <option value="targetTurnEnd"   {{#if flag.typeTargetTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnEnd"}}</option>
       </select>
     </div>
-    <div class="form-group">
+    <div class="form-group" id="bot-condition-group">
       <label>{{localize "BOT.ui.condition.label"}}</label>
       <select name="condition">
         <option value="hit"    {{#if flag.conditionHit}}selected{{/if}}>{{localize "BOT.ui.condition.hit"}}</option>

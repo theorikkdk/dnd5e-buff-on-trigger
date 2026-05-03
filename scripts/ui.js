@@ -116,6 +116,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     super._onRender(context, options);
     const form = this.element.matches?.("form") ? this.element : this.element.querySelector?.("form");
     if (form) form.__botApp = this;
+    const triggerSelect = this.element.querySelector?.('[name="type"]');
+    if (triggerSelect) window.botUpdateTriggerUI(triggerSelect);
   }
 
   async _prepareContext(options) {
@@ -141,6 +143,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       targetModeAlly:        raw.targetMode === "ally",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
+      typeMsak:              raw.type === "msak",
+      typeRsak:              raw.type === "rsak",
       typeTurnStart:         raw.type === "turnStart",
       typeTurnEnd:           raw.type === "turnEnd",
       typeTargetTurnStart:   raw.type === "targetTurnStart",
@@ -270,6 +274,16 @@ window.botShowTab = function(btn, tabId) {
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.resizeToContent();
+};
+
+window.botUpdateTriggerUI = function(selectEl) {
+  const conditionGroup = document.getElementById("bot-condition-group");
+  if (!conditionGroup) return;
+  if (["mwak", "rwak", "msak", "rsak"].includes(selectEl.value)) {
+    conditionGroup.style.display = "";
+  } else {
+    conditionGroup.style.display = "none";
+  }
 };
 
 window.botShowSubTab = function(btn, tabId) {
