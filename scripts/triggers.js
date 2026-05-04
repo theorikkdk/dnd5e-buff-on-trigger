@@ -78,6 +78,7 @@ export function registerTriggers() {
           itemName: workflow.item?.name,
           itemImg: workflow.item?.img,
           itemUuid: workflow.item?.uuid ?? null,
+          originActorUuid: workflow.actor?.uuid ?? null,
           duration: buildItemDurationData(workflow.item) ?? buffConfig.duration,
           chargesRemaining: buffConfig.charges ?? null
         };

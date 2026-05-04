@@ -25,6 +25,120 @@ function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
 }
 
+function normalizeSaveDC(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+function readNumericSaveDCFromItem(item) {
+  if (!item) return null;
+
+  const directDc = normalizeSaveDC(item.system?.save?.dc);
+  if (directDc !== null) return directDc;
+
+  const activities = item.system?.activities;
+  if (activities && typeof activities === "object") {
+    for (const activity of Object.values(activities)) {
+      const activityDc = normalizeSaveDC(activity?.save?.dc);
+      if (activityDc !== null) return activityDc;
+    }
+  }
+
+  return null;
+}
+
+function readNumericSaveDCFromActor(actor) {
+  if (!actor) return null;
+  return normalizeSaveDC(
+    actor.system?.attributes?.spell?.dc
+    ?? actor.system?.attributes?.spelldc
+  );
+}
+
+async function resolveActorFromUuid(uuid) {
+  if (!uuid) return null;
+  try {
+    if (typeof fromUuidSync === "function") {
+      return fromUuidSync(uuid);
+    }
+    if (typeof fromUuid === "function") {
+      return await fromUuid(uuid);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function resolveDocumentFromUuid(uuid) {
+  if (!uuid) return null;
+  try {
+    if (typeof fromUuidSync === "function") {
+      return fromUuidSync(uuid);
+    }
+    if (typeof fromUuid === "function") {
+      return await fromUuid(uuid);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function resolveSaveDC(workflow, flag) {
+  const source = flag.save?.dcSource ?? "fixed";
+  const fixedDc = normalizeSaveDC(flag.save?.dc);
+
+  if (source === "fixed") {
+    if (fixedDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${fixedDc} via fixed`);
+    }
+    return fixedDc;
+  }
+
+  if (source === "origin") {
+    const originItem = await resolveDocumentFromUuid(flag.itemUuid) ?? workflow.item ?? null;
+    const itemDc = readNumericSaveDCFromItem(originItem);
+    if (itemDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${itemDc} via origin-item`);
+      return itemDc;
+    }
+
+    const originActor = await resolveActorFromUuid(flag.originActorUuid)
+      ?? originItem?.actor
+      ?? workflow.item?.actor
+      ?? null;
+    const actorDc = readNumericSaveDCFromActor(originActor);
+    if (actorDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${actorDc} via origin-actor`);
+      return actorDc;
+    }
+
+    if (fixedDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${fixedDc} via fixed-fallback`);
+    }
+    return fixedDc;
+  }
+
+  if (source === "owner") {
+    const ownerDc = readNumericSaveDCFromActor(workflow.actor);
+    if (ownerDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${ownerDc} via owner`);
+      return ownerDc;
+    }
+
+    if (fixedDc !== null) {
+      console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${fixedDc} via fixed-fallback`);
+    }
+    return fixedDc;
+  }
+
+  if (fixedDc !== null) {
+    console.log(`[${MODULE_ID}] DD de sauvegarde résolu : ${fixedDc} via fixed-fallback`);
+  }
+  return fixedDc;
+}
+
 function isWorkflowCritical(workflow) {
   return Boolean(
     workflow?.isCritical
@@ -650,6 +764,49 @@ export async function applyBonusDamage(workflow, flag) {
         console.log(`[${MODULE_ID}] Critique : formule des dÃƒÂ©gÃƒÂ¢ts bonus ajustÃƒÂ©e`);
       }
     }
+    let fullTargets = targets;
+    let halfTargets = new Set();
+
+    if (flag.save?.ability) {
+      const saveDc = await resolveSaveDC(workflow, flag);
+      if (saveDc === null) {
+        console.warn(`[${MODULE_ID}] applyBonusDamage : DD de sauvegarde introuvable, jet ignoré`);
+      }
+      fullTargets = new Set();
+      halfTargets = new Set();
+      for (const token of targets) {
+        const targetActor = token.actor;
+        if (!targetActor) continue;
+        if (saveDc === null) {
+          fullTargets.add(token);
+          continue;
+        }
+        const saveRolls = await targetActor.rollSavingThrow(
+          {
+            ability: flag.save.ability,
+            // Provide DC context to dnd5e so the native save card can display target information when supported.
+            target: saveDc,
+            targetValue: saveDc,
+            dc: saveDc
+          },
+          { configure: false },
+          { create: true }
+        );
+        if (!saveRolls || saveRolls.length === 0) {
+          fullTargets.add(token);
+          continue;
+        }
+        const saveRoll = saveRolls[0];
+        const success = saveRoll.total >= saveDc;
+        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
+        if (success) {
+          if (flag.save.effect === "none") continue;
+          if (flag.save.effect === "half") { halfTargets.add(token); continue; }
+        }
+        fullTargets.add(token);
+      }
+    }
+
     const roll = await new Roll(formula).evaluate();
     await sendRollMessage(
       workflow.actor,
@@ -659,35 +816,6 @@ export async function applyBonusDamage(workflow, flag) {
     );
 
     console.log(`[${MODULE_ID}] DÃƒÂ©gÃƒÂ¢ts bonus : ${roll.total} ${damageType}`);
-
-    let fullTargets = targets;
-    let halfTargets = new Set();
-
-    if (flag.save?.ability) {
-      fullTargets = new Set();
-      halfTargets = new Set();
-      for (const token of targets) {
-        const targetActor = token.actor;
-        if (!targetActor) continue;
-        const saveRolls = await targetActor.rollSavingThrow(
-          { ability: flag.save.ability },
-          { configure: false },
-          { create: true }
-        );
-        if (!saveRolls || saveRolls.length === 0) {
-          fullTargets.add(token);
-          continue;
-        }
-        const saveRoll = saveRolls[0];
-        const success = saveRoll.total >= flag.save.dc;
-        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
-        if (success) {
-          if (flag.save.effect === "none") continue;
-          if (flag.save.effect === "half") { halfTargets.add(token); continue; }
-        }
-        fullTargets.add(token);
-      }
-    }
 
     if (flag.type === "damaged") {
       for (const token of fullTargets) {

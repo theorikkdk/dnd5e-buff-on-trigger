@@ -214,6 +214,38 @@
   font-size: 11px;
 }
 
+.bot-save-row {
+  align-items: center;
+}
+
+.bot-save-main-select,
+.bot-save-source-select {
+  min-width: 190px;
+}
+
+.bot-save-source-select {
+  flex: 1.2;
+}
+
+.bot-save-dc-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: fit-content;
+}
+
+.bot-save-success-label {
+  margin-left: 4px;
+}
+
+.bot-save-effect-select {
+  min-width: 110px;
+}
+
+.buff-on-trigger-config select {
+  min-height: 28px;
+}
+
 .bot-summary-panel,
 .bot-inline-panel {
   margin-top: 12px;

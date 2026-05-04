@@ -108,9 +108,9 @@
         <option value="storedTarget" {{#if flag.damageTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.storedTarget"}}</option>
       </select>
     </div>
-    <div class="bot-row">
+    <div class="bot-row bot-save-row">
       <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
-      <select name="saveAbility" class="bot-input-flex">
+      <select name="saveAbility" class="bot-input-flex bot-save-main-select">
         <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
         <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
         <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
@@ -119,10 +119,20 @@
         <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
         <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
       </select>
-      <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
-      <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
-      <label class="bot-label-sm">{{localize "BOT.ui.success.label"}}</label>
-      <select name="saveEffect" class="bot-input-sm">
+      <label class="bot-label-sm">{{localize "BOT.ui.saveDcSource.label"}}</label>
+      <select name="saveDcSource" class="bot-input-flex bot-save-source-select" onchange="botUpdateSaveDcUI(this)">
+        <option value="fixed" {{#if flag.saveDcSourceFixed}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.fixed"}}</option>
+        <option value="origin" {{#if flag.saveDcSourceOrigin}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.origin"}}</option>
+        <option value="owner" {{#if flag.saveDcSourceOwner}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.owner"}}</option>
+      </select>
+    </div>
+    <div class="bot-row bot-save-row">
+      <div id="bot-save-dc-group" class="bot-save-dc-group" {{#unless flag.saveDcSourceFixed}}style="display:none"{{/unless}}>
+        <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
+        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
+      </div>
+      <label class="bot-label-sm bot-save-success-label">{{localize "BOT.ui.success.label"}}</label>
+      <select name="saveEffect" class="bot-input-sm bot-save-effect-select">
         <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
         <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
         <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>

@@ -129,6 +129,10 @@ function getStatusTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.status.targetMode.${targetMode ?? "legacy"}`);
 }
 
+function getSaveDcSourceLabel(source) {
+  return game.i18n.localize(`BOT.ui.saveDcSource.${source ?? "fixed"}`);
+}
+
 function normalizeHealingTargetMode(targetMode) {
   return targetMode === "target" ? "triggerTarget" : (targetMode ?? "self");
 }
@@ -302,9 +306,10 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   }
 
   if (raw.save?.ability) {
+    const saveDcSource = raw.save.dcSource ?? "fixed";
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
-      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} ${game.i18n.localize("BOT.ui.dc.label")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
+      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} • ${saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource)} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
     });
   }
 
@@ -391,6 +396,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (form) form.__botApp = this;
     const triggerSelect = this.element.querySelector?.('[name="type"]');
     if (triggerSelect) window.botUpdateTriggerUI(triggerSelect);
+    const saveDcSourceSelect = this.element.querySelector?.('[name="saveDcSource"]');
+    if (saveDcSourceSelect) window.botUpdateSaveDcUI(saveDcSourceSelect);
   }
 
   async _prepareContext(options) {
@@ -496,6 +503,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       itemDurationLabel:     formatItemDurationSummary(itemDurationRounds, legacyDurationFallback),
       saveAbility:           raw.save?.ability ?? "",
       saveDC:                raw.save?.dc ?? 15,
+      saveDcSourceFixed:     (raw.save?.dcSource ?? "fixed") === "fixed",
+      saveDcSourceOrigin:    raw.save?.dcSource === "origin",
+      saveDcSourceOwner:     raw.save?.dcSource === "owner",
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
       saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
       saveEffectFull:        raw.save?.effect === "full",
@@ -577,7 +587,12 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           targetMode: normalizeTemporaryHpTargetMode(data.temporaryHpTargetMode),
           mode: data.temporaryHpMode ?? "keepHighest",
         } : null,
-          save: data.saveAbility ? { ability: data.saveAbility, dc: Number(data.saveDC), effect: data.saveEffect } : null,
+          save: data.saveAbility ? {
+            ability: data.saveAbility,
+            dc: Number(data.saveDC),
+            dcSource: data.saveDcSource ?? "fixed",
+            effect: data.saveEffect
+          } : null,
           status: data.statusId ? {
             id: data.statusId,
             ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {})
@@ -649,6 +664,16 @@ window.botUpdateTriggerUI = function(selectEl) {
   } else {
     conditionGroup.style.display = "none";
   }
+};
+
+window.botUpdateSaveDcUI = function(selectEl) {
+  const form = selectEl.closest('form');
+  const dcGroup = form?.querySelector?.('#bot-save-dc-group');
+  if (!dcGroup) return;
+  dcGroup.style.display = selectEl.value === "fixed" ? "" : "none";
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
 };
 
 window.botShowSubTab = function(btn, tabId) {
