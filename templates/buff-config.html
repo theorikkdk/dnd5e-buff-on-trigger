@@ -46,7 +46,7 @@
         <option value="always" {{#if flag.conditionAlways}}selected{{/if}}>{{localize "BOT.ui.condition.always"}}</option>
       </select>
     </div>
-    <section class="bot-inline-panel">
+    <section class="bot-inline-panel" id="bot-received-conditions-group" {{#unless flag.typeDamaged}}style="display:none"{{/unless}}>
       <h3 class="bot-summary-title">{{localize "BOT.ui.receivedConditions.title"}}</h3>
       <div class="form-group">
         <label>{{localize "BOT.ui.receivedAttackType.label"}}</label>
@@ -156,6 +156,31 @@
         <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
       </select>
     </div>
+    <section class="bot-formula-help">
+      <strong>{{localize "BOT.ui.formulaHelp.title"}}</strong>
+      <div>{{localize "BOT.ui.formulaHelp.aliases"}}</div>
+      <div>{{localize "BOT.ui.formulaHelp.origin"}}</div>
+      <div>{{localize "BOT.ui.formulaHelp.owner"}}</div>
+      <div>{{localize "BOT.ui.formulaHelp.target"}}</div>
+      <div>{{localize "BOT.ui.formulaHelp.attacker"}}</div>
+      <div>{{localize "BOT.ui.formulaHelp.stored"}}</div>
+      <div class="bot-formula-help-insert-label">{{localize "BOT.ui.formulaHelp.insert"}}</div>
+      <div class="bot-formula-variable-list">
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@spellLevel')">@spellLevel</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@prof')">@prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@str.mod')">@str.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@dex.mod')">@dex.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@con.mod')">@con.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@int.mod')">@int.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@wis.mod')">@wis.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@cha.mod')">@cha.mod</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@origin.prof')">@origin.prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@owner.prof')">@owner.prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@target.prof')">@target.prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@attacker.prof')">@attacker.prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@stored.prof')">@stored.prof</button>
+      </div>
+    </section>
 
     <section class="bot-inline-panel">
       <div class="form-group">

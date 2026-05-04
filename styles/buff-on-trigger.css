@@ -290,3 +290,44 @@
   background: var(--color-bg-option, rgba(0, 0, 0, 0.03));
   color: var(--color-text-dark-secondary, #4b4a44);
 }
+
+.bot-formula-help {
+  margin: 8px 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--color-border-highlight, #8b6914);
+  background: var(--color-bg-option, rgba(0, 0, 0, 0.03));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bot-formula-help strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.bot-formula-help-insert-label {
+  margin-top: 8px;
+  font-weight: 700;
+}
+
+.bot-formula-variable-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bot-formula-variable {
+  padding: 3px 8px;
+  border: 1px solid var(--color-border-light-primary, #c9c7b8);
+  border-radius: 999px;
+  background: var(--color-bg, #f0ece0);
+  color: var(--color-text-dark-primary, #191813);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.bot-formula-variable:hover {
+  background: var(--color-bg-btn-minor-hover, #ddd8c4);
+}

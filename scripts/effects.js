@@ -139,6 +139,96 @@ async function resolveSaveDC(workflow, flag) {
   return fixedDc;
 }
 
+function normalizeFormulaNumber(value, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function readAbilityModifier(actor, ability) {
+  return normalizeFormulaNumber(actor?.system?.abilities?.[ability]?.mod, 0);
+}
+
+function readProfBonus(actor) {
+  return normalizeFormulaNumber(
+    actor?.system?.attributes?.prof
+    ?? actor?.system?.attributes?.proficiency
+    ?? actor?.getRollData?.()?.prof,
+    0
+  );
+}
+
+function readItemBaseSpellLevel(item) {
+  if (!item) return null;
+  const level = normalizeFormulaNumber(
+    item.system?.level
+    ?? item.system?.spellLevel
+    ?? item.system?.details?.level,
+    NaN
+  );
+  return Number.isFinite(level) && level >= 0 ? level : null;
+}
+
+function buildActorFormulaSource(actor) {
+  return {
+    prof: readProfBonus(actor),
+    str: { mod: readAbilityModifier(actor, "str") },
+    dex: { mod: readAbilityModifier(actor, "dex") },
+    con: { mod: readAbilityModifier(actor, "con") },
+    int: { mod: readAbilityModifier(actor, "int") },
+    wis: { mod: readAbilityModifier(actor, "wis") },
+    cha: { mod: readAbilityModifier(actor, "cha") }
+  };
+}
+
+function getFirstResolvedTargetToken(workflow, flag) {
+  // Multi-target workflows currently expose only the first resolved trigger target to @target.* variables.
+  return [...resolveTriggerTargetTokens(workflow, flag, "formule")][0] ?? null;
+}
+
+async function buildFormulaRollData(workflow, flag) {
+  const originActor = await resolveActorFromUuid(flag.originActorUuid);
+  const ownerActor = workflow.actor ?? null;
+  const targetActor = getFirstResolvedTargetToken(workflow, flag)?.actor ?? null;
+  const attackerActor = inferAttackerToken(workflow, ownerActor, flag.type)?.actor ?? null;
+  const storedActor = canvas.tokens.get(flag.targetTokenId)?.actor ?? null;
+  const sourceActor = originActor ?? ownerActor;
+  const sourceItem = await resolveDocumentFromUuid(flag.originItemUuid ?? flag.itemUuid) ?? workflow.item ?? null;
+
+  const baseRollData = sourceActor?.getRollData?.() ?? {};
+  const rawSpellLevel = flag.originSpellLevel
+    ?? workflow.castData?.castLevel
+    ?? workflow.castData?.level
+    ?? workflow.castLevel
+    ?? workflow.activity?.castLevel
+    ?? workflow.activity?.spellLevel
+    ?? readItemBaseSpellLevel(sourceItem);
+  const spellLevel = Math.max(1, normalizeFormulaNumber(rawSpellLevel, 1));
+  const originData = buildActorFormulaSource(originActor ?? ownerActor ?? null);
+  const ownerData = buildActorFormulaSource(ownerActor);
+  const targetData = buildActorFormulaSource(targetActor);
+  const attackerData = buildActorFormulaSource(attackerActor);
+  const storedData = buildActorFormulaSource(storedActor);
+
+  const aliasRollData = {
+    spellLevel,
+    prof: originData.prof,
+    str: { mod: originData.str.mod },
+    dex: { mod: originData.dex.mod },
+    con: { mod: originData.con.mod },
+    int: { mod: originData.int.mod },
+    wis: { mod: originData.wis.mod },
+    cha: { mod: originData.cha.mod },
+    origin: originData,
+    owner: ownerData,
+    target: targetData,
+    attacker: attackerData,
+    stored: storedData
+  };
+
+  console.log(`[${MODULE_ID}] Données de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
+  return foundry.utils.mergeObject(foundry.utils.deepClone(baseRollData), aliasRollData);
+}
+
 function isWorkflowCritical(workflow) {
   return Boolean(
     workflow?.isCritical
@@ -291,6 +381,21 @@ function getWorkflowConditionTargets(workflow, condition = "hit") {
   return workflow.hitTargets ?? new Set();
 }
 
+function isTurnTriggerType(type) {
+  return ["turnStart", "turnEnd", "targetTurnStart", "targetTurnEnd"].includes(type);
+}
+
+function resolveTriggerTargetTokens(workflow, flag, effectType = "effet") {
+  if (isTurnTriggerType(flag.type)) {
+    console.log(`[${MODULE_ID}] Cible du déclenchement indisponible pour ce trigger de tour`);
+    if ((flag.condition ?? "hit") !== "hit") {
+      console.log(`[${MODULE_ID}] Condition ignorée pour le trigger de tour (${effectType})`);
+    }
+    return new Set();
+  }
+  return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
+}
+
 function getCurrentTriggerUsage() {
   if (!game.combat?.id) return null;
   return {
@@ -411,6 +516,13 @@ function resolveTargets(workflow, flag) {
   }
 
   // "self" et "ally" : mÃƒÂªme logique, les cibles viennent du workflow
+  if (isTurnTriggerType(flag.type)) {
+    console.log(`[${MODULE_ID}] Cible du déclenchement indisponible pour ce trigger de tour`);
+    if (condition !== "hit") {
+      console.log(`[${MODULE_ID}] Condition ignorée pour le trigger de tour (ciblage par défaut)`);
+    }
+    return new Set();
+  }
   return getWorkflowConditionTargets(workflow, condition);
 }
 
@@ -419,7 +531,7 @@ function resolveBonusDamageTargets(workflow, flag) {
   if (!targetMode) return resolveTargets(workflow, flag);
 
   if (targetMode === "triggerTarget") {
-    return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
+    return resolveTriggerTargetTokens(workflow, flag, "dégâts bonus");
   }
 
   if (targetMode === "self") {
@@ -450,7 +562,7 @@ function resolveStatusTargets(workflow, flag) {
   if (!targetMode) return resolveTargets(workflow, flag);
 
   if (targetMode === "triggerTarget") {
-    return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
+    return resolveTriggerTargetTokens(workflow, flag, "statut");
   }
 
   if (targetMode === "self") {
@@ -496,9 +608,7 @@ function resolveHealingTargets(workflow, flag) {
   }
 
   if (targetMode === "triggerTarget") {
-    return workflow.hitTargets?.size
-      ? new Set(workflow.hitTargets)
-      : new Set(workflow.targets ?? []);
+    return resolveTriggerTargetTokens(workflow, flag, "soin bonus");
   }
 
   if (targetMode === "attacker") {
@@ -527,9 +637,7 @@ function resolveTemporaryHpTargets(workflow, flag) {
   }
 
   if (targetMode === "triggerTarget") {
-    return workflow.hitTargets?.size
-      ? new Set(workflow.hitTargets)
-      : new Set(workflow.targets ?? []);
+    return resolveTriggerTargetTokens(workflow, flag, "PV temporaires");
   }
 
   if (targetMode === "attacker") {
@@ -807,7 +915,8 @@ export async function applyBonusDamage(workflow, flag) {
       }
     }
 
-    const roll = await new Roll(formula).evaluate();
+    const rollData = await buildFormulaRollData(workflow, flag);
+    const roll = await new Roll(formula, rollData).evaluate();
     await sendRollMessage(
       workflow.actor,
       roll,
@@ -918,7 +1027,8 @@ export async function applyBonusHealing(workflow, flag) {
     const formula = flag.healing?.formula;
     if (!formula) return;
 
-    const roll = await new Roll(formula).evaluate();
+    const rollData = await buildFormulaRollData(workflow, flag);
+    const roll = await new Roll(formula, rollData).evaluate();
     await sendRollMessage(
       workflow.actor,
       roll,
@@ -971,7 +1081,8 @@ export async function applyTemporaryHp(workflow, flag) {
     const formula = flag.temporaryHp?.formula;
     if (!formula) return;
 
-    const roll = await new Roll(formula).evaluate();
+    const rollData = await buildFormulaRollData(workflow, flag);
+    const roll = await new Roll(formula, rollData).evaluate();
     await sendRollMessage(
       workflow.actor,
       roll,

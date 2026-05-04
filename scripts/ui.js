@@ -398,6 +398,15 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (triggerSelect) window.botUpdateTriggerUI(triggerSelect);
     const saveDcSourceSelect = this.element.querySelector?.('[name="saveDcSource"]');
     if (saveDcSourceSelect) window.botUpdateSaveDcUI(saveDcSourceSelect);
+    const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"]') ?? [];
+    for (const input of formulaInputs) {
+      input.addEventListener("focus", () => {
+        if (form) form.__botLastFormulaInput = input;
+      });
+      input.addEventListener("click", () => {
+        if (form) form.__botLastFormulaInput = input;
+      });
+    }
   }
 
   async _prepareContext(options) {
@@ -657,13 +666,21 @@ window.botShowTab = function(btn, tabId) {
 };
 
 window.botUpdateTriggerUI = function(selectEl) {
-  const conditionGroup = document.getElementById("bot-condition-group");
-  if (!conditionGroup) return;
-  if (["mwak", "rwak", "msak", "rsak"].includes(selectEl.value)) {
-    conditionGroup.style.display = "";
-  } else {
-    conditionGroup.style.display = "none";
+  const form = selectEl.closest('form');
+  const conditionGroup = form?.querySelector?.("#bot-condition-group");
+  const receivedConditionsGroup = form?.querySelector?.("#bot-received-conditions-group");
+
+  if (conditionGroup) {
+    conditionGroup.style.display = ["mwak", "rwak", "msak", "rsak"].includes(selectEl.value) ? "" : "none";
   }
+
+  if (receivedConditionsGroup) {
+    receivedConditionsGroup.style.display = selectEl.value === "damaged" ? "" : "none";
+  }
+
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
 };
 
 window.botUpdateSaveDcUI = function(selectEl) {
@@ -715,6 +732,23 @@ window.botUpdateHidden = function(targetId) {
   const tagsDiv = document.getElementById('tags-' + targetId);
   const hiddenInput = document.getElementById('hidden-' + targetId);
   hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
+};
+
+window.botInsertFormulaVariable = function(buttonEl, variableName) {
+  const form = buttonEl.closest('form');
+  const input = form?.__botLastFormulaInput
+    ?? form?.querySelector?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"]');
+  if (!input) return;
+
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  input.value = `${input.value.slice(0, start)}${variableName}${input.value.slice(end)}`;
+  input.focus();
+  const cursor = start + variableName.length;
+  if (typeof input.setSelectionRange === "function") input.setSelectionRange(cursor, cursor);
+  form.__botLastFormulaInput = input;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
 export function registerItemSheetButton() {
