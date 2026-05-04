@@ -1,4 +1,4 @@
-import { MODULE_ID, BUFF_ICON, SKILL_IDS } from "./constants.js";
+﻿import { MODULE_ID, BUFF_ICON, SKILL_IDS } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
 
 const DAMAGE_LABEL_KEYS = {
@@ -23,6 +23,146 @@ function localize(key) {
 
 function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
+}
+
+function isWorkflowCritical(workflow) {
+  return Boolean(
+    workflow?.isCritical
+    || workflow?.critical
+    || workflow?.attackRoll?.isCritical
+    || workflow?.attackRoll?.options?.critical
+  );
+}
+
+function parseAdditiveFormulaTerms(formula) {
+  const matches = String(formula).match(/[+-]?\s*[^+-]+/g) ?? [];
+  return matches.map((term) => {
+    const trimmed = term.trim();
+    const sign = trimmed.startsWith("-") ? -1 : 1;
+    const body = trimmed.replace(/^[+-]\s*/, "").trim();
+    return { sign, body };
+  }).filter((term) => term.body);
+}
+
+function formatAdditiveFormulaTerms(parts) {
+  return parts.map((part, index) => {
+    const value = String(part).trim();
+    if (index === 0) return value.startsWith("-") ? `-${value.slice(1).trim()}` : value;
+    return value.startsWith("-") ? `- ${value.slice(1).trim()}` : `+ ${value}`;
+  }).join(" ");
+}
+
+function doubleDiceFormula(formula) {
+  return String(formula).replace(/(^|[^0-9])(\d*)d(\d+)/gi, (match, prefix, count, faces) => {
+    const diceCount = count ? Number(count) : 1;
+    return `${prefix}${diceCount * 2}d${faces}`;
+  });
+}
+
+function applyModifierMultiplication(formula) {
+  const parts = [];
+  for (const term of parseAdditiveFormulaTerms(formula)) {
+    if (/^\d+(\.\d+)?$/.test(term.body)) {
+      parts.push(`${term.sign < 0 ? "-" : ""}${Number(term.body) * 2}`);
+    } else {
+      parts.push(`${term.sign < 0 ? "-" : ""}${term.body}`);
+    }
+  }
+  return formatAdditiveFormulaTerms(parts);
+}
+
+function maximizeBaseDiceFormula(formula, multiplyModifiers = false) {
+  const parts = [];
+  for (const term of parseAdditiveFormulaTerms(formula)) {
+    const diceMatch = term.body.match(/^(\d*)d(\d+)$/i);
+    if (diceMatch) {
+      const count = diceMatch[1] ? Number(diceMatch[1]) : 1;
+      const faces = Number(diceMatch[2]);
+      const maxValue = count * faces;
+      const reroll = `${count}d${faces}`;
+      parts.push(`${term.sign < 0 ? "-" : ""}${maxValue}`);
+      parts.push(`${term.sign < 0 ? "-" : ""}${reroll}`);
+      continue;
+    }
+    if (/^\d+(\.\d+)?$/.test(term.body)) {
+      const value = multiplyModifiers ? Number(term.body) * 2 : Number(term.body);
+      parts.push(`${term.sign < 0 ? "-" : ""}${value}`);
+      continue;
+    }
+    parts.push(`${term.sign < 0 ? "-" : ""}${term.body}`);
+  }
+  return formatAdditiveFormulaTerms(parts);
+}
+
+function getDnd5eCriticalSettings() {
+  let maximizeDice = null;
+  let multiplyModifiers = null;
+  const detected = [];
+  const settingsRegistry = game.settings?.settings;
+  const hasSetting = (key) => settingsRegistry?.has?.(`dnd5e.${key}`);
+  const readBooleanSetting = (key) => {
+    if (!hasSetting(key)) return null;
+    try {
+      const value = game.settings.get("dnd5e", key);
+      return typeof value === "boolean" ? value : null;
+    } catch {
+      return null;
+    }
+  };
+
+  for (const key of ["criticalDamageMaxDice", "criticalDamageMaximizeDice", "criticalDamageMaximized"]) {
+    const value = readBooleanSetting(key);
+    if (value !== null) {
+      maximizeDice = value;
+      detected.push(`${key}=${value}`);
+      break;
+    }
+  }
+
+  const modifierValue = readBooleanSetting("criticalDamageModifiers");
+  if (modifierValue !== null) {
+    multiplyModifiers = modifierValue;
+    detected.push(`criticalDamageModifiers=${modifierValue}`);
+  }
+
+  const candidates = [...(settingsRegistry?.values?.() ?? [])]
+    .filter((setting) => setting.namespace === "dnd5e")
+    .filter((setting) => /critical|crit|maximi[sz]e|maxdice|max-dice|maximum|max|modifier|multiply/i.test(
+      `${setting.key} ${setting.name ?? ""} ${setting.hint ?? ""}`
+    ));
+
+  for (const setting of candidates) {
+    try {
+      const value = game.settings.get("dnd5e", setting.key);
+      if (typeof value !== "boolean") continue;
+      const haystack = `${setting.key} ${setting.name ?? ""} ${setting.hint ?? ""}`.toLowerCase();
+      if (maximizeDice === null && /maximi[sz]e|maxdice|max-dice|maximum|max/.test(haystack)) {
+        maximizeDice = value;
+        detected.push(`${setting.key}=${value}`);
+      }
+      if (multiplyModifiers === null && /multiply.*modifier|modifier.*multiply/.test(haystack)) {
+        multiplyModifiers = value;
+        detected.push(`${setting.key}=${value}`);
+      }
+    } catch {
+      // Ignore unreadable settings and keep fallback behavior.
+    }
+  }
+
+  return {
+    maximizeDice,
+    multiplyModifiers,
+    detected,
+    reliable: maximizeDice !== null || multiplyModifiers !== null,
+  };
+}
+
+async function sendRollMessage(actor, roll, flavor, type) {
+  await roll.toMessage({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    flavor,
+    flags: { [MODULE_ID]: { type } },
+  });
 }
 
 function getWorkflowConditionTargets(workflow, condition = "hit") {
@@ -99,7 +239,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
     if (activeBuff) {
       const durationRounds = getFlagDurationInRounds(activeBuff);
       await actor.createEmbeddedDocuments("ActiveEffect", [{
-        name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " ⚡",
+        name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " Ã¢Å¡Â¡",
         img: activeBuff.itemImg ?? BUFF_ICON,
         statuses: ["bot-active"],
         changes: extraChanges,
@@ -127,7 +267,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     flags: { [MODULE_ID]: { targetIndicator: true } },
     duration: {},
   }]);
-  console.log(`[${MODULE_ID}] Indicateur posé sur ${targetActor.name}`);
+  console.log(`[${MODULE_ID}] Indicateur posÃƒÂ© sur ${targetActor.name}`);
 }
 
 export async function removeTargetIndicator(targetActor, itemName) {
@@ -148,7 +288,7 @@ function resolveTargets(workflow, flag) {
     if (!token) return new Set();
     const targetIds = new Set((workflow.targets ?? []).map((t) => t.id));
     if (!targetIds.has(token.id)) {
-      console.log(`[${MODULE_ID}] Mode target — cible fixe non visée, pas de déclenchement`);
+      console.log(`[${MODULE_ID}] Mode target Ã¢â‚¬â€ cible fixe non visÃƒÂ©e, pas de dÃƒÂ©clenchement`);
       return new Set();
     }
     if (condition === "hit" && !hitIds.has(token.id)) return new Set();
@@ -156,7 +296,7 @@ function resolveTargets(workflow, flag) {
     return new Set([token]);
   }
 
-  // "self" et "ally" : même logique, les cibles viennent du workflow
+  // "self" et "ally" : mÃƒÂªme logique, les cibles viennent du workflow
   return getWorkflowConditionTargets(workflow, condition);
 }
 
@@ -300,7 +440,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
         const actor = workflow.actor;
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-        console.log(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
+        console.log(`[${MODULE_ID}] Buff ÃƒÂ©puisÃƒÂ© Ã¢â‚¬â€ toutes les charges consommÃƒÂ©es`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
         for (const e of mechEffects ?? []) await e.delete();
         const concentrationEffect = actor?.effects.find(
@@ -308,7 +448,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
         );
         if (concentrationEffect) {
           await concentrationEffect.delete();
-          console.log(`[${MODULE_ID}] Concentration retirée (charges épuisées) sur ${actor.name}`);
+          console.log(`[${MODULE_ID}] Concentration retirÃƒÂ©e (charges ÃƒÂ©puisÃƒÂ©es) sur ${actor.name}`);
         }
         await refreshBuffIndicator(actor, flag.itemName);
         for (const token of targets) {
@@ -322,7 +462,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      console.log(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
+      console.log(`[${MODULE_ID}] Buff consommÃƒÂ© sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
       for (const e of mechEffects ?? []) await e.delete();
       const concentrationEffect = actor?.effects.find(
@@ -330,7 +470,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
       );
       if (concentrationEffect) {
         await concentrationEffect.delete();
-        console.log(`[${MODULE_ID}] Concentration retirée sur ${actor?.name}`);
+        console.log(`[${MODULE_ID}] Concentration retirÃƒÂ©e sur ${actor?.name}`);
       }
       await refreshBuffIndicator(actor, flag.itemName);
       for (const token of targets) {
@@ -383,19 +523,19 @@ export function buildMechanicalChanges(flag) {
     const key = skillMode === "advantage" ? "flags.midi-qol.advantage.check.all" : "flags.midi-qol.disadvantage.check.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });
   }
-  // Avantage sur les compétences sélectionnées
+  // Avantage sur les compÃƒÂ©tences sÃƒÂ©lectionnÃƒÂ©es
   if (skills?.length) {
     for (const id of skills) {
       changes.push({ key: `flags.midi-qol.advantage.skill.${id}`, mode: 5, value: "1", priority: 20 });
     }
   }
-  // Bonus sur les compétences sélectionnées
+  // Bonus sur les compÃƒÂ©tences sÃƒÂ©lectionnÃƒÂ©es
   if (skillBonusSkills?.length && skillBonus) {
     for (const id of skillBonusSkills) {
       changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
     }
   }
-  // Bonus sur TOUTES les compétences
+  // Bonus sur TOUTES les compÃƒÂ©tences
   if (skillBonusAll) {
     for (const id of SKILL_IDS) {
       changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonusAll), priority: 20 });
@@ -473,13 +613,49 @@ export async function applyBonusDamage(workflow, flag) {
       return;
     }
 
-    console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} — cibles : ${targets.size}`);
+    console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} Ã¢â‚¬â€ cibles : ${targets.size}`);
 
-    const formula = flag.damage.formula;
+    const criticalMode = flag.damage.criticalMode ?? "system";
+    const critical = isWorkflowCritical(workflow);
+    let formula = flag.damage.formula;
     const damageType = flag.damage.type;
+    const systemCriticalSettings = critical && criticalMode === "system"
+      ? getDnd5eCriticalSettings()
+      : null;
+    if (systemCriticalSettings?.detected?.length) {
+      console.log(`[${MODULE_ID}] Réglages critiques dnd5e détectés : maximizeDice=${systemCriticalSettings.maximizeDice}, multiplyModifiers=${systemCriticalSettings.multiplyModifiers}`);
+    }
+    if (critical && (criticalMode === "system" || criticalMode === "doubleDice" || criticalMode === "maxBaseDice")) {
+      // Bonus damage is rolled separately from native dnd5e/Midi-QOL damage resolution,
+      // so "system" falls back to the standard 5e behavior: double only the dice on critical hits.
+      if (criticalMode === "doubleDice") {
+        formula = doubleDiceFormula(formula);
+      } else if (criticalMode === "maxBaseDice") {
+        formula = maximizeBaseDiceFormula(formula, false);
+      } else if (systemCriticalSettings?.maximizeDice === true) {
+        formula = maximizeBaseDiceFormula(formula, systemCriticalSettings.multiplyModifiers === true);
+      } else if (systemCriticalSettings?.reliable) {
+        formula = doubleDiceFormula(formula);
+        if (systemCriticalSettings.multiplyModifiers === true) {
+          formula = applyModifierMultiplication(formula);
+        }
+      } else {
+        // Fallback if no reliable dnd5e critical setting is detectable in this system version.
+        formula = doubleDiceFormula(formula);
+      }
+      if (formula !== flag.damage.formula) {
+        console.log(`[${MODULE_ID}] Critique : formule des dÃƒÂ©gÃƒÂ¢ts bonus ajustÃƒÂ©e`);
+      }
+    }
     const roll = await new Roll(formula).evaluate();
+    await sendRollMessage(
+      workflow.actor,
+      roll,
+      `${localize("BOT.chat.bonusDamageRoll")} Ã¢â‚¬â€ ${flag.itemName ?? localize("BOT.fallback.effectName")} (${localizeDamageType(damageType)})`,
+      "bonus-damage"
+    );
 
-    console.log(`[${MODULE_ID}] Dégâts bonus : ${roll.total} ${damageType}`);
+    console.log(`[${MODULE_ID}] DÃƒÂ©gÃƒÂ¢ts bonus : ${roll.total} ${damageType}`);
 
     let fullTargets = targets;
     let halfTargets = new Set();
@@ -501,7 +677,7 @@ export async function applyBonusDamage(workflow, flag) {
         }
         const saveRoll = saveRolls[0];
         const success = saveRoll.total >= flag.save.dc;
-        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} — ${success ? "réussite" : "échec"}`);
+        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${flag.save.dc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
         if (success) {
           if (flag.save.effect === "none") continue;
           if (flag.save.effect === "half") { halfTargets.add(token); continue; }
@@ -527,19 +703,11 @@ export async function applyBonusDamage(workflow, flag) {
       }
       await ChatMessage.create({
         content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px;">
-          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${roll.total} dégâts ${damageType}
+          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${roll.total} dÃƒÂ©gÃƒÂ¢ts ${damageType}
         </div>`,
         speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-        rolls: [roll]
       });
     } else if (typeof MidiQOL?.applyTokenDamage === "function") {
-      await ChatMessage.create({
-        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
-          <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-      });
       if (fullTargets.size) {
         await MidiQOL.applyTokenDamage(
           [{ damage: roll.total, type: damageType }],
@@ -568,29 +736,11 @@ export async function applyBonusDamage(workflow, flag) {
         );
       }
     } else {
-      await ChatMessage.create({
-        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px; margin-bottom: 4px;">
-          <img src="${flag.itemImg ?? BUFF_ICON}" width="16" height="16" style="vertical-align:middle; margin-right:4px;"/>
-          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> ${localize("BOT.chat.triggered")}
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-      });
       for (const token of fullTargets) {
         await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
       }
       for (const token of halfTargets) {
         await token.actor?.applyDamage([{ value: Math.floor(roll.total / 2), type: damageType }]);
-      }
-      if (fullTargets.size || halfTargets.size) {
-        await ChatMessage.create({
-          content: game.i18n.format("BOT.chat.damageResult", {
-            name: flag.itemName ?? localize("BOT.fallback.effectName"),
-            total: roll.total,
-            type: localizeDamageType(damageType)
-          }),
-          speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-          rolls: [roll],
-        });
       }
     }
 
@@ -616,7 +766,7 @@ export async function applyStatusEffect(workflow, flag) {
       if (!targetActor) continue;
 
       await targetActor.toggleStatusEffect(statusId, { active: true });
-      console.log(`[${MODULE_ID}] Statut ${statusId} appliqué sur ${targetActor.name}`);
+      console.log(`[${MODULE_ID}] Statut ${statusId} appliquÃƒÂ© sur ${targetActor.name}`);
     }
 
     if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
@@ -638,6 +788,12 @@ export async function applyBonusHealing(workflow, flag) {
     if (!formula) return;
 
     const roll = await new Roll(formula).evaluate();
+    await sendRollMessage(
+      workflow.actor,
+      roll,
+      `${localize("BOT.chat.bonusHealingRoll")} Ã¢â‚¬â€ ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
+      "bonus-healing"
+    );
     const healAmount = Math.max(0, roll.total ?? 0);
     const healedTargets = [];
 
@@ -665,7 +821,6 @@ export async function applyBonusHealing(workflow, flag) {
         <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${healedTargets.map((target) => `${target.amount} PV vers ${target.name}`).join(", ")}
       </div>`,
       speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-      rolls: [roll]
     });
 
     if (!flag.damage && !flag.status) await consumeOrDecrementCharges(workflow, flag, targets);
@@ -686,6 +841,12 @@ export async function applyTemporaryHp(workflow, flag) {
     if (!formula) return;
 
     const roll = await new Roll(formula).evaluate();
+    await sendRollMessage(
+      workflow.actor,
+      roll,
+      `${localize("BOT.chat.temporaryHpRoll")} Ã¢â‚¬â€ ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
+      "temporary-hp"
+    );
     const tempHpAmount = Math.max(0, roll.total ?? 0);
     if (tempHpAmount <= 0) return;
 
@@ -717,7 +878,6 @@ export async function applyTemporaryHp(workflow, flag) {
         <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${updatedTargets.map((target) => `${target.amount} PV temporaires vers ${target.name}`).join(", ")}
       </div>`,
       speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-      rolls: [roll]
     });
 
     if (!flag.damage && !flag.status && !flag.healing) await consumeOrDecrementCharges(workflow, flag, targets);
@@ -728,12 +888,12 @@ export async function applyTemporaryHp(workflow, flag) {
 
 export async function applyEffect(workflow, flag) {
   if (!flag.damage && !flag.status && !flag.healing && !flag.temporaryHp) {
-    console.log(`[${MODULE_ID}] Aucun effet configuré dans le flag`);
+    console.log(`[${MODULE_ID}] Aucun effet configurÃƒÂ© dans le flag`);
     return;
   }
 
   if (await shouldBlockTriggerFrequency(workflow.actor, flag)) {
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : fréquence déjà utilisée`);
+    console.log(`[${MODULE_ID}] DÃƒÂ©clenchement ignorÃƒÂ© : frÃƒÂ©quence dÃƒÂ©jÃƒÂ  utilisÃƒÂ©e`);
     return;
   }
 

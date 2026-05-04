@@ -109,6 +109,15 @@
       </select>
     </div>
     <div class="bot-row">
+      <label class="bot-label-sm">{{localize "BOT.ui.damage.criticalMode.label"}}</label>
+      <select name="damageCriticalMode" class="bot-input-flex">
+        <option value="system" {{#if flag.damageCriticalModeSystem}}selected{{/if}}>{{localize "BOT.ui.damage.criticalMode.system"}}</option>
+        <option value="doubleDice" {{#if flag.damageCriticalModeDoubleDice}}selected{{/if}}>{{localize "BOT.ui.damage.criticalMode.doubleDice"}}</option>
+        <option value="maxBaseDice" {{#if flag.damageCriticalModeMaxBaseDice}}selected{{/if}}>{{localize "BOT.ui.damage.criticalMode.maxBaseDice"}}</option>
+        <option value="neverDouble" {{#if flag.damageCriticalModeNeverDouble}}selected{{/if}}>{{localize "BOT.ui.damage.criticalMode.neverDouble"}}</option>
+      </select>
+    </div>
+    <div class="bot-row">
       <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
       <select name="saveAbility" class="bot-input-flex">
         <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
