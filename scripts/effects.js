@@ -226,6 +226,9 @@ async function buildFormulaRollData(workflow, flag) {
   };
 
   console.log(`[${MODULE_ID}] Données de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
+  if (attackerActor) {
+    console.log(`[${MODULE_ID}] Source formule attacker : ${attackerActor.name}`);
+  }
   return foundry.utils.mergeObject(foundry.utils.deepClone(baseRollData), aliasRollData);
 }
 
@@ -366,6 +369,78 @@ async function sendRollMessage(actor, roll, flavor, type) {
     speaker: ChatMessage.getSpeaker({ actor }),
     flavor,
     flags: { [MODULE_ID]: { type } },
+  });
+}
+
+function getBonusDamageApplicationMode() {
+  const configuredMode = game.settings?.get?.(MODULE_ID, "bonusDamageApplicationMode");
+  return ["automatic", "midiWorkflow"].includes(configuredMode)
+    ? configuredMode
+    : "automatic";
+}
+
+async function applyDamageWithMidiWorkflow(workflow, flag, damageType, damageTotal, targets, roll) {
+  if (!targets?.size) return true;
+
+  const DamageOnlyWorkflow = globalThis.MidiQOL?.DamageOnlyWorkflow;
+  if (typeof DamageOnlyWorkflow !== "function") {
+    console.warn(`[${MODULE_ID}] Workflow de dégâts Midi-QOL indisponible, retour au mode automatique`);
+    return false;
+  }
+
+  const sourceActor = workflow.actor ?? workflow.item?.actor ?? [...targets][0]?.actor ?? null;
+  const sourceToken = workflow.token ?? sourceActor?.getActiveTokens?.()?.[0] ?? null;
+
+  try {
+    new DamageOnlyWorkflow(
+      sourceActor,
+      sourceToken,
+      damageTotal,
+      damageType,
+      targets,
+      roll,
+      {
+        flavor: flag.itemName ?? localize("BOT.fallback.effectName"),
+        isCritical: isWorkflowCritical(workflow),
+      }
+    );
+    return true;
+  } catch (error) {
+    console.warn(`[${MODULE_ID}] Workflow de dégâts Midi-QOL indisponible, retour au mode automatique`, error);
+    return false;
+  }
+}
+
+async function createBonusDamageSummaryMessage(workflow, flag, damageType, appliedResults) {
+  if (!appliedResults.length) return;
+
+  const summaryParts = appliedResults.map((result) => {
+    const typeLabel = localizeDamageType(damageType);
+    if (result.outcome === "half") {
+      return game.i18n.format("BOT.chat.bonusDamageSummary.half", {
+        target: result.name,
+        amount: result.amount,
+        type: typeLabel,
+      });
+    }
+    if (result.outcome === "none") {
+      return game.i18n.format("BOT.chat.bonusDamageSummary.none", {
+        target: result.name,
+        type: typeLabel,
+      });
+    }
+    return game.i18n.format("BOT.chat.bonusDamageSummary.full", {
+      target: result.name,
+      amount: result.amount,
+      type: typeLabel,
+    });
+  });
+
+  await ChatMessage.create({
+    content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px;">
+      <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> — ${localize("BOT.chat.bonusDamageSummary.heading")} : ${summaryParts.join(" ")}
+    </div>`,
+    speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
   });
 }
 
@@ -546,6 +621,13 @@ function resolveBonusDamageTargets(workflow, flag) {
       ?? (flag.type === "damaged"
         ? ([...(workflow.hitTargets ?? workflow.targets ?? [])].find((token) => token?.actor?.id !== workflow.actor?.id) ?? null)
         : null);
+    if (!attackerToken && flag.type === "damaged") {
+      console.log(`[${MODULE_ID}] Attaquant introuvable pour le trigger damaged`);
+      return new Set();
+    }
+    if (attackerToken) {
+      console.log(`[${MODULE_ID}] Cibles dégâts bonus résolues : mode=attacker, cibles=${attackerToken.name}`);
+    }
     return attackerToken ? new Set([attackerToken]) : new Set();
   }
 
@@ -874,6 +956,7 @@ export async function applyBonusDamage(workflow, flag) {
     }
     let fullTargets = targets;
     let halfTargets = new Set();
+    let noDamageTargets = new Set();
 
     if (flag.save?.ability) {
       const saveDc = await resolveSaveDC(workflow, flag);
@@ -882,6 +965,7 @@ export async function applyBonusDamage(workflow, flag) {
       }
       fullTargets = new Set();
       halfTargets = new Set();
+      noDamageTargets = new Set();
       for (const token of targets) {
         const targetActor = token.actor;
         if (!targetActor) continue;
@@ -908,47 +992,76 @@ export async function applyBonusDamage(workflow, flag) {
         const success = saveRoll.total >= saveDc;
         console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
         if (success) {
-          if (flag.save.effect === "none") continue;
+          if (flag.save.effect === "none") {
+            noDamageTargets.add(token);
+            continue;
+          }
           if (flag.save.effect === "half") { halfTargets.add(token); continue; }
         }
         fullTargets.add(token);
       }
     }
 
+    const bonusDamageApplicationMode = getBonusDamageApplicationMode();
     const rollData = await buildFormulaRollData(workflow, flag);
     const roll = await new Roll(formula, rollData).evaluate();
-    await sendRollMessage(
-      workflow.actor,
-      roll,
-      `${localize("BOT.chat.bonusDamageRoll")} Ã¢â‚¬â€ ${flag.itemName ?? localize("BOT.fallback.effectName")} (${localizeDamageType(damageType)})`,
-      "bonus-damage"
-    );
 
     console.log(`[${MODULE_ID}] DÃƒÂ©gÃƒÂ¢ts bonus : ${roll.total} ${damageType}`);
 
-    if (flag.type === "damaged") {
-      for (const token of fullTargets) {
-        if (!token.actor) continue;
-        await token.actor.applyDamage(
-          [{ value: roll.total, type: damageType }],
-          { noConcentrationCheck: true }
-        );
+    const halfDamage = Math.floor(roll.total / 2);
+    const appliedResults = [
+      ...[...fullTargets].map((token) => ({ name: token.name, amount: roll.total, outcome: "full" })),
+      ...[...halfTargets].map((token) => ({ name: token.name, amount: halfDamage, outcome: "half" })),
+      ...[...noDamageTargets].map((token) => ({ name: token.name, amount: 0, outcome: "none" })),
+    ];
+
+    let handledFullByMidiWorkflow = false;
+    let handledHalfByMidiWorkflow = false;
+    if (bonusDamageApplicationMode === "midiWorkflow") {
+      handledFullByMidiWorkflow = await applyDamageWithMidiWorkflow(workflow, flag, damageType, roll.total, fullTargets, roll);
+      if (halfTargets.size) {
+        const halfRoll = await new Roll(String(halfDamage)).evaluate();
+        handledHalfByMidiWorkflow = await applyDamageWithMidiWorkflow(workflow, flag, damageType, halfDamage, halfTargets, halfRoll);
+      } else {
+        handledHalfByMidiWorkflow = true;
       }
-      for (const token of halfTargets) {
-        if (!token.actor) continue;
-        await token.actor.applyDamage(
-          [{ value: Math.floor(roll.total / 2), type: damageType }],
-          { noConcentrationCheck: true }
-        );
+    }
+
+    const usingAutomaticApplication = bonusDamageApplicationMode === "automatic";
+    const needsAutomaticFallback = !handledFullByMidiWorkflow || !handledHalfByMidiWorkflow;
+    const shouldShowModuleRoll = usingAutomaticApplication || needsAutomaticFallback;
+    const shouldShowSummaryMessage = usingAutomaticApplication || needsAutomaticFallback;
+
+    if (shouldShowModuleRoll) {
+      await sendRollMessage(
+        workflow.actor,
+        roll,
+        `${localize("BOT.chat.bonusDamageRoll")} Ã¢â‚¬â€ ${flag.itemName ?? localize("BOT.fallback.effectName")} (${localizeDamageType(damageType)})`,
+        "bonus-damage"
+      );
+    }
+
+    if (flag.type === "damaged" && needsAutomaticFallback) {
+      if (!handledFullByMidiWorkflow) {
+        for (const token of fullTargets) {
+          if (!token.actor) continue;
+          await token.actor.applyDamage(
+            [{ value: roll.total, type: damageType }],
+            { noConcentrationCheck: true }
+          );
+        }
       }
-      await ChatMessage.create({
-        content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px;">
-          <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> : ${roll.total} dÃƒÂ©gÃƒÂ¢ts ${damageType}
-        </div>`,
-        speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
-      });
-    } else if (typeof MidiQOL?.applyTokenDamage === "function") {
-      if (fullTargets.size) {
+      if (!handledHalfByMidiWorkflow) {
+        for (const token of halfTargets) {
+          if (!token.actor) continue;
+          await token.actor.applyDamage(
+            [{ value: halfDamage, type: damageType }],
+            { noConcentrationCheck: true }
+          );
+        }
+      }
+    } else if (needsAutomaticFallback) {
+      if (typeof MidiQOL?.applyTokenDamage === "function" && fullTargets.size && !handledFullByMidiWorkflow) {
         await MidiQOL.applyTokenDamage(
           [{ damage: roll.total, type: damageType }],
           roll.total,
@@ -961,11 +1074,10 @@ export async function applyBonusDamage(workflow, flag) {
           }
         );
       }
-      if (halfTargets.size) {
-        const half = Math.floor(roll.total / 2);
+      if (typeof MidiQOL?.applyTokenDamage === "function" && halfTargets.size && !handledHalfByMidiWorkflow) {
         await MidiQOL.applyTokenDamage(
-          [{ damage: half, type: damageType }],
-          half,
+          [{ damage: halfDamage, type: damageType }],
+          halfDamage,
           halfTargets,
           workflow.item ?? null,
           new Set(),
@@ -974,16 +1086,23 @@ export async function applyBonusDamage(workflow, flag) {
             noConcentrationCheck: true
           }
         );
-      }
-    } else {
-      for (const token of fullTargets) {
-        await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
-      }
-      for (const token of halfTargets) {
-        await token.actor?.applyDamage([{ value: Math.floor(roll.total / 2), type: damageType }]);
+      } else if (typeof MidiQOL?.applyTokenDamage !== "function") {
+        if (!handledFullByMidiWorkflow) {
+          for (const token of fullTargets) {
+            await token.actor?.applyDamage([{ value: roll.total, type: damageType }]);
+          }
+        }
+        if (!handledHalfByMidiWorkflow) {
+          for (const token of halfTargets) {
+            await token.actor?.applyDamage([{ value: halfDamage, type: damageType }]);
+          }
+        }
       }
     }
 
+    if (shouldShowSummaryMessage) {
+      await createBonusDamageSummaryMessage(workflow, flag, damageType, appliedResults);
+    }
     await consumeOrDecrementCharges(workflow, flag, targets);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyBonusDamage :`, error);

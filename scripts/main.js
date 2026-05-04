@@ -18,6 +18,18 @@ Hooks.once("init", () => {
       neverDouble: game.i18n.localize("BOT.ui.damage.criticalMode.neverDouble"),
     },
   });
+  game.settings.register(MODULE_ID, "bonusDamageApplicationMode", {
+    name: "BOT.settings.bonusDamageApplicationMode.name",
+    hint: "BOT.settings.bonusDamageApplicationMode.hint",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "automatic",
+    choices: {
+      automatic: game.i18n.localize("BOT.settings.bonusDamageApplicationMode.automatic"),
+      midiWorkflow: game.i18n.localize("BOT.settings.bonusDamageApplicationMode.midiWorkflow"),
+    },
+  });
   console.log(`[${MODULE_ID}] Module initialized`);
 });
 
