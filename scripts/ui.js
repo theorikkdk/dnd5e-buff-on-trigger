@@ -406,7 +406,20 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       input.addEventListener("click", () => {
         if (form) form.__botLastFormulaInput = input;
       });
+      input.addEventListener("input", () => {
+        if (form) window.botUpdateEffectSectionsUI(form);
+      });
     }
+    const healingEnabled = this.element.querySelector?.('[name="healingEnabled"]');
+    if (healingEnabled) healingEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    const temporaryHpEnabled = this.element.querySelector?.('[name="temporaryHpEnabled"]');
+    if (temporaryHpEnabled) temporaryHpEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    const statusSelect = this.element.querySelector?.('[name="statusId"]');
+    if (statusSelect) statusSelect.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    this.element.querySelectorAll?.('.bot-collapsible-panel')?.forEach((panel) => {
+      panel.addEventListener("toggle", () => this.resizeToContent());
+    });
+    if (form) window.botUpdateEffectSectionsUI(form);
   }
 
   async _prepareContext(options) {
@@ -678,6 +691,8 @@ window.botUpdateTriggerUI = function(selectEl) {
     receivedConditionsGroup.style.display = selectEl.value === "damaged" ? "" : "none";
   }
 
+  window.botUpdateTargetModeOptions(form, selectEl.value);
+
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.resizeToContent();
@@ -732,6 +747,73 @@ window.botUpdateHidden = function(targetId) {
   const tagsDiv = document.getElementById('tags-' + targetId);
   const hiddenInput = document.getElementById('hidden-' + targetId);
   hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
+};
+
+window.botUpdateEffectSectionsUI = function(form) {
+  if (!form) return;
+
+  const healingDetails = form.querySelector('#bot-healing-details');
+  const healingEnabled = form.querySelector('[name="healingEnabled"]');
+  if (healingDetails && healingEnabled) {
+    healingDetails.style.display = healingEnabled.checked ? "" : "none";
+  }
+
+  const temporaryHpDetails = form.querySelector('#bot-temporary-hp-details');
+  const temporaryHpEnabled = form.querySelector('[name="temporaryHpEnabled"]');
+  if (temporaryHpDetails && temporaryHpEnabled) {
+    temporaryHpDetails.style.display = temporaryHpEnabled.checked ? "" : "none";
+  }
+
+  const statusTargetRow = form.querySelector('#bot-status-target-row');
+  const statusSelect = form.querySelector('[name="statusId"]');
+  if (statusTargetRow && statusSelect) {
+    statusTargetRow.style.display = statusSelect.value ? "" : "none";
+  }
+
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botUpdateTargetModeOptions = function(form, triggerType) {
+  if (!form) return;
+
+  const attackTriggers = ["mwak", "rwak", "msak", "rsak"];
+  const turnTriggers = ["turnStart", "turnEnd", "targetTurnStart", "targetTurnEnd"];
+
+  let allowedModes = ["triggerTarget", "self", "attacker", "storedTarget"];
+  let fallbackMode = "self";
+
+  if (turnTriggers.includes(triggerType)) {
+    allowedModes = ["self", "storedTarget"];
+    fallbackMode = "self";
+  } else if (triggerType === "damaged") {
+    allowedModes = ["self", "attacker", "storedTarget"];
+    fallbackMode = "attacker";
+  } else if (attackTriggers.includes(triggerType)) {
+    allowedModes = ["triggerTarget", "self", "storedTarget"];
+    fallbackMode = "triggerTarget";
+  }
+
+  const selectNames = ["damageTargetMode", "statusTargetMode", "healingTargetMode", "temporaryHpTargetMode"];
+  for (const name of selectNames) {
+    const select = form.querySelector(`[name="${name}"]`);
+    if (!select) continue;
+
+    for (const option of select.options) {
+      const allowed = allowedModes.includes(option.value);
+      option.hidden = !allowed;
+      option.disabled = !allowed;
+    }
+
+    if (!allowedModes.includes(select.value)) {
+      select.value = fallbackMode;
+    }
+
+    if (!allowedModes.includes(select.value)) {
+      select.value = allowedModes[0] ?? "";
+    }
+  }
 };
 
 window.botInsertFormulaVariable = function(buttonEl, variableName) {

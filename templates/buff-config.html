@@ -79,84 +79,100 @@
 
   <!-- Onglet 2 : Dégâts & Effets -->
   <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
-    <div class="bot-row">
-      <label class="bot-label-sm">{{localize "BOT.ui.damageFormula.label"}}</label>
-      <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="2d6" class="bot-input-flex" />
-      <label class="bot-label-sm">{{localize "BOT.ui.damageType.label"}}</label>
-      <select name="damageType" class="bot-input-flex">
-        <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
-        <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
-        <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>
-        <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>{{localize "BOT.damageTypes.fire"}}</option>
-        <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>{{localize "BOT.damageTypes.force"}}</option>
-        <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>{{localize "BOT.damageTypes.lightning"}}</option>
-        <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>{{localize "BOT.damageTypes.necrotic"}}</option>
-        <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>{{localize "BOT.damageTypes.piercing"}}</option>
-        <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>{{localize "BOT.damageTypes.poison"}}</option>
-        <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>{{localize "BOT.damageTypes.psychic"}}</option>
-        <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>{{localize "BOT.damageTypes.radiant"}}</option>
-        <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>{{localize "BOT.damageTypes.slashing"}}</option>
-        <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>{{localize "BOT.damageTypes.thunder"}}</option>
-      </select>
-    </div>
-    <div class="bot-row">
-      <label class="bot-label-sm">{{localize "BOT.ui.damage.targetMode.label"}}</label>
-      <select name="damageTargetMode" class="bot-input-flex">
-        <option value="triggerTarget" {{#if flag.damageTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.triggerTarget"}}</option>
-        <option value="self" {{#if flag.damageTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.self"}}</option>
-        <option value="attacker" {{#if flag.damageTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.attacker"}}</option>
-        <option value="storedTarget" {{#if flag.damageTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.storedTarget"}}</option>
-      </select>
-    </div>
-    <div class="bot-row bot-save-row">
-      <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
-      <select name="saveAbility" class="bot-input-flex bot-save-main-select">
-        <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
-        <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
-        <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
-        <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>{{localize "BOT.abilities.con"}}</option>
-        <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>{{localize "BOT.abilities.int"}}</option>
-        <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
-        <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
-      </select>
-      <label class="bot-label-sm">{{localize "BOT.ui.saveDcSource.label"}}</label>
-      <select name="saveDcSource" class="bot-input-flex bot-save-source-select" onchange="botUpdateSaveDcUI(this)">
-        <option value="fixed" {{#if flag.saveDcSourceFixed}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.fixed"}}</option>
-        <option value="origin" {{#if flag.saveDcSourceOrigin}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.origin"}}</option>
-        <option value="owner" {{#if flag.saveDcSourceOwner}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.owner"}}</option>
-      </select>
-    </div>
-    <div class="bot-row bot-save-row">
-      <div id="bot-save-dc-group" class="bot-save-dc-group" {{#unless flag.saveDcSourceFixed}}style="display:none"{{/unless}}>
-        <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
-        <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
+    <details class="bot-collapsible-panel bot-effect-panel" id="bot-damage-panel" {{#if flag.damage.formula}}open{{/if}}>
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.damage"}}{{#if flag.damage.formula}} — {{flag.damage.formula}}{{/if}}</summary>
+      <div class="bot-collapsible-body">
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.damageFormula.label"}}</label>
+          <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="2d6" class="bot-input-flex" />
+          <label class="bot-label-sm">{{localize "BOT.ui.damageType.label"}}</label>
+          <select name="damageType" class="bot-input-flex">
+            <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
+            <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
+            <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>
+            <option value="fire"        {{#if flag.damageTypeFire}}selected{{/if}}>{{localize "BOT.damageTypes.fire"}}</option>
+            <option value="force"       {{#if flag.damageTypeForce}}selected{{/if}}>{{localize "BOT.damageTypes.force"}}</option>
+            <option value="lightning"   {{#if flag.damageTypeLightning}}selected{{/if}}>{{localize "BOT.damageTypes.lightning"}}</option>
+            <option value="necrotic"    {{#if flag.damageTypeNecrotic}}selected{{/if}}>{{localize "BOT.damageTypes.necrotic"}}</option>
+            <option value="piercing"    {{#if flag.damageTypePiercing}}selected{{/if}}>{{localize "BOT.damageTypes.piercing"}}</option>
+            <option value="poison"      {{#if flag.damageTypePoison}}selected{{/if}}>{{localize "BOT.damageTypes.poison"}}</option>
+            <option value="psychic"     {{#if flag.damageTypePsychic}}selected{{/if}}>{{localize "BOT.damageTypes.psychic"}}</option>
+            <option value="radiant"     {{#if flag.damageTypeRadiant}}selected{{/if}}>{{localize "BOT.damageTypes.radiant"}}</option>
+            <option value="slashing"    {{#if flag.damageTypeSlashing}}selected{{/if}}>{{localize "BOT.damageTypes.slashing"}}</option>
+            <option value="thunder"     {{#if flag.damageTypeThunder}}selected{{/if}}>{{localize "BOT.damageTypes.thunder"}}</option>
+          </select>
+        </div>
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.damage.targetMode.label"}}</label>
+          <select name="damageTargetMode" class="bot-input-flex">
+            <option value="triggerTarget" {{#if flag.damageTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.triggerTarget"}}</option>
+            <option value="self" {{#if flag.damageTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.self"}}</option>
+            <option value="attacker" {{#if flag.damageTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.attacker"}}</option>
+            <option value="storedTarget" {{#if flag.damageTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.storedTarget"}}</option>
+          </select>
+        </div>
+        <section class="bot-inline-subpanel">
+          <div class="bot-row bot-save-row">
+            <label class="bot-label-sm">{{localize "BOT.ui.save.label"}}</label>
+            <select name="saveAbility" class="bot-input-flex bot-save-main-select">
+              <option value=""    {{#unless flag.saveAbility}}selected{{/unless}}>{{localize "BOT.ui.none"}}</option>
+              <option value="str" {{#if (eq flag.saveAbility "str")}}selected{{/if}}>{{localize "BOT.abilities.str"}}</option>
+              <option value="dex" {{#if (eq flag.saveAbility "dex")}}selected{{/if}}>{{localize "BOT.abilities.dex"}}</option>
+              <option value="con" {{#if (eq flag.saveAbility "con")}}selected{{/if}}>{{localize "BOT.abilities.con"}}</option>
+              <option value="int" {{#if (eq flag.saveAbility "int")}}selected{{/if}}>{{localize "BOT.abilities.int"}}</option>
+              <option value="wis" {{#if (eq flag.saveAbility "wis")}}selected{{/if}}>{{localize "BOT.abilities.wis"}}</option>
+              <option value="cha" {{#if (eq flag.saveAbility "cha")}}selected{{/if}}>{{localize "BOT.abilities.cha"}}</option>
+            </select>
+            <label class="bot-label-sm">{{localize "BOT.ui.saveDcSource.label"}}</label>
+            <select name="saveDcSource" class="bot-input-flex bot-save-source-select" onchange="botUpdateSaveDcUI(this)">
+              <option value="fixed" {{#if flag.saveDcSourceFixed}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.fixed"}}</option>
+              <option value="origin" {{#if flag.saveDcSourceOrigin}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.origin"}}</option>
+              <option value="owner" {{#if flag.saveDcSourceOwner}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.owner"}}</option>
+            </select>
+          </div>
+          <div class="bot-row bot-save-row">
+            <div id="bot-save-dc-group" class="bot-save-dc-group" {{#unless flag.saveDcSourceFixed}}style="display:none"{{/unless}}>
+              <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
+              <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
+            </div>
+            <label class="bot-label-sm bot-save-success-label">{{localize "BOT.ui.success.label"}}</label>
+            <select name="saveEffect" class="bot-input-sm bot-save-effect-select">
+              <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
+              <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
+              <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
+            </select>
+          </div>
+        </section>
       </div>
-      <label class="bot-label-sm bot-save-success-label">{{localize "BOT.ui.success.label"}}</label>
-      <select name="saveEffect" class="bot-input-sm bot-save-effect-select">
-        <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
-        <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
-        <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
-      </select>
-    </div>
-    <div class="bot-row">
-      <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
-      <select name="statusId" class="bot-input-flex">
-        <option value="">{{localize "BOT.ui.status.none"}}</option>
-        {{#each flag.statusOptions}}
-          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-        {{/each}}
-      </select>
-    </div>
-    <div class="bot-row">
-      <label class="bot-label-sm">{{localize "BOT.ui.status.targetMode.label"}}</label>
-      <select name="statusTargetMode" class="bot-input-flex">
-        <option value="triggerTarget" {{#if flag.statusTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.triggerTarget"}}</option>
-        <option value="self" {{#if flag.statusTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.self"}}</option>
-        <option value="attacker" {{#if flag.statusTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.attacker"}}</option>
-        <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
-      </select>
-    </div>
-    <section class="bot-formula-help">
+    </details>
+
+    <details class="bot-collapsible-panel bot-effect-panel" id="bot-status-panel" {{#if flag.status.id}}open{{/if}}>
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.status.id}} — {{flag.status.id}}{{/if}}</summary>
+      <div class="bot-collapsible-body">
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
+          <select name="statusId" class="bot-input-flex">
+            <option value="">{{localize "BOT.ui.status.none"}}</option>
+            {{#each flag.statusOptions}}
+              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="bot-row" id="bot-status-target-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+          <label class="bot-label-sm">{{localize "BOT.ui.status.targetMode.label"}}</label>
+          <select name="statusTargetMode" class="bot-input-flex">
+            <option value="triggerTarget" {{#if flag.statusTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.triggerTarget"}}</option>
+            <option value="self" {{#if flag.statusTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.self"}}</option>
+            <option value="attacker" {{#if flag.statusTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.attacker"}}</option>
+            <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
+          </select>
+        </div>
+      </div>
+    </details>
+
+    <details class="bot-collapsible-panel bot-formula-help-panel">
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.formulaHelp.summary"}}</summary>
+      <div class="bot-collapsible-body bot-formula-help">
       <strong>{{localize "BOT.ui.formulaHelp.title"}}</strong>
       <div>{{localize "BOT.ui.formulaHelp.aliases"}}</div>
       <div>{{localize "BOT.ui.formulaHelp.origin"}}</div>
@@ -180,49 +196,54 @@
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@attacker.prof')">@attacker.prof</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@stored.prof')">@stored.prof</button>
       </div>
-    </section>
+      </div>
+    </details>
 
-    <section class="bot-inline-panel">
+    <section class="bot-inline-panel bot-effect-panel">
       <div class="form-group">
         <label>{{localize "BOT.ui.healing.enabled"}}</label>
         <input type="checkbox" name="healingEnabled" {{#if flag.healingEnabled}}checked{{/if}} />
       </div>
-      <div class="bot-row">
-        <label class="bot-label-sm">{{localize "BOT.ui.healing.formula"}}</label>
-        <input type="text" name="healingFormula" value="{{flag.healingFormula}}" placeholder="2d6" class="bot-input-flex" />
-        <label class="bot-label-sm">{{localize "BOT.ui.healing.targetMode.label"}}</label>
-        <select name="healingTargetMode" class="bot-input-flex">
-          <option value="triggerTarget" {{#if flag.healingTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.triggerTarget"}}</option>
-          <option value="self" {{#if flag.healingTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.self"}}</option>
-          <option value="attacker" {{#if flag.healingTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.attacker"}}</option>
-          <option value="storedTarget" {{#if flag.healingTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.storedTarget"}}</option>
-        </select>
+      <div id="bot-healing-details" {{#unless flag.healingEnabled}}style="display:none"{{/unless}}>
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.healing.formula"}}</label>
+          <input type="text" name="healingFormula" value="{{flag.healingFormula}}" placeholder="2d6" class="bot-input-flex" />
+          <label class="bot-label-sm">{{localize "BOT.ui.healing.targetMode.label"}}</label>
+          <select name="healingTargetMode" class="bot-input-flex">
+            <option value="triggerTarget" {{#if flag.healingTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.triggerTarget"}}</option>
+            <option value="self" {{#if flag.healingTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.self"}}</option>
+            <option value="attacker" {{#if flag.healingTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.attacker"}}</option>
+            <option value="storedTarget" {{#if flag.healingTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.healing.targetMode.storedTarget"}}</option>
+          </select>
+        </div>
       </div>
     </section>
 
-    <section class="bot-inline-panel">
+    <section class="bot-inline-panel bot-effect-panel">
       <div class="form-group">
         <label>{{localize "BOT.ui.temporaryHp.enabled"}}</label>
         <input type="checkbox" name="temporaryHpEnabled" {{#if flag.temporaryHpEnabled}}checked{{/if}} />
       </div>
-      <div class="bot-row">
-        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.formula"}}</label>
-        <input type="text" name="temporaryHpFormula" value="{{flag.temporaryHpFormula}}" placeholder="1d6" class="bot-input-flex" />
-        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.targetMode.label"}}</label>
-        <select name="temporaryHpTargetMode" class="bot-input-flex">
-          <option value="triggerTarget" {{#if flag.temporaryHpTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.triggerTarget"}}</option>
-          <option value="self" {{#if flag.temporaryHpTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.self"}}</option>
-          <option value="attacker" {{#if flag.temporaryHpTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.attacker"}}</option>
-          <option value="storedTarget" {{#if flag.temporaryHpTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.storedTarget"}}</option>
-        </select>
-      </div>
-      <div class="bot-row">
-        <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.mode.label"}}</label>
-        <select name="temporaryHpMode" class="bot-input-flex">
-          <option value="keepHighest" {{#if flag.temporaryHpModeKeepHighest}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.keepHighest"}}</option>
-          <option value="replace" {{#if flag.temporaryHpModeReplace}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.replace"}}</option>
-          <option value="add" {{#if flag.temporaryHpModeAdd}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.add"}}</option>
-        </select>
+      <div id="bot-temporary-hp-details" {{#unless flag.temporaryHpEnabled}}style="display:none"{{/unless}}>
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.formula"}}</label>
+          <input type="text" name="temporaryHpFormula" value="{{flag.temporaryHpFormula}}" placeholder="1d6" class="bot-input-flex" />
+          <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.targetMode.label"}}</label>
+          <select name="temporaryHpTargetMode" class="bot-input-flex">
+            <option value="triggerTarget" {{#if flag.temporaryHpTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.triggerTarget"}}</option>
+            <option value="self" {{#if flag.temporaryHpTargetModeSelf}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.self"}}</option>
+            <option value="attacker" {{#if flag.temporaryHpTargetModeAttacker}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.attacker"}}</option>
+            <option value="storedTarget" {{#if flag.temporaryHpTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.storedTarget"}}</option>
+          </select>
+        </div>
+        <div class="bot-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.mode.label"}}</label>
+          <select name="temporaryHpMode" class="bot-input-flex">
+            <option value="keepHighest" {{#if flag.temporaryHpModeKeepHighest}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.keepHighest"}}</option>
+            <option value="replace" {{#if flag.temporaryHpModeReplace}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.replace"}}</option>
+            <option value="add" {{#if flag.temporaryHpModeAdd}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.mode.add"}}</option>
+          </select>
+        </div>
       </div>
     </section>
   </div>

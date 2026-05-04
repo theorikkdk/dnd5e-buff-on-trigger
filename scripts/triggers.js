@@ -424,14 +424,12 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   if (overrideTargets !== null) {
     cibles = overrideTargets;
   } else {
-    cibles = [...game.user.targets];
-    if (cibles.length === 0) {
-      cibles = canvas.tokens.placeables.filter(
-        (t) => t.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE
-      );
-    }
+    cibles = [];
+    console.log(`[${MODULE_ID}] Trigger de tour : aucune cible de déclenchement implicite`);
   }
-  console.log(`[${MODULE_ID}] Cibles pour ${triggerType} : ${cibles.length}`);
+  if (overrideTargets !== null) {
+    console.log(`[${MODULE_ID}] Cibles explicites pour ${triggerType} : ${cibles.length}`);
+  }
 
   const targetsSet = new Set(cibles);
   const workflow = {

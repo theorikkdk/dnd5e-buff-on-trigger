@@ -105,6 +105,7 @@
   "BOT.ui.status.targetMode.attacker": "Attaquant",
   "BOT.ui.status.targetMode.storedTarget": "Cible mémorisée",
   "BOT.ui.formulaHelp.title": "Variables disponibles dans les formules",
+  "BOT.ui.formulaHelp.summary": "Variables : @spellLevel, @prof, @wis.mod…",
   "BOT.ui.formulaHelp.aliases": "Variables simples : @spellLevel vient du sort d'origine ; @prof et @str.mod / @dex.mod / @con.mod / @int.mod / @wis.mod / @cha.mod viennent du lanceur / source d'origine.",
   "BOT.ui.formulaHelp.origin": "@origin : lanceur / source d'origine",
   "BOT.ui.formulaHelp.owner": "@owner : porteur actuel du buff",

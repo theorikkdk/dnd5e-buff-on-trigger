@@ -105,6 +105,7 @@
   "BOT.ui.status.targetMode.attacker": "Attacker",
   "BOT.ui.status.targetMode.storedTarget": "Stored target",
   "BOT.ui.formulaHelp.title": "Available formula variables",
+  "BOT.ui.formulaHelp.summary": "Variables: @spellLevel, @prof, @wis.mod…",
   "BOT.ui.formulaHelp.aliases": "Simple variables: @spellLevel comes from the origin spell; @prof and @str.mod / @dex.mod / @con.mod / @int.mod / @wis.mod / @cha.mod come from the origin caster / source.",
   "BOT.ui.formulaHelp.origin": "@origin: origin caster / source",
   "BOT.ui.formulaHelp.owner": "@owner: current buff owner",
