@@ -125,10 +125,6 @@ function getDamageTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
 }
 
-function getDamageCriticalModeLabel(mode) {
-  return game.i18n.localize(`BOT.ui.damage.criticalMode.${mode ?? "system"}`);
-}
-
 function getStatusTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.status.targetMode.${targetMode ?? "legacy"}`);
 }
@@ -288,10 +284,6 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.damageTarget"),
       value: getDamageTargetModeLabel(raw.damage.targetMode)
-    });
-    summary.push({
-      label: game.i18n.localize("BOT.ui.summary.damageCriticalMode"),
-      value: getDamageCriticalModeLabel(raw.damage.criticalMode)
     });
   }
 
@@ -514,10 +506,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTargetModeSelf: raw.damage?.targetMode === "self",
       damageTargetModeAttacker: raw.damage?.targetMode === "attacker",
       damageTargetModeStoredTarget: raw.damage?.targetMode === "storedTarget",
-      damageCriticalModeSystem: (raw.damage?.criticalMode ?? "system") === "system",
-      damageCriticalModeDoubleDice: raw.damage?.criticalMode === "doubleDice",
-      damageCriticalModeMaxBaseDice: raw.damage?.criticalMode === "maxBaseDice",
-      damageCriticalModeNeverDouble: raw.damage?.criticalMode === "neverDouble",
       statusOptions,
       statusTargetModeTriggerTarget: (raw.status?.targetMode ?? "triggerTarget") === "triggerTarget",
       statusTargetModeSelf: raw.status?.targetMode === "self",
@@ -562,8 +550,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
         const submittedDamageTargetMode = data.damageTargetMode ?? "triggerTarget";
         const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
-        const submittedDamageCriticalMode = data.damageCriticalMode ?? "system";
-        const shouldPersistDamageCriticalMode = !!currentFlag.damage?.criticalMode || submittedDamageCriticalMode !== "system";
         const submittedStatusTargetMode = data.statusTargetMode ?? "triggerTarget";
         const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
         const flag = {
@@ -580,8 +566,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         damage: data.damageFormula ? {
           formula: data.damageFormula,
           type: data.damageType,
-          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {}),
-          ...(shouldPersistDamageCriticalMode ? { criticalMode: submittedDamageCriticalMode } : {})
+          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
         } : null,
         healing: data.healingEnabled && data.healingFormula ? {
           formula: data.healingFormula,

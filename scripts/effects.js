@@ -615,7 +615,10 @@ export async function applyBonusDamage(workflow, flag) {
 
     console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} Ã¢â‚¬â€ cibles : ${targets.size}`);
 
-    const criticalMode = flag.damage.criticalMode ?? "system";
+    const configuredCriticalMode = game.settings.get(MODULE_ID, "bonusDamageCriticalMode");
+    const criticalMode = ["system", "doubleDice", "maxBaseDice", "neverDouble"].includes(configuredCriticalMode)
+      ? configuredCriticalMode
+      : "system";
     const critical = isWorkflowCritical(workflow);
     let formula = flag.damage.formula;
     const damageType = flag.damage.type;

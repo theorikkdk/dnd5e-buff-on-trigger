@@ -3,6 +3,8 @@
   "BOT.status.active": "Buff on Trigger actif",
   "BOT.settings.enabled": "Activer le module",
   "BOT.settings.enabledHint": "Activer ou désactiver le module Buff on Trigger",
+  "BOT.settings.bonusDamageCriticalMode.name": "Critique des dégâts bonus",
+  "BOT.settings.bonusDamageCriticalMode.hint": "Détermine comment les dégâts bonus du module sont traités lors d’un coup critique.",
   "BOT.fallback.effectName": "Buff on Trigger",
   "BOT.notifications.noTargetSelected": "Buff on Trigger : aucune cible sélectionnée. Ciblez un token avant d'utiliser ce sort.",
   "BOT.chat.triggered": "se déclenche !",

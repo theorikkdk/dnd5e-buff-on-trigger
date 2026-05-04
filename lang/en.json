@@ -3,6 +3,8 @@
   "BOT.status.active": "Buff on Trigger Active",
   "BOT.settings.enabled": "Enable module",
   "BOT.settings.enabledHint": "Enable or disable the Buff on Trigger module",
+  "BOT.settings.bonusDamageCriticalMode.name": "Bonus damage critical",
+  "BOT.settings.bonusDamageCriticalMode.hint": "Determines how the module's bonus damage is handled on a critical hit.",
   "BOT.fallback.effectName": "Buff on Trigger",
   "BOT.notifications.noTargetSelected": "Buff on Trigger: no target selected. Target a token before using this spell.",
   "BOT.chat.triggered": "triggers!",

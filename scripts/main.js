@@ -4,6 +4,20 @@ import { registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 
 Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, "bonusDamageCriticalMode", {
+    name: "BOT.settings.bonusDamageCriticalMode.name",
+    hint: "BOT.settings.bonusDamageCriticalMode.hint",
+    scope: "world",
+    config: true,
+    type: String,
+    default: "system",
+    choices: {
+      system: game.i18n.localize("BOT.ui.damage.criticalMode.system"),
+      doubleDice: game.i18n.localize("BOT.ui.damage.criticalMode.doubleDice"),
+      maxBaseDice: game.i18n.localize("BOT.ui.damage.criticalMode.maxBaseDice"),
+      neverDouble: game.i18n.localize("BOT.ui.damage.criticalMode.neverDouble"),
+    },
+  });
   console.log(`[${MODULE_ID}] Module initialized`);
 });
 
