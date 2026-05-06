@@ -140,7 +140,7 @@ export function registerTriggers() {
       const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
       if (buffConfig || flag) console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
       if (buffConfig && !ATTACK_ACTION_TYPES.includes(actionType)) {
-        const targetMode = buffConfig.targetMode ?? "self";
+        const targetMode = buffConfig.targetMode === "ally" ? "target" : (buffConfig.targetMode ?? "self");
         const activeFlag = {
           ...buffConfig,
           itemName: workflow.item?.name,
@@ -161,47 +161,7 @@ export function registerTriggers() {
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
         const sourceActorName = workflow.actor.name;
 
-        if (targetMode === "ally") {
-          const selectedAllyToken = getExactlyOneSelectedTarget();
-          if (!selectedAllyToken?.actor) {
-            ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
-            console.log(`[${MODULE_ID}] Mode ally — activation annulée, il faut exactement une cible`);
-            return;
-          }
-          activeFlag.targetTokenId = selectedAllyToken.id;
-          activeFlag.storedTargetTokenUuid = selectedAllyToken.document?.uuid ?? selectedAllyToken.uuid ?? null;
-          activeFlag.storedTargetActorUuid = selectedAllyToken.actor.uuid ?? null;
-          await selectedAllyToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          console.log(`[${MODULE_ID}] Buff activé sur ${selectedAllyToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
-          if (hasMechBuffs) {
-            const changes = buildMechanicalChanges(activeFlag);
-            await refreshBuffIndicator(selectedAllyToken.actor, null, changes);
-          } else {
-            await refreshBuffIndicator(selectedAllyToken.actor);
-          }
-          return;
-          const allyToken = [...game.user.targets][0];
-          if (!allyToken?.actor) {
-            // Fallback sur le lanceur
-            await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-            console.log(`[${MODULE_ID}] Mode "ally" sans cible — buff appliqué sur le lanceur ${workflow.actor.name}`);
-            if (hasMechBuffs) {
-              const changes = buildMechanicalChanges(activeFlag);
-              await refreshBuffIndicator(workflow.actor, null, changes);
-            } else {
-              await refreshBuffIndicator(workflow.actor);
-            }
-          } else {
-            await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-            console.log(`[${MODULE_ID}] Buff activé sur l'allié ${allyToken.actor.name} via ${workflow.item.name}`);
-            await refreshBuffIndicator(workflow.actor);
-            if (hasMechBuffs) {
-              await applyMechanicalBuffs(allyToken.actor, activeFlag, activeFlag.duration?.rounds ?? null);
-            } else {
-              await applyTargetIndicator(allyToken.actor, activeFlag);
-            }
-          }
-        } else if (targetMode === "target") {
+        if (targetMode === "target") {
           const selectedTargetToken = getExactlyOneSelectedTarget();
           if (!selectedTargetToken?.actor) {
             ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
@@ -218,25 +178,6 @@ export function registerTriggers() {
             await refreshBuffIndicator(selectedTargetToken.actor, null, changes);
           } else {
             await refreshBuffIndicator(selectedTargetToken.actor);
-          }
-          return;
-          const targetToken = [...game.user.targets][0];
-          if (!targetToken) {
-            ui.notifications.warn(game.i18n.localize("BOT.notifications.noTargetSelected"));
-            console.log(`[${MODULE_ID}] Mode target — activation annulée, aucune cible`);
-            return;
-          }
-          activeFlag.targetTokenId = targetToken.id;
-          await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
-          console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken.name})`);
-          const buffTarget = canvas.tokens.get(activeFlag.targetTokenId)?.actor ?? null;
-          if (hasMechBuffs && buffTarget) {
-            await refreshBuffIndicator(workflow.actor);
-            await applyMechanicalBuffs(buffTarget, activeFlag, activeFlag.duration?.rounds ?? null);
-          } else {
-            await refreshBuffIndicator(workflow.actor);
-            if (targetToken.actor) await applyTargetIndicator(targetToken.actor, activeFlag);
           }
         } else {
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
@@ -507,12 +448,6 @@ export function registerTriggers() {
         if (!actor) return;
         await clearConcentrationLinkedBuffs(actor);
         return;
-        const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-        if (!activeBuff) return;
-        const itemName = activeBuff.itemName;
-        await actor.unsetFlag(MODULE_ID, "activeBuff");
-        await refreshBuffIndicator(actor, itemName);
-        console.log(`[${MODULE_ID}] Concentration brisée — buff ${itemName} annulé sur ${actor.name}`);
       }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans deleteActiveEffect :`, error);

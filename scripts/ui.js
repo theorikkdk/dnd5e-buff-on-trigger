@@ -97,8 +97,17 @@ function getTriggerLabel(type) {
   return game.i18n.localize(`BOT.ui.trigger.${type}`);
 }
 
+function normalizeGlobalTargetMode(targetMode) {
+  if (targetMode === "ally") return "target";
+  return targetMode ?? "self";
+}
+
 function getTargetModeLabel(targetMode) {
-  return game.i18n.localize(`BOT.ui.targetMode.${targetMode ?? "self"}`);
+  const normalizedTargetMode = normalizeGlobalTargetMode(targetMode);
+  if (game.i18n.lang?.startsWith("fr")) {
+    return normalizedTargetMode === "target" ? "Sur une cible" : "Sur soi-même";
+  }
+  return normalizedTargetMode === "target" ? "On one target" : "On self";
 }
 
 function getConditionLabel(condition) {
@@ -471,10 +480,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const languageOptions       = LANGUAGE_IDS.map(value => ({ value, label: languageLabels[value], selected: (raw.buffs?.languages ?? []).includes(value) }));
     const flag = {
       ...raw,
-      targetMode:            raw.targetMode ?? "self",
-      targetModeSelf:        (raw.targetMode ?? "self") === "self",
-      targetModeTarget:      raw.targetMode === "target",
-      targetModeAlly:        raw.targetMode === "ally",
+      targetMode:            normalizeGlobalTargetMode(raw.targetMode),
+      targetModeSelf:        normalizeGlobalTargetMode(raw.targetMode) === "self",
+      targetModeTarget:      normalizeGlobalTargetMode(raw.targetMode) === "target",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
       typeMsak:              raw.type === "msak",
@@ -606,7 +614,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         const submittedStatusTargetMode = data.statusTargetMode ?? "triggerTarget";
         const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
         const flag = {
-        targetMode: data.targetMode ?? "self",
+        targetMode: normalizeGlobalTargetMode(data.targetMode),
         type: data.type,
         condition: data.condition,
         receivedAttackType: data.receivedAttackType ?? "any",
