@@ -62,6 +62,107 @@ function getExactlyOneSelectedTarget() {
   return selectedTargets.length === 1 ? selectedTargets[0] ?? null : null;
 }
 
+function tokenMatchesStoredTarget(token, flag) {
+  if (!token || !flag) return false;
+
+  const tokenUuid = token.document?.uuid ?? token.uuid ?? null;
+  const actorUuid = token.actor?.uuid ?? null;
+  if (flag.storedTargetTokenUuid && tokenUuid && tokenUuid === flag.storedTargetTokenUuid) return true;
+  if (flag.storedTargetActorUuid && actorUuid && actorUuid === flag.storedTargetActorUuid) return true;
+  if (flag.targetTokenId && token.id && token.id === flag.targetTokenId) return true;
+  return false;
+}
+
+function isWorkflowCriticalHit(workflow) {
+  return Boolean(
+    workflow?.isCritical
+    || workflow?.critical
+    || workflow?.attackRoll?.isCritical
+    || workflow?.attackRoll?.options?.critical
+  );
+}
+
+function getMissedAttackTargets(workflow) {
+  if (workflow?.missedTargets?.size) return [...workflow.missedTargets];
+  const hitIds = new Set([...(workflow?.hitTargets ?? [])].map((token) => token.id));
+  return [...(workflow?.targets ?? [])].filter((token) => !hitIds.has(token.id));
+}
+
+function getStoredTargetCandidates(workflow, flag) {
+  if (flag.type === "damaged") {
+    const attackerToken = workflow.attackerToken
+      ?? [...(workflow.hitTargets ?? [])][0]
+      ?? [...(workflow.targets ?? [])][0]
+      ?? null;
+    return attackerToken ? [attackerToken] : [];
+  }
+
+  if (["mwak", "rwak", "msak", "rsak"].includes(flag.type)) {
+    const condition = flag.condition ?? "hit";
+    if (condition === "hit") return [...(workflow.hitTargets ?? [])];
+    if (condition === "miss") return getMissedAttackTargets(workflow);
+    if (condition === "critical") return isWorkflowCriticalHit(workflow) ? [...(workflow.hitTargets ?? [])] : [];
+
+    const candidates = new Map();
+    for (const token of [...(workflow.targets ?? []), ...(workflow.hitTargets ?? []), ...getMissedAttackTargets(workflow)]) {
+      const key = token?.document?.uuid ?? token?.uuid ?? token?.id ?? null;
+      if (key) candidates.set(key, token);
+    }
+    return [...candidates.values()];
+  }
+
+  const candidates = new Map();
+  for (const token of [...(workflow.hitTargets ?? []), ...(workflow.targets ?? [])]) {
+    const key = token?.document?.uuid ?? token?.uuid ?? token?.id ?? null;
+    if (key) candidates.set(key, token);
+  }
+  return [...candidates.values()];
+}
+
+function workflowMatchesStoredTarget(workflow, flag) {
+  if (!flag.requireStoredTargetMatch) return true;
+
+  const candidates = getStoredTargetCandidates(workflow, flag);
+  if (!candidates.length) {
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
+    return false;
+  }
+
+  if (!candidates.some((token) => tokenMatchesStoredTarget(token, flag))) {
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
+    return false;
+  }
+
+  return true;
+}
+
+function doesAttackConditionMatch(workflow, flag) {
+  const condition = flag.condition ?? "hit";
+  if (condition === "always") return true;
+
+  const hitTargets = [...(workflow.hitTargets ?? [])];
+  if (condition === "hit") {
+    if (hitTargets.length > 0) return true;
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : attaque non touchée`);
+    return false;
+  }
+
+  if (condition === "miss") {
+    if (getMissedAttackTargets(workflow).length > 0) return true;
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+    return false;
+  }
+
+  if (condition === "critical") {
+    if (isWorkflowCriticalHit(workflow) && hitTargets.length > 0) return true;
+    console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+    return false;
+  }
+
+  console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+  return false;
+}
+
 async function clearConcentrationLinkedBuffs(sourceActor) {
   const sourceActorUuid = sourceActor?.uuid ?? null;
   const sourceActorId = sourceActor?.id ?? null;
@@ -117,7 +218,7 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
     const itemName = activeBuff.itemName;
     await actor.unsetFlag(MODULE_ID, "activeBuff");
     await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-    await refreshBuffIndicator(actor, itemName);
+    await refreshBuffIndicator(actor, itemName, [], activeBuff);
     removedCount += 1;
     console.log(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
   }
@@ -160,14 +261,16 @@ export function registerTriggers() {
         };
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
         const sourceActorName = workflow.actor.name;
+        const shouldRememberTarget = targetMode === "target" || activeFlag.rememberTargetOnActivation === true;
+        const selectedTargetToken = shouldRememberTarget ? getExactlyOneSelectedTarget() : null;
+
+        if (shouldRememberTarget && !selectedTargetToken?.actor) {
+          ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
+          console.log(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
+          return;
+        }
 
         if (targetMode === "target") {
-          const selectedTargetToken = getExactlyOneSelectedTarget();
-          if (!selectedTargetToken?.actor) {
-            ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
-            console.log(`[${MODULE_ID}] Mode target — activation annulée, il faut exactement une cible`);
-            return;
-          }
           activeFlag.targetTokenId = selectedTargetToken.id;
           activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
           activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
@@ -180,6 +283,11 @@ export function registerTriggers() {
             await refreshBuffIndicator(selectedTargetToken.actor);
           }
         } else {
+          if (selectedTargetToken?.actor) {
+            activeFlag.targetTokenId = selectedTargetToken.id;
+            activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
+            activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
+          }
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
           console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
           if (hasMechBuffs) {
@@ -429,7 +537,7 @@ export function registerTriggers() {
         const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
         const itemName = effect.name;
         await actor.unsetFlag(MODULE_ID, "activeBuff");
-        await refreshBuffIndicator(actor, itemName);
+        await refreshBuffIndicator(actor, itemName, [], activeBuff);
         console.log(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
         if (activeBuff?.duration?.concentration) {
           const concentrationEffect = actor.effects.find(
@@ -458,6 +566,8 @@ export function registerTriggers() {
 function handleAttackTrigger(workflow, flag) {
   const triggerType = workflow.activity?.actionType ?? flag.type;
   console.log(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
+  if (!doesAttackConditionMatch(workflow, flag)) return;
+  if (!workflowMatchesStoredTarget(workflow, flag)) return;
   applyEffect(workflow, flag);
 }
 
@@ -483,9 +593,11 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
     hitTargets: new Set(cibles),
     missedTargets: new Set(),
   };
+  if (!workflowMatchesStoredTarget(workflow, flag)) return;
   await applyEffect(workflow, flag);
   if (flag.consumeOnTrigger === true) {
     await actor.unsetFlag(MODULE_ID, "activeBuff");
-    await refreshBuffIndicator(actor, flag.itemName);
+    await refreshBuffIndicator(actor, flag.itemName, [], flag);
   }
 }
+

@@ -105,9 +105,9 @@ function normalizeGlobalTargetMode(targetMode) {
 function getTargetModeLabel(targetMode) {
   const normalizedTargetMode = normalizeGlobalTargetMode(targetMode);
   if (game.i18n.lang?.startsWith("fr")) {
-    return normalizedTargetMode === "target" ? "Sur une cible" : "Sur soi-même";
+    return normalizedTargetMode === "target" ? "Sur la cible sélectionnée" : "Sur le lanceur";
   }
-  return normalizedTargetMode === "target" ? "On one target" : "On self";
+  return normalizedTargetMode === "target" ? "On the selected target" : "On the caster";
 }
 
 function getConditionLabel(condition) {
@@ -276,6 +276,8 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   const summary = [
     { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
+    { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
+    { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
 
   if (["mwak", "rwak", "msak", "rsak"].includes(raw.type)) {
@@ -442,6 +444,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (temporaryHpEnabled) temporaryHpEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const statusSelect = this.element.querySelector?.('[name="statusId"]');
     if (statusSelect) statusSelect.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    const targetModeSelect = this.element.querySelector?.('[name="targetMode"]');
+    if (targetModeSelect) window.botUpdateStoredTargetUI(targetModeSelect);
     this.element.querySelectorAll?.('.bot-collapsible-panel')?.forEach((panel) => {
       panel.addEventListener("toggle", () => this.resizeToContent());
     });
@@ -483,6 +487,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       targetMode:            normalizeGlobalTargetMode(raw.targetMode),
       targetModeSelf:        normalizeGlobalTargetMode(raw.targetMode) === "self",
       targetModeTarget:      normalizeGlobalTargetMode(raw.targetMode) === "target",
+      showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
+      rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
+      requireStoredTargetMatch: !!raw.requireStoredTargetMatch,
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
       typeMsak:              raw.type === "msak",
@@ -615,6 +622,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
         const flag = {
         targetMode: normalizeGlobalTargetMode(data.targetMode),
+        rememberTargetOnActivation: data.rememberTargetOnActivation ?? false,
+        requireStoredTargetMatch: data.requireStoredTargetMatch ?? false,
         type: data.type,
         condition: data.condition,
         receivedAttackType: data.receivedAttackType ?? "any",
@@ -723,6 +732,17 @@ window.botUpdateTriggerUI = function(selectEl) {
 
   window.botUpdateTargetModeOptions(form, selectEl.value);
 
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botUpdateStoredTargetUI = function(selectEl) {
+  const form = selectEl.closest('form');
+  const storedTargetGroup = form?.querySelector?.('#bot-stored-target-group');
+  if (storedTargetGroup) {
+    storedTargetGroup.style.display = selectEl.value === "self" ? "" : "none";
+  }
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.resizeToContent();

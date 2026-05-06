@@ -4,14 +4,6 @@
     <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
-  <div class="form-group">
-    <label>{{localize "BOT.ui.targetMode.label"}}</label>
-    <select name="targetMode">
-      <option value="self"   {{#if flag.targetModeSelf}}selected{{/if}}>{{localize "BOT.ui.targetMode.self"}}</option>
-      <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>{{localize "BOT.ui.targetMode.target"}}</option>
-    </select>
-  </div>
-
   <!-- Navigation par onglets -->
   <div class="bot-tabs">
     <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">{{localize "BOT.ui.tabs.trigger"}}</button>
@@ -22,6 +14,25 @@
 
   <!-- Onglet 1 : Déclencheur -->
   <div id="bot-tab-trigger" class="bot-tab-panel">
+    <div class="form-group">
+      <label>{{localize "BOT.ui.targetMode.label"}}</label>
+      <select name="targetMode" onchange="botUpdateStoredTargetUI(this)">
+        <option value="self"   {{#if flag.targetModeSelf}}selected{{/if}}>{{localize "BOT.ui.targetMode.self"}}</option>
+        <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>{{localize "BOT.ui.targetMode.target"}}</option>
+      </select>
+    </div>
+    <section class="bot-inline-panel" id="bot-stored-target-group" {{#unless flag.showStoredTargetSection}}style="display:none"{{/unless}}>
+      <h3 class="bot-summary-title">{{localize "BOT.ui.storedTarget.title"}}</h3>
+      <p class="hint">{{localize "BOT.ui.storedTarget.help"}}</p>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.storedTarget.rememberTargetOnActivation"}}</label>
+        <input type="checkbox" name="rememberTargetOnActivation" {{#if flag.rememberTargetOnActivation}}checked{{/if}} />
+      </div>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.storedTarget.requireStoredTargetMatch"}}</label>
+        <input type="checkbox" name="requireStoredTargetMatch" {{#if flag.requireStoredTargetMatch}}checked{{/if}} />
+      </div>
+    </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.trigger.label"}}</label>
       <select name="type" onchange="botUpdateTriggerUI(this)">
@@ -78,7 +89,8 @@
 
   <!-- Onglet 2 : Dégâts & Effets -->
   <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
-    <details class="bot-collapsible-panel bot-effect-panel" id="bot-damage-panel" {{#if flag.damage.formula}}open{{/if}}>
+      <p class="hint">{{localize "BOT.ui.effectTargets.help"}}</p>
+      <details class="bot-collapsible-panel bot-effect-panel" id="bot-damage-panel" {{#if flag.damage.formula}}open{{/if}}>
       <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.damage"}}{{#if flag.damage.formula}} — {{flag.damage.formula}}{{/if}}</summary>
       <div class="bot-collapsible-body">
         <div class="bot-row">

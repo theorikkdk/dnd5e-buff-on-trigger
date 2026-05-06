@@ -1,6 +1,8 @@
 {
   "BOT.moduleTitle": "Buff on Trigger",
   "BOT.status.active": "Buff on Trigger actif",
+  "BOT.status.storedTarget": "Cible marquée",
+  "BOT.status.markedBy": "Marquée par {name}",
   "BOT.settings.enabled": "Activer le module",
   "BOT.settings.enabledHint": "Activer ou désactiver le module Buff on Trigger",
   "BOT.settings.bonusDamageCriticalMode.name": "Critique des dégâts bonus",
@@ -24,9 +26,9 @@
   "BOT.ui.configTitle": "Buff on Trigger — Configuration",
   "BOT.ui.enable": "Activer le buff on trigger",
   "BOT.ui.none": "Aucune",
-  "BOT.ui.targetMode.label": "Mode de ciblage",
-  "BOT.ui.targetMode.self": "Sur moi-même (buff offensif)",
-  "BOT.ui.targetMode.target": "Sur une cible (malus/debuff)",
+  "BOT.ui.targetMode.label": "Où placer le buff ?",
+  "BOT.ui.targetMode.self": "Sur le lanceur",
+  "BOT.ui.targetMode.target": "Sur la cible sélectionnée",
   "BOT.ui.targetMode.ally": "Sur un allié (buff défensif)",
   "BOT.ui.tabs.trigger": "Déclencheur",
   "BOT.ui.tabs.damageEffects": "Dégâts & Effets",
@@ -113,6 +115,11 @@
   "BOT.ui.status.targetMode.self": "Porteur du buff",
   "BOT.ui.status.targetMode.attacker": "Attaquant",
   "BOT.ui.status.targetMode.storedTarget": "Cible mémorisée",
+  "BOT.ui.storedTarget.title": "Marque / cible mémorisée",
+  "BOT.ui.storedTarget.help": "Utile pour les effets comme Maléfice ou Marque du chasseur : le buff reste sur le lanceur, mais une cible est mémorisée.",
+  "BOT.ui.storedTarget.rememberTargetOnActivation": "Mémoriser une cible à l'activation",
+  "BOT.ui.storedTarget.requireStoredTargetMatch": "Ne se déclenche que contre cette cible",
+  "BOT.ui.effectTargets.help": "Cible du déclenchement = la cible touchée ou concernée par l'événement. Porteur du buff = l'acteur qui possède l'effet actif. Cible mémorisée = la cible choisie à l'activation.",
   "BOT.ui.status.applyCondition.label": "Appliquer le statut",
   "BOT.ui.status.applyCondition.always": "Toujours",
   "BOT.ui.status.applyCondition.saveFailure": "Si le jet de sauvegarde échoue",
@@ -197,6 +204,8 @@
   "BOT.ui.summary.status": "Statut",
   "BOT.ui.summary.statusTarget": "Cible du statut",
   "BOT.ui.summary.statusApplyCondition": "Application du statut",
+  "BOT.ui.summary.rememberTargetOnActivation": "Cible mémorisée",
+  "BOT.ui.summary.requireStoredTargetMatch": "Correspondance cible mémorisée requise",
   "BOT.ui.summary.mechanical": "Buffs mécaniques",
   "BOT.ui.summary.consumeOnTrigger": "Consommation au déclenchement",
   "BOT.ui.summary.triggerFrequency": "Fréquence",
@@ -288,3 +297,4 @@
   "BOT.languages.primordial": "Primordial",
   "BOT.languages.deep": "Profond"
 }
+

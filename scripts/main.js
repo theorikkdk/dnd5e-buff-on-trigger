@@ -1,4 +1,4 @@
-import { MODULE_ID, BUFF_ICON } from "./constants.js";
+import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON } from "./constants.js";
 import { syncItemDurationFlag } from "./duration.js";
 import { registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
@@ -39,6 +39,11 @@ Hooks.once("setup", () => {
     name: game.i18n.localize("BOT.status.active"),
     img: BUFF_ICON,
   });
+  CONFIG.statusEffects.push({
+    id: "bot-stored-target",
+    name: game.i18n.localize("BOT.status.storedTarget"),
+    img: STORED_TARGET_ICON,
+  });
   console.log(`[${MODULE_ID}] Statut bot-active enregistré dans setup`);
 });
 
@@ -51,3 +56,4 @@ Hooks.once("ready", () => {
     await syncItemDurationFlag(item, options);
   });
 });
+

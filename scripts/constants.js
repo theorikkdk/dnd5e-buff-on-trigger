@@ -13,3 +13,4 @@ export const LANGUAGE_IDS = ["common","elvish","dwarvish","orcish","draconic","i
 export const ATTACK_ACTION_TYPES = ["mwak","rwak","msak","rsak"];
 
 export const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
+export const STORED_TARGET_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-stored-target.svg";

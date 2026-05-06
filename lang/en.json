@@ -1,6 +1,8 @@
 {
   "BOT.moduleTitle": "Buff on Trigger",
   "BOT.status.active": "Buff on Trigger Active",
+  "BOT.status.storedTarget": "Marked target",
+  "BOT.status.markedBy": "Marked by {name}",
   "BOT.settings.enabled": "Enable module",
   "BOT.settings.enabledHint": "Enable or disable the Buff on Trigger module",
   "BOT.settings.bonusDamageCriticalMode.name": "Bonus damage critical",
@@ -24,9 +26,9 @@
   "BOT.ui.configTitle": "Buff on Trigger — Configuration",
   "BOT.ui.enable": "Enable Buff on Trigger",
   "BOT.ui.none": "None",
-  "BOT.ui.targetMode.label": "Targeting mode",
-  "BOT.ui.targetMode.self": "On myself (offensive buff)",
-  "BOT.ui.targetMode.target": "On one target (malus/debuff)",
+  "BOT.ui.targetMode.label": "Where should the buff be placed?",
+  "BOT.ui.targetMode.self": "On the caster",
+  "BOT.ui.targetMode.target": "On the selected target",
   "BOT.ui.targetMode.ally": "On an ally (defensive buff)",
   "BOT.ui.tabs.trigger": "Trigger",
   "BOT.ui.tabs.damageEffects": "Damage & Effects",
@@ -113,6 +115,11 @@
   "BOT.ui.status.targetMode.self": "Buff owner",
   "BOT.ui.status.targetMode.attacker": "Attacker",
   "BOT.ui.status.targetMode.storedTarget": "Stored target",
+  "BOT.ui.storedTarget.title": "Mark / stored target",
+  "BOT.ui.storedTarget.help": "Useful for effects like Hex or Hunter's Mark: the buff stays on the caster, but a target is remembered.",
+  "BOT.ui.storedTarget.rememberTargetOnActivation": "Remember a target on activation",
+  "BOT.ui.storedTarget.requireStoredTargetMatch": "Only triggers against this target",
+  "BOT.ui.effectTargets.help": "Trigger target = the target hit or otherwise affected by the event. Buff owner = the actor currently carrying the active effect. Stored target = the target chosen on activation.",
   "BOT.ui.status.applyCondition.label": "Apply status",
   "BOT.ui.status.applyCondition.always": "Always",
   "BOT.ui.status.applyCondition.saveFailure": "If the saving throw fails",
@@ -199,6 +206,8 @@
   "BOT.ui.summary.status": "Status",
   "BOT.ui.summary.statusTarget": "Status target",
   "BOT.ui.summary.statusApplyCondition": "Status application",
+  "BOT.ui.summary.rememberTargetOnActivation": "Stored target",
+  "BOT.ui.summary.requireStoredTargetMatch": "Stored target match required",
   "BOT.ui.summary.mechanical": "Mechanical buffs",
   "BOT.ui.summary.consumeOnTrigger": "Consume on trigger",
   "BOT.ui.summary.triggerFrequency": "Frequency",
@@ -288,3 +297,4 @@
   "BOT.languages.primordial": "Primordial",
   "BOT.languages.deep": "Deep Speech"
 }
+
