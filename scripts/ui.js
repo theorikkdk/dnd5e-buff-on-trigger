@@ -129,8 +129,16 @@ function getStatusTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.status.targetMode.${targetMode ?? "legacy"}`);
 }
 
+function getStatusApplyConditionLabel(condition) {
+  return game.i18n.localize(`BOT.ui.status.applyCondition.${condition ?? "always"}`);
+}
+
 function getSaveDcSourceLabel(source) {
   return game.i18n.localize(`BOT.ui.saveDcSource.${source ?? "fixed"}`);
+}
+
+function getAbilityLabel(ability) {
+  return ability ? game.i18n.localize(`BOT.abilities.${ability}`) : game.i18n.localize("BOT.ui.none");
 }
 
 function normalizeHealingTargetMode(targetMode) {
@@ -311,6 +319,11 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
       label: game.i18n.localize("BOT.ui.summary.save"),
       value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} • ${saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource)} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
     });
+  } else {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.save"),
+      value: game.i18n.localize("BOT.ui.none")
+    });
   }
 
   if (raw.status?.id) {
@@ -321,6 +334,10 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.statusTarget"),
       value: getStatusTargetModeLabel(raw.status.targetMode)
+    });
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.statusApplyCondition"),
+      value: getStatusApplyConditionLabel(raw.status.applyCondition)
     });
   }
 
@@ -524,6 +541,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       itemDurationRounds,
       itemDurationLabel:     formatItemDurationSummary(itemDurationRounds, legacyDurationFallback),
       saveAbility:           raw.save?.ability ?? "",
+      saveAbilityLabel:      getAbilityLabel(raw.save?.ability ?? ""),
       saveDC:                raw.save?.dc ?? 15,
       saveDcSourceFixed:     (raw.save?.dcSource ?? "fixed") === "fixed",
       saveDcSourceOrigin:    raw.save?.dcSource === "origin",
@@ -543,6 +561,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       statusTargetModeSelf: raw.status?.targetMode === "self",
       statusTargetModeAttacker: raw.status?.targetMode === "attacker",
       statusTargetModeStoredTarget: raw.status?.targetMode === "storedTarget",
+      statusApplyConditionAlways: (raw.status?.applyCondition ?? "always") === "always",
+      statusApplyConditionSaveFailure: raw.status?.applyCondition === "saveFailure",
+      statusApplyConditionSaveSuccess: raw.status?.applyCondition === "saveSuccess",
       receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
       receivedAttackTypeMelee: raw.receivedAttackType === "melee",
       receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
@@ -617,7 +638,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           } : null,
           status: data.statusId ? {
             id: data.statusId,
-            ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {})
+            ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {}),
+            applyCondition: data.statusApplyCondition ?? "always"
           } : null,
         charges: data.charges ? Number(data.charges) : null,
         buffs: (() => {
@@ -765,9 +787,13 @@ window.botUpdateEffectSectionsUI = function(form) {
   }
 
   const statusTargetRow = form.querySelector('#bot-status-target-row');
+  const statusApplyConditionRow = form.querySelector('#bot-status-apply-condition-row');
   const statusSelect = form.querySelector('[name="statusId"]');
   if (statusTargetRow && statusSelect) {
     statusTargetRow.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusApplyConditionRow && statusSelect) {
+    statusApplyConditionRow.style.display = statusSelect.value ? "" : "none";
   }
 
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")

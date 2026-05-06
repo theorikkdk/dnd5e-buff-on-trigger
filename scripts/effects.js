@@ -471,6 +471,87 @@ function resolveTriggerTargetTokens(workflow, flag, effectType = "effet") {
   return getWorkflowConditionTargets(workflow, flag.condition ?? "hit");
 }
 
+function getTokenResolutionKey(token) {
+  return token?.document?.uuid ?? token?.uuid ?? token?.id ?? null;
+}
+
+function collectSavingThrowTargets(workflow, flag) {
+  const targets = new Map();
+  const addTargets = (tokens) => {
+    for (const token of tokens ?? []) {
+      const key = getTokenResolutionKey(token);
+      if (key) targets.set(key, token);
+    }
+  };
+
+  if (flag.damage) {
+    addTargets(resolveBonusDamageTargets(workflow, flag));
+  }
+
+  if (flag.status && (flag.status?.applyCondition ?? "always") !== "always") {
+    addTargets(resolveStatusTargets(workflow, flag));
+  }
+
+  return new Set(targets.values());
+}
+
+async function resolveConfiguredSavingThrows(workflow, flag) {
+  if (workflow._botSaveResults) return workflow._botSaveResults;
+
+  workflow._botSaveResults = null;
+  if (!flag.save?.ability) return null;
+
+  const targets = collectSavingThrowTargets(workflow, flag);
+  if (!targets.size) return null;
+
+  const saveDc = await resolveSaveDC(workflow, flag);
+  const saveResults = {
+    successes: new Set(),
+    failures: new Set(),
+    resolvedCount: 0,
+    dc: saveDc,
+  };
+
+  for (const token of targets) {
+    const targetActor = token.actor;
+    if (!targetActor) continue;
+
+    if (saveDc === null) {
+      const tokenKey = getTokenResolutionKey(token);
+      if (tokenKey) saveResults.failures.add(tokenKey);
+      continue;
+    }
+
+    const saveRolls = await targetActor.rollSavingThrow(
+      {
+        ability: flag.save.ability,
+        // Provide DC context to dnd5e so the native save card can display target information when supported.
+        target: saveDc,
+        targetValue: saveDc,
+        dc: saveDc
+      },
+      { configure: false },
+      { create: true }
+    );
+
+    const tokenKey = getTokenResolutionKey(token);
+    if (!saveRolls || saveRolls.length === 0 || !tokenKey) {
+      if (tokenKey) saveResults.failures.add(tokenKey);
+      continue;
+    }
+
+    const saveRoll = saveRolls[0];
+    const success = saveRoll.total >= saveDc;
+    console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
+    if (success) saveResults.successes.add(tokenKey);
+    else saveResults.failures.add(tokenKey);
+    saveResults.resolvedCount += 1;
+  }
+
+  workflow._botSaveResults = saveResults;
+  return saveResults;
+}
+
 function getCurrentTriggerUsage() {
   if (!game.combat?.id) return null;
   return {
@@ -959,39 +1040,18 @@ export async function applyBonusDamage(workflow, flag) {
     let noDamageTargets = new Set();
 
     if (flag.save?.ability) {
-      const saveDc = await resolveSaveDC(workflow, flag);
-      if (saveDc === null) {
-        console.warn(`[${MODULE_ID}] applyBonusDamage : DD de sauvegarde introuvable, jet ignoré`);
-      }
+      const saveResults = workflow._botSaveResults ?? await resolveConfiguredSavingThrows(workflow, flag);
+      const saveDc = saveResults?.dc ?? null;
       fullTargets = new Set();
       halfTargets = new Set();
       noDamageTargets = new Set();
       for (const token of targets) {
-        const targetActor = token.actor;
-        if (!targetActor) continue;
-        if (saveDc === null) {
+        const tokenKey = getTokenResolutionKey(token);
+        if (saveDc === null || !saveResults || !tokenKey) {
           fullTargets.add(token);
           continue;
         }
-        const saveRolls = await targetActor.rollSavingThrow(
-          {
-            ability: flag.save.ability,
-            // Provide DC context to dnd5e so the native save card can display target information when supported.
-            target: saveDc,
-            targetValue: saveDc,
-            dc: saveDc
-          },
-          { configure: false },
-          { create: true }
-        );
-        if (!saveRolls || saveRolls.length === 0) {
-          fullTargets.add(token);
-          continue;
-        }
-        const saveRoll = saveRolls[0];
-        const success = saveRoll.total >= saveDc;
-        console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} Ã¢â‚¬â€ ${success ? "rÃƒÂ©ussite" : "ÃƒÂ©chec"}`);
-        if (success) {
+        if (saveResults.successes.has(tokenKey)) {
           if (flag.save.effect === "none") {
             noDamageTargets.add(token);
             continue;
@@ -1111,7 +1171,7 @@ export async function applyBonusDamage(workflow, flag) {
 
 export async function applyStatusEffect(workflow, flag) {
   try {
-    const targets = resolveStatusTargets(workflow, flag);
+    let targets = resolveStatusTargets(workflow, flag);
 
     if (!targets?.size) {
       console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible valide (mode "${flag.status?.targetMode ?? flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
@@ -1119,6 +1179,26 @@ export async function applyStatusEffect(workflow, flag) {
     }
 
     const statusId = flag.status.id;
+    const applyCondition = flag.status?.applyCondition ?? "always";
+    if (applyCondition !== "always") {
+      const saveResults = workflow._botSaveResults;
+      if (!saveResults || saveResults.resolvedCount <= 0) {
+        console.log(`[${MODULE_ID}] Statut ignoré : aucun résultat de sauvegarde disponible`);
+        return;
+      }
+
+      targets = new Set(
+        [...targets].filter((token) => {
+          const tokenKey = getTokenResolutionKey(token);
+          if (!tokenKey) return false;
+          if (applyCondition === "saveFailure") return saveResults.failures.has(tokenKey);
+          if (applyCondition === "saveSuccess") return saveResults.successes.has(tokenKey);
+          return true;
+        })
+      );
+
+      if (!targets.size) return;
+    }
 
     for (const token of targets) {
       const targetActor = token.actor;
@@ -1259,6 +1339,13 @@ export async function applyEffect(workflow, flag) {
   }
 
   await markTriggerFrequencyUsage(workflow.actor);
+  workflow._botSaveResults = null;
+
+  const shouldResolveSaveBeforeEffects = !!flag.save?.ability
+    && (!!flag.damage || (flag.status && (flag.status?.applyCondition ?? "always") !== "always"));
+  if (shouldResolveSaveBeforeEffects) {
+    await resolveConfiguredSavingThrows(workflow, flag);
+  }
 
   if (flag.damage) await applyBonusDamage(workflow, flag);
   if (flag.status) await applyStatusEffect(workflow, flag);
