@@ -10,6 +10,7 @@
   "BOT.settings.bonusDamageApplicationMode.automatic": "Automatic",
   "BOT.settings.bonusDamageApplicationMode.midiWorkflow": "Midi-QOL damage workflow",
   "BOT.fallback.effectName": "Buff on Trigger",
+  "BOT.notifications.selectExactlyOneTarget": "Buff on Trigger: select exactly one target before using this spell.",
   "BOT.notifications.noTargetSelected": "Buff on Trigger: no target selected. Target a token before using this spell.",
   "BOT.chat.triggered": "triggers!",
   "BOT.chat.damageResult": "{name} — {total} {type} damage",

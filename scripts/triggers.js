@@ -57,6 +57,74 @@ function getReceivedDamageTypes(damageItem, workflow) {
   return [...types];
 }
 
+function getExactlyOneSelectedTarget() {
+  const selectedTargets = [...(game.user?.targets ?? [])];
+  return selectedTargets.length === 1 ? selectedTargets[0] ?? null : null;
+}
+
+async function clearConcentrationLinkedBuffs(sourceActor) {
+  const sourceActorUuid = sourceActor?.uuid ?? null;
+  const sourceActorId = sourceActor?.id ?? null;
+  if (!sourceActorUuid && !sourceActorId) return;
+
+  const carrierEntries = new Map();
+  const addCarrier = (actor, tokenDocument = null) => {
+    if (!actor?.getFlag) return;
+    const key = tokenDocument?.uuid
+      ?? actor.uuid
+      ?? (tokenDocument?.id && tokenDocument?.parent?.id ? `${tokenDocument.parent.id}.${tokenDocument.id}` : null)
+      ?? actor.id
+      ?? null;
+    if (!key || carrierEntries.has(key)) return;
+    carrierEntries.set(key, { actor, tokenDocument });
+  };
+
+  for (const actor of game.actors.contents) addCarrier(actor);
+
+  if (canvas?.tokens?.placeables) {
+    for (const token of canvas.tokens.placeables) {
+      addCarrier(token.actor ?? null, token.document ?? null);
+    }
+  }
+
+  if (canvas?.scene?.tokens) {
+    for (const tokenDocument of canvas.scene.tokens) {
+      addCarrier(tokenDocument.actor ?? null, tokenDocument);
+    }
+  }
+
+  if (game?.scenes?.contents) {
+    for (const scene of game.scenes.contents) {
+      for (const tokenDocument of scene.tokens ?? []) {
+        addCarrier(tokenDocument.actor ?? null, tokenDocument);
+      }
+    }
+  }
+
+  console.log(`[${MODULE_ID}] Nettoyage concentration — porteurs inspectés : ${carrierEntries.size}`);
+
+  let removedCount = 0;
+  for (const { actor } of carrierEntries.values()) {
+    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    if (!activeBuff) continue;
+
+    console.log(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
+
+    const matchesOrigin = (sourceActorUuid && activeBuff.originActorUuid === sourceActorUuid)
+      || (!activeBuff.originActorUuid && sourceActorId && actor.id === sourceActorId);
+    if (!matchesOrigin) continue;
+
+    const itemName = activeBuff.itemName;
+    await actor.unsetFlag(MODULE_ID, "activeBuff");
+    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+    await refreshBuffIndicator(actor, itemName);
+    removedCount += 1;
+    console.log(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
+  }
+
+  console.log(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
+}
+
 export function registerTriggers() {
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
@@ -91,8 +159,27 @@ export function registerTriggers() {
           chargesRemaining: buffConfig.charges ?? null
         };
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
+        const sourceActorName = workflow.actor.name;
 
         if (targetMode === "ally") {
+          const selectedAllyToken = getExactlyOneSelectedTarget();
+          if (!selectedAllyToken?.actor) {
+            ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
+            console.log(`[${MODULE_ID}] Mode ally — activation annulée, il faut exactement une cible`);
+            return;
+          }
+          activeFlag.targetTokenId = selectedAllyToken.id;
+          activeFlag.storedTargetTokenUuid = selectedAllyToken.document?.uuid ?? selectedAllyToken.uuid ?? null;
+          activeFlag.storedTargetActorUuid = selectedAllyToken.actor.uuid ?? null;
+          await selectedAllyToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+          console.log(`[${MODULE_ID}] Buff activé sur ${selectedAllyToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
+          if (hasMechBuffs) {
+            const changes = buildMechanicalChanges(activeFlag);
+            await refreshBuffIndicator(selectedAllyToken.actor, null, changes);
+          } else {
+            await refreshBuffIndicator(selectedAllyToken.actor);
+          }
+          return;
           const allyToken = [...game.user.targets][0];
           if (!allyToken?.actor) {
             // Fallback sur le lanceur
@@ -115,6 +202,24 @@ export function registerTriggers() {
             }
           }
         } else if (targetMode === "target") {
+          const selectedTargetToken = getExactlyOneSelectedTarget();
+          if (!selectedTargetToken?.actor) {
+            ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
+            console.log(`[${MODULE_ID}] Mode target — activation annulée, il faut exactement une cible`);
+            return;
+          }
+          activeFlag.targetTokenId = selectedTargetToken.id;
+          activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
+          activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
+          await selectedTargetToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+          console.log(`[${MODULE_ID}] Buff activé sur ${selectedTargetToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
+          if (hasMechBuffs) {
+            const changes = buildMechanicalChanges(activeFlag);
+            await refreshBuffIndicator(selectedTargetToken.actor, null, changes);
+          } else {
+            await refreshBuffIndicator(selectedTargetToken.actor);
+          }
+          return;
           const targetToken = [...game.user.targets][0];
           if (!targetToken) {
             ui.notifications.warn(game.i18n.localize("BOT.notifications.noTargetSelected"));
@@ -123,6 +228,7 @@ export function registerTriggers() {
           }
           activeFlag.targetTokenId = targetToken.id;
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+          console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
           console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name} (cible fixe : ${targetToken.name})`);
           const buffTarget = canvas.tokens.get(activeFlag.targetTokenId)?.actor ?? null;
           if (hasMechBuffs && buffTarget) {
@@ -399,6 +505,8 @@ export function registerTriggers() {
       if (effect.statuses?.has("concentrating") || effect.statuses?.has("concentration")) {
         const actor = effect.parent;
         if (!actor) return;
+        await clearConcentrationLinkedBuffs(actor);
+        return;
         const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
         if (!activeBuff) return;
         const itemName = activeBuff.itemName;

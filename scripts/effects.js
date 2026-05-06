@@ -85,6 +85,18 @@ async function resolveDocumentFromUuid(uuid) {
   return null;
 }
 
+function resolveStoredTargetActor(flag) {
+  const storedToken = canvas.tokens.get(flag.targetTokenId)
+    ?? (flag.storedTargetTokenUuid && typeof fromUuidSync === "function"
+      ? fromUuidSync(flag.storedTargetTokenUuid)?.object ?? null
+      : null);
+  return storedToken?.actor
+    ?? (flag.storedTargetActorUuid && typeof fromUuidSync === "function"
+      ? fromUuidSync(flag.storedTargetActorUuid)
+      : null)
+    ?? null;
+}
+
 async function resolveSaveDC(workflow, flag) {
   const source = flag.save?.dcSource ?? "fixed";
   const fixedDc = normalizeSaveDC(flag.save?.dc);
@@ -190,7 +202,7 @@ async function buildFormulaRollData(workflow, flag) {
   const ownerActor = workflow.actor ?? null;
   const targetActor = getFirstResolvedTargetToken(workflow, flag)?.actor ?? null;
   const attackerActor = inferAttackerToken(workflow, ownerActor, flag.type)?.actor ?? null;
-  const storedActor = canvas.tokens.get(flag.targetTokenId)?.actor ?? null;
+  const storedActor = resolveStoredTargetActor(flag);
   const sourceActor = originActor ?? ownerActor;
   const sourceItem = await resolveDocumentFromUuid(flag.originItemUuid ?? flag.itemUuid) ?? workflow.item ?? null;
 
