@@ -35,6 +35,8 @@
   "BOT.ui.tabs.buffs": "Buffs",
   "BOT.ui.tabs.settings": "Paramètres",
   "BOT.ui.trigger.label": "Déclencheur",
+  "BOT.ui.trigger.passive": "Aucun déclencheur — effet actif",
+  "BOT.ui.trigger.passiveHelp": "Ce mode active le buff sans déclenchement automatique. Utile pour les modificateurs de jet comme Bénédiction, Fléau ou Assistance.",
   "BOT.ui.trigger.mwak": "Attaque corps à corps",
   "BOT.ui.trigger.rwak": "Attaque à distance",
   "BOT.ui.trigger.msak": "Attaque de sort mêlée",

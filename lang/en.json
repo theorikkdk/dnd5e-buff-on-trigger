@@ -35,6 +35,8 @@
   "BOT.ui.tabs.buffs": "Buffs",
   "BOT.ui.tabs.settings": "Settings",
   "BOT.ui.trigger.label": "Trigger",
+  "BOT.ui.trigger.passive": "No trigger \u2014 active effect",
+  "BOT.ui.trigger.passiveHelp": "This mode activates the buff without an automatic trigger. Useful for roll modifiers such as Bless, Bane, or Guidance.",
   "BOT.ui.trigger.mwak": "Melee attack",
   "BOT.ui.trigger.rwak": "Ranged attack",
   "BOT.ui.trigger.msak": "Melee spell attack",

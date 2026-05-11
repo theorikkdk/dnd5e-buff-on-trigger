@@ -46,9 +46,11 @@
         <option value="targetTurnStart" {{#if flag.typeTargetTurnStart}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnStart"}}</option>
         <option value="turnEnd"         {{#if flag.typeTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.turnEnd"}}</option>
         <option value="targetTurnEnd"   {{#if flag.typeTargetTurnEnd}}selected{{/if}}>{{localize "BOT.ui.trigger.targetTurnEnd"}}</option>
+        <option value="passive"         {{#if flag.typePassive}}selected{{/if}}>{{localize "BOT.ui.trigger.passive"}}</option>
       </select>
     </div>
-    <div class="form-group" id="bot-condition-group">
+    <p class="hint" id="bot-passive-help" {{#unless flag.typePassive}}style="display:none"{{/unless}}>{{localize "BOT.ui.trigger.passiveHelp"}}</p>
+    <div class="form-group" id="bot-condition-group" {{#unless flag.showAttackCondition}}style="display:none"{{/unless}}>
       <label>{{localize "BOT.ui.condition.label"}}</label>
       <select name="condition">
         <option value="hit"    {{#if flag.conditionHit}}selected{{/if}}>{{localize "BOT.ui.condition.hit"}}</option>

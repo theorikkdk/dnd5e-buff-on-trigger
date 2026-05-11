@@ -383,6 +383,7 @@ export function registerTriggers() {
 
       // Phase 2 : attaque → lit le marqueur sur l'acteur et déclenche l'effet
       if (!flag) return;
+      if (flag.type === "passive") return;
 
       if (flag.type === actionType) {
         handleAttackTrigger(workflow, flag);
@@ -688,6 +689,7 @@ export function registerTriggers() {
 }
 
 function handleAttackTrigger(workflow, flag) {
+  if (flag.type === "passive") return;
   const triggerType = workflow.activity?.actionType ?? flag.type;
   console.log(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
   if (!doesAttackConditionMatch(workflow, flag)) return;

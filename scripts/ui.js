@@ -517,6 +517,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
       requireStoredTargetMatch: !!raw.requireStoredTargetMatch,
+      typePassive:           raw.type === "passive",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
       typeMsak:              raw.type === "msak",
@@ -597,6 +598,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
       saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
       saveEffectFull:        raw.save?.effect === "full",
+      showAttackCondition:   ["mwak", "rwak", "msak", "rsak"].includes(raw.type),
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
@@ -764,6 +766,7 @@ window.botUpdateTriggerUI = function(selectEl) {
   const form = selectEl.closest('form');
   const conditionGroup = form?.querySelector?.("#bot-condition-group");
   const receivedConditionsGroup = form?.querySelector?.("#bot-received-conditions-group");
+  const passiveHelp = form?.querySelector?.("#bot-passive-help");
 
   if (conditionGroup) {
     conditionGroup.style.display = ["mwak", "rwak", "msak", "rsak"].includes(selectEl.value) ? "" : "none";
@@ -771,6 +774,10 @@ window.botUpdateTriggerUI = function(selectEl) {
 
   if (receivedConditionsGroup) {
     receivedConditionsGroup.style.display = selectEl.value === "damaged" ? "" : "none";
+  }
+
+  if (passiveHelp) {
+    passiveHelp.style.display = selectEl.value === "passive" ? "" : "none";
   }
 
   window.botUpdateTargetModeOptions(form, selectEl.value);
@@ -902,6 +909,9 @@ window.botUpdateTargetModeOptions = function(form, triggerType) {
   } else if (attackTriggers.includes(triggerType)) {
     allowedModes = ["triggerTarget", "self", "storedTarget"];
     fallbackMode = "triggerTarget";
+  } else if (triggerType === "passive") {
+    allowedModes = ["self", "storedTarget"];
+    fallbackMode = "self";
   }
 
   const selectNames = ["damageTargetMode", "statusTargetMode", "healingTargetMode", "temporaryHpTargetMode"];
