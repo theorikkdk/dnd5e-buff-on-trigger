@@ -25,6 +25,146 @@ function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
 }
 
+function hasConfiguredCharges(flag) {
+  const charges = Number(flag?.charges);
+  return Number.isFinite(charges) && charges > 0;
+}
+
+const finalizedRollModifierRolls = new WeakSet();
+const finalizedRollModifierMetadata = new WeakSet();
+const finalizedRollModifierKeys = new Map();
+const recentRollModifierConsumptions = new Map();
+
+function pruneFinalizedRollModifierKeys(now = Date.now()) {
+  for (const [key, timestamp] of finalizedRollModifierKeys.entries()) {
+    if (now - timestamp > 1000) finalizedRollModifierKeys.delete(key);
+  }
+}
+
+function pruneRecentRollModifierConsumptions(now = Date.now()) {
+  for (const [key, timestamp] of recentRollModifierConsumptions.entries()) {
+    if (now - timestamp > 500) recentRollModifierConsumptions.delete(key);
+  }
+}
+
+function getBuffItemUuid(flag) {
+  return flag?.originItemUuid ?? flag?.itemUuid ?? null;
+}
+
+function isSameActiveBuff(currentFlag, expectedFlag) {
+  if (!currentFlag || !expectedFlag) return false;
+  return currentFlag.originActorUuid === expectedFlag.originActorUuid
+    && getBuffItemUuid(currentFlag) === getBuffItemUuid(expectedFlag)
+    && currentFlag.itemName === expectedFlag.itemName;
+}
+
+function getRollModifierFinalizationKey(actor, metadata, rolls) {
+  const formulas = (Array.isArray(rolls) ? rolls : [])
+    .map((roll) => roll?.id ?? roll?._id ?? roll?.formula ?? roll?._formula ?? roll?.total ?? "roll")
+    .join("|");
+  return [
+    actor?.uuid ?? "actor",
+    metadata?.rollType ?? "rollType",
+    metadata?.formula ?? "formula",
+    formulas,
+  ].join("::");
+}
+
+function getRollModifierConsumptionKey(actor, flag, metadata) {
+  return [
+    actor?.uuid ?? "actor",
+    flag?.originActorUuid ?? "origin",
+    getBuffItemUuid(flag) ?? "item",
+    flag?.itemName ?? "buff",
+    metadata?.formula ?? flag?.rollModifier?.formula ?? "formula",
+  ].join("::");
+}
+
+function reserveRollModifierConsumption(actor, flag, metadata) {
+  const now = Date.now();
+  pruneRecentRollModifierConsumptions(now);
+  const key = getRollModifierConsumptionKey(actor, flag, metadata);
+  const previous = recentRollModifierConsumptions.get(key);
+  if (previous && now - previous <= 500) return false;
+  recentRollModifierConsumptions.set(key, now);
+  return true;
+}
+
+async function deleteDocumentIfExists(document, context = "document") {
+  if (!document || document.deleted) return false;
+  try {
+    await document.delete();
+    return true;
+  } catch (error) {
+    const message = String(error?.message ?? error ?? "");
+    if (message.includes("does not exist")) {
+      debugLog(`[${MODULE_ID}] Suppression ignorée : ${context} déjà supprimé`, error);
+      return false;
+    }
+    throw error;
+  }
+}
+
+function hasFinalizedRollModifier(actor, metadata, rolls) {
+  const rollList = Array.isArray(rolls) ? rolls : [];
+  if (metadata && finalizedRollModifierMetadata.has(metadata)) return true;
+  if (rollList.some((roll) => roll && typeof roll === "object" && finalizedRollModifierRolls.has(roll))) return true;
+
+  const now = Date.now();
+  pruneFinalizedRollModifierKeys(now);
+  const key = getRollModifierFinalizationKey(actor, metadata, rollList);
+  return finalizedRollModifierKeys.has(key);
+}
+
+function markFinalizedRollModifier(actor, metadata, rolls) {
+  const rollList = Array.isArray(rolls) ? rolls : [];
+  if (metadata && typeof metadata === "object") finalizedRollModifierMetadata.add(metadata);
+  for (const roll of rollList) {
+    if (roll && typeof roll === "object") finalizedRollModifierRolls.add(roll);
+  }
+  finalizedRollModifierKeys.set(getRollModifierFinalizationKey(actor, metadata, rollList), Date.now());
+}
+function getRemainingCharges(flag) {
+  if (!hasConfiguredCharges(flag)) return null;
+  const remaining = Number(flag.chargesRemaining ?? flag.charges);
+  return Number.isFinite(remaining) ? Math.max(remaining, 0) : null;
+}
+
+function getChargeCountLabel(count) {
+  return game.i18n.format(count === 1 ? "BOT.chat.chargeRemaining" : "BOT.chat.chargesRemaining", { count });
+}
+
+function getActiveBuffIndicatorName(activeBuff) {
+  const baseName = activeBuff.itemName ?? localize("BOT.fallback.effectName");
+  const remaining = getRemainingCharges(activeBuff);
+  if (remaining !== null) return `${baseName} — ${getChargeCountLabel(remaining)}`;
+  return `${baseName} \u26A1`;
+}
+
+async function updateActiveBuffIndicatorName(actor, activeBuff) {
+  const existing = actor?.effects?.find?.((e) => e.statuses?.has("bot-active"));
+  if (!existing || existing.deleted) return;
+  try {
+    await existing.update({ name: getActiveBuffIndicatorName(activeBuff) });
+  } catch (error) {
+    debugLog(`[${MODULE_ID}] Mise à jour de l'indicateur actif ignorée : effet déjà supprimé`, error);
+  }
+}
+
+async function createChargeConsumptionMessage(actor, flag, remainingCharges) {
+  const itemName = flag.itemName ?? localize("BOT.fallback.effectName");
+  const content = remainingCharges <= 0
+    ? game.i18n.format("BOT.chat.lastChargeConsumed", { name: itemName })
+    : game.i18n.format("BOT.chat.chargeRemainingMessage", {
+      name: itemName,
+      count: remainingCharges,
+      label: getChargeCountLabel(remainingCharges),
+    });
+  await ChatMessage.create({
+    content,
+    speaker: ChatMessage.getSpeaker({ actor }),
+  });
+}
 function normalizeSaveDC(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
@@ -776,7 +916,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
     const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
-    if (existing) await existing.delete();
+    if (existing) await deleteDocumentIfExists(existing, "indicateur actif");
 
     if (!activeBuff && itemName) {
       for (const token of canvas.tokens.placeables) {
@@ -787,7 +927,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
     if (activeBuff) {
       const durationRounds = getFlagDurationInRounds(activeBuff);
       await actor.createEmbeddedDocuments("ActiveEffect", [{
-        name: (activeBuff.itemName ?? localize("BOT.fallback.effectName")) + " Ã¢Å¡Â¡",
+        name: getActiveBuffIndicatorName(activeBuff),
         img: activeBuff.itemImg ?? BUFF_ICON,
         statuses: ["bot-active"],
         changes: extraChanges,
@@ -825,7 +965,7 @@ export async function removeTargetIndicator(targetActor, itemName) {
   const existing = targetActor.effects.find(
     (e) => e.flags?.[MODULE_ID]?.targetIndicator && e.name === itemName
   );
-  if (existing) await existing.delete();
+  if (existing) await deleteDocumentIfExists(existing, "indicateur actif");
 }
 
 function resolveTargets(workflow, flag) {
@@ -994,47 +1134,65 @@ function resolveTemporaryHpTargets(workflow, flag) {
 async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) {
   try {
     if (flag.chargesRemaining !== null) {
-      const newCharges = flag.chargesRemaining - 1;
+      const actor = workflow.actor;
+      const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
+      if (!isSameActiveBuff(currentFlag, flag)) {
+        debugLog(`[${MODULE_ID}] Consommation ignorée : buff actif déjà modifié ou supprimé`);
+        return;
+      }
+      const currentCharges = Number(currentFlag.chargesRemaining);
+      if (!Number.isFinite(currentCharges) || currentCharges <= 0) {
+        debugLog(`[${MODULE_ID}] Consommation ignorée : charges déjà consommées`);
+        return;
+      }
+      const newCharges = currentCharges - 1;
+      await createChargeConsumptionMessage(actor, currentFlag, newCharges);
       debugLog(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
       if (newCharges <= 0) {
-        const actor = workflow.actor;
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-        debugLog(`[${MODULE_ID}] Buff ÃƒÂ©puisÃƒÂ© Ã¢â‚¬â€ toutes les charges consommÃƒÂ©es`);
+        debugLog(`[${MODULE_ID}] Buff épuisé — toutes les charges consommées`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-        for (const e of mechEffects ?? []) await e.delete();
+        for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mécanique");
         const concentrationEffect = actor?.effects.find(
           (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
         );
         if (concentrationEffect) {
-          await concentrationEffect.delete();
-          debugLog(`[${MODULE_ID}] Concentration retirÃƒÂ©e (charges ÃƒÂ©puisÃƒÂ©es) sur ${actor.name}`);
+          await deleteDocumentIfExists(concentrationEffect, "concentration");
+          debugLog(`[${MODULE_ID}] Concentration retirée (charges épuisées) sur ${actor.name}`);
         }
-        await refreshBuffIndicator(actor, flag.itemName, [], flag);
+        await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
         for (const token of targets) {
-          if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
+          if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
         }
       } else {
-        await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
+        const updatedFlag = { ...currentFlag, chargesRemaining: newCharges };
+        await workflow.actor?.setFlag(MODULE_ID, "activeBuff", updatedFlag);
+        await updateActiveBuffIndicatorName(workflow.actor, updatedFlag);
         debugLog(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
       }
     } else if ((options.forceConsume || workflow.item !== null) && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
+      const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
+      if (!isSameActiveBuff(currentFlag, flag)) {
+        debugLog(`[${MODULE_ID}] Consommation ignorée : buff actif déjà modifié ou supprimé`);
+        return;
+      }
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      debugLog(`[${MODULE_ID}] Buff consommÃƒÂ© sur ${actor?.name}`);
+      debugLog(`[${MODULE_ID}] Buff consommé sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-      for (const e of mechEffects ?? []) await e.delete();
+      for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mécanique");
       const concentrationEffect = actor?.effects.find(
         (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
       );
       if (concentrationEffect) {
-        await concentrationEffect.delete();
-        debugLog(`[${MODULE_ID}] Concentration retirÃƒÂ©e sur ${actor?.name}`);
+        await deleteDocumentIfExists(concentrationEffect, "concentration");
+        debugLog(`[${MODULE_ID}] Concentration retirée sur ${actor?.name}`);
       }
-      await refreshBuffIndicator(actor, flag.itemName, [], flag);
+      await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
       for (const token of targets) {
-        if (token.actor) await removeTargetIndicator(token.actor, flag.itemName);
+        if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
       }
     }
 
@@ -1130,13 +1288,25 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
   try {
     if (!actor?.getFlag || !metadata?.formula || metadata.consumed) return false;
     const rollList = Array.isArray(rolls) ? rolls : [];
+    if (hasFinalizedRollModifier(actor, metadata, rollList)) {
+      metadata.consumed = true;
+      debugLog(`[${MODULE_ID}] Consommation roll modifier ignorée : déjà traitée`);
+      return false;
+    }
     if (!rollList.some((roll) => rollContainsModifierFormula(roll, metadata.formula))) {
       console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible`);
       return false;
     }
 
+    markFinalizedRollModifier(actor, metadata, rollList);
+    metadata.consumed = true;
+
     const flag = actor.getFlag(MODULE_ID, "activeBuff");
     if (!flag?.rollModifier?.enabled) return false;
+    if (!reserveRollModifierConsumption(actor, flag, metadata)) {
+      debugLog(`[${MODULE_ID}] Consommation roll modifier ignorée : déjà traitée`);
+      return false;
+    }
 
     const workflow = {
       actor,
@@ -1148,7 +1318,6 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
     };
     await markTriggerFrequencyUsage(actor);
     await consumeOrDecrementCharges(workflow, flag, getRollModifierTargets(actor, flag), { forceConsume: true });
-    metadata.consumed = true;
     debugLog(`[${MODULE_ID}] Modificateur de jet appliqu\u00e9 : ${metadata.formula} sur ${rollType}`);
     return true;
   } catch (error) {
@@ -1641,9 +1810,4 @@ export async function applyEffect(workflow, flag) {
   if (flag.healing) await applyBonusHealing(workflow, flag);
   if (flag.temporaryHp) await applyTemporaryHp(workflow, flag);
 }
-
-
-
-
-
 

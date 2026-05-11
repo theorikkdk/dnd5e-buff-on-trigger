@@ -138,6 +138,12 @@ function getTriggerFrequencyLabel(frequency) {
   return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
 }
 
+function getChargesSummary(charges) {
+  if (!isFilled(charges) || Number(charges) <= 0) return game.i18n.localize("BOT.ui.chargeSummary.none");
+  const count = Number(charges);
+  return game.i18n.format(count === 1 ? "BOT.ui.chargeSummary.one" : "BOT.ui.chargeSummary.many", { count });
+}
+
 function getDamageTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
 }
@@ -389,12 +395,10 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     value: getTriggerFrequencyLabel(raw.triggerFrequency)
   });
 
-  if (isFilled(raw.charges)) {
-    summary.push({
-      label: game.i18n.localize("BOT.ui.summary.charges"),
-      value: String(raw.charges)
-    });
-  }
+  summary.push({
+    label: game.i18n.localize("BOT.ui.summary.charges"),
+    value: getChargesSummary(raw.charges)
+  });
 
   summary.push({
     label: game.i18n.localize("BOT.ui.summary.durationRounds"),
