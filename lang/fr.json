@@ -5,6 +5,8 @@
   "BOT.status.markedBy": "Marquée par {name}",
   "BOT.settings.enabled": "Activer le module",
   "BOT.settings.enabledHint": "Activer ou désactiver le module Buff on Trigger",
+  "BOT.settings.debug.name": "Activer les logs de debug",
+  "BOT.settings.debug.hint": "Affiche des informations détaillées dans la console pour diagnostiquer le module.",
   "BOT.settings.bonusDamageCriticalMode.name": "Critique des dégâts bonus",
   "BOT.settings.bonusDamageCriticalMode.hint": "Détermine comment les dégâts bonus du module sont traités lors d’un coup critique.",
   "BOT.settings.bonusDamageApplicationMode.name": "Application des dégâts bonus",

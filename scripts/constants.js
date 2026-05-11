@@ -14,3 +14,19 @@ export const ATTACK_ACTION_TYPES = ["mwak","rwak","msak","rsak"];
 
 export const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
 export const STORED_TARGET_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-stored-target.svg";
+
+export function isDebugEnabled() {
+  try {
+    return game.settings?.get?.(MODULE_ID, "debug") === true;
+  } catch {
+    return false;
+  }
+}
+
+export function debugLog(...args) {
+  if (isDebugEnabled()) console.log(...args);
+}
+
+export function debugWarn(...args) {
+  if (isDebugEnabled()) console.warn(...args);
+}

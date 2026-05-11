@@ -1,9 +1,18 @@
-import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON } from "./constants.js";
+import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, debugLog } from "./constants.js";
 import { syncItemDurationFlag } from "./duration.js";
 import { changeStoredTarget, registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 
 Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, "debug", {
+    name: "BOT.settings.debug.name",
+    hint: "BOT.settings.debug.hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   game.settings.register(MODULE_ID, "bonusDamageCriticalMode", {
     name: "BOT.settings.bonusDamageCriticalMode.name",
     hint: "BOT.settings.bonusDamageCriticalMode.hint",
@@ -30,7 +39,7 @@ Hooks.once("init", () => {
       midiWorkflow: game.i18n.localize("BOT.settings.bonusDamageApplicationMode.midiWorkflow"),
     },
   });
-  console.log(`[${MODULE_ID}] Module initialized`);
+  debugLog(`[${MODULE_ID}] Module initialized`);
 });
 
 Hooks.once("setup", () => {
@@ -44,11 +53,11 @@ Hooks.once("setup", () => {
     name: game.i18n.localize("BOT.status.storedTarget"),
     img: STORED_TARGET_ICON,
   });
-  console.log(`[${MODULE_ID}] Statut bot-active enregistré dans setup`);
+  debugLog(`[${MODULE_ID}] Statut bot-active enregistré dans setup`);
 });
 
 Hooks.once("ready", () => {
-  console.log(`[${MODULE_ID}] Module ready`);
+  debugLog(`[${MODULE_ID}] Module ready`);
   const module = game.modules.get(MODULE_ID);
   if (module) {
     module.api = {

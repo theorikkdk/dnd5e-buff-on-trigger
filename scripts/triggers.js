@@ -1,4 +1,4 @@
-import { MODULE_ID, ATTACK_ACTION_TYPES } from "./constants.js";
+import { MODULE_ID, ATTACK_ACTION_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication } from "./effects.js";
 
@@ -48,12 +48,12 @@ async function handleRollModifierHook(hookName, rollType, ...args) {
   const actor = resolveRollHookActor(config) ?? args.find((arg) => arg?.getFlag) ?? null;
   if (!actor?.getFlag || !config) {
     console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible (${hookName})`);
-    console.debug?.(`[${MODULE_ID}] Debug ${hookName} : ${summarizeRollHookArgs(args)}`);
+    debugLog(`[${MODULE_ID}] Debug ${hookName} : ${summarizeRollHookArgs(args)}`);
     return;
   }
-  console.debug?.(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, subject=${config.subject?.constructor?.name ?? "none"}, rolls=${config.rolls?.length ?? 0}, roll0.parts=${Array.isArray(config.rolls?.[0]?.parts)}, roll0.bonus=${config.rolls?.[0]?.bonus !== undefined}, config.parts=${Array.isArray(config.parts)}, config.bonus=${config.bonus !== undefined}`);
+  debugLog(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, subject=${config.subject?.constructor?.name ?? "none"}, rolls=${config.rolls?.length ?? 0}, roll0.parts=${Array.isArray(config.rolls?.[0]?.parts)}, roll0.bonus=${config.rolls?.[0]?.bonus !== undefined}, config.parts=${Array.isArray(config.parts)}, config.bonus=${config.bonus !== undefined}`);
   if (rollType === "ability" && (config.skill || config.tool)) {
-    console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
+    debugLog(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
     return;
   }
   await applyRollModifierToConfig(actor, rollType, config);
@@ -63,12 +63,12 @@ function handleRollModifierBuildHook(hookName, rollType, process, rollConfig) {
   const actor = resolveRollHookActor(process);
   if (!actor?.getFlag || !rollConfig) {
     console.warn(`[${MODULE_ID}] Modificateur de jet non appliqué : configuration dnd5e incompatible (${hookName})`);
-    console.debug?.(`[${MODULE_ID}] Debug ${hookName} : processKeys=${Object.keys(process ?? {}).join(",")}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}`);
+    debugLog(`[${MODULE_ID}] Debug ${hookName} : processKeys=${Object.keys(process ?? {}).join(",")}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}`);
     return;
   }
-  console.debug?.(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, processSubject=${process?.subject?.constructor?.name ?? "none"}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}, parts=${Array.isArray(rollConfig.parts)}, bonus=${rollConfig.bonus !== undefined}, formula=${rollConfig.formula ?? "none"}, options=${Object.keys(rollConfig.options ?? {}).join(",")}`);
+  debugLog(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, processSubject=${process?.subject?.constructor?.name ?? "none"}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}, parts=${Array.isArray(rollConfig.parts)}, bonus=${rollConfig.bonus !== undefined}, formula=${rollConfig.formula ?? "none"}, options=${Object.keys(rollConfig.options ?? {}).join(",")}`);
   if (rollType === "ability" && (process.skill || process.tool)) {
-    console.log(`[${MODULE_ID}] Modificateur de jet ignoré : type non compatible`);
+    debugLog(`[${MODULE_ID}] Modificateur de jet ignoré : type non compatible`);
     return;
   }
   const applied = applyRollModifierToConfig(actor, rollType, rollConfig, { consume: false });
@@ -202,12 +202,12 @@ function workflowMatchesStoredTarget(workflow, flag) {
 
   const candidates = getStoredTargetCandidates(workflow, flag);
   if (!candidates.length) {
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
+    debugLog(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
     return false;
   }
 
   if (!candidates.some((token) => tokenMatchesStoredTarget(token, flag))) {
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
+    debugLog(`[${MODULE_ID}] Déclenchement ignoré : cible mémorisée non correspondante`);
     return false;
   }
 
@@ -221,23 +221,23 @@ function doesAttackConditionMatch(workflow, flag) {
   const hitTargets = [...(workflow.hitTargets ?? [])];
   if (condition === "hit") {
     if (hitTargets.length > 0) return true;
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : attaque non touchée`);
+    debugLog(`[${MODULE_ID}] Déclenchement ignoré : attaque non touchée`);
     return false;
   }
 
   if (condition === "miss") {
     if (getMissedAttackTargets(workflow).length > 0) return true;
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+    debugLog(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
     return false;
   }
 
   if (condition === "critical") {
     if (isWorkflowCriticalHit(workflow) && hitTargets.length > 0) return true;
-    console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+    debugLog(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
     return false;
   }
 
-  console.log(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
+  debugLog(`[${MODULE_ID}] Déclenchement ignoré : condition d’attaque non remplie`);
   return false;
 }
 
@@ -356,8 +356,8 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
     ? fromUuidSync(nextFlag.originActorUuid)?.name ?? actor.name
     : actor.name;
-  console.log(`[${MODULE_ID}] Cible mÃ©morisÃ©e changÃ©e : ${previousName} â†’ ${nextName}`);
-  console.log(`[${MODULE_ID}] Indicateur de marque ajoutÃ© sur ${nextName}, origine ${originName}`);
+  debugLog(`[${MODULE_ID}] Cible mÃ©morisÃ©e changÃ©e : ${previousName} â†’ ${nextName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque ajoutÃ© sur ${nextName}, origine ${originName}`);
   return true;
 }
 
@@ -416,14 +416,14 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
     }
   }
 
-  console.log(`[${MODULE_ID}] Nettoyage concentration — porteurs inspectés : ${carrierEntries.size}`);
+  debugLog(`[${MODULE_ID}] Nettoyage concentration — porteurs inspectés : ${carrierEntries.size}`);
 
   let removedCount = 0;
   for (const { actor } of carrierEntries.values()) {
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
     if (!activeBuff) continue;
 
-    console.log(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
+    debugLog(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
 
     const matchesOrigin = (sourceActorUuid && activeBuff.originActorUuid === sourceActorUuid)
       || (!activeBuff.originActorUuid && sourceActorId && actor.id === sourceActorId);
@@ -434,10 +434,10 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
     await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
     await refreshBuffIndicator(actor, itemName, [], activeBuff);
     removedCount += 1;
-    console.log(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
+    debugLog(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
   }
 
-  console.log(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
+  debugLog(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
 }
 
 export function registerTriggers() {
@@ -453,7 +453,7 @@ export function registerTriggers() {
       // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
       const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
       const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
-      if (buffConfig || flag) console.log(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
+      if (buffConfig || flag) debugLog(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
       if (buffConfig && !ATTACK_ACTION_TYPES.includes(actionType)) {
         const targetMode = buffConfig.targetMode === "ally" ? "target" : (buffConfig.targetMode ?? "self");
         const activeFlag = {
@@ -481,7 +481,7 @@ export function registerTriggers() {
 
         if (shouldRememberTarget && !selectedTargetToken?.actor) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
-          console.log(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
+          debugLog(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
           return;
         }
 
@@ -489,7 +489,7 @@ export function registerTriggers() {
           for (const existing of existingBuffs) {
             await clearExistingBuffInstance(existing.actor, existing.activeBuff);
           }
-          console.log(`[${MODULE_ID}] Ancien buff remplacÃ© : ${workflow.item.name}`);
+          debugLog(`[${MODULE_ID}] Ancien buff remplacÃ© : ${workflow.item.name}`);
         }
 
         if (targetMode === "target") {
@@ -497,7 +497,7 @@ export function registerTriggers() {
           activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
           activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
           await selectedTargetToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          console.log(`[${MODULE_ID}] Buff activé sur ${selectedTargetToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
+          debugLog(`[${MODULE_ID}] Buff activé sur ${selectedTargetToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
           if (hasMechBuffs) {
             const changes = buildMechanicalChanges(activeFlag);
             await refreshBuffIndicator(selectedTargetToken.actor, null, changes);
@@ -511,7 +511,7 @@ export function registerTriggers() {
             activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
           }
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          console.log(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
+          debugLog(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
           if (hasMechBuffs) {
             const changes = buildMechanicalChanges(activeFlag);
             await refreshBuffIndicator(workflow.actor, null, changes);
@@ -617,21 +617,21 @@ export function registerTriggers() {
       if (token.actor.id !== actor.id) return;
       const flag = actor?.getFlag(MODULE_ID, "activeBuff");
       if (!flag) {
-        console.log(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);
+        debugLog(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);
         return;
       }
       if (flag.type !== "damaged") {
-        console.log(`[${MODULE_ID}] midi-qol.isDamaged : buff actif trouvé mais type différent de damaged (${flag.type})`);
+        debugLog(`[${MODULE_ID}] midi-qol.isDamaged : buff actif trouvé mais type différent de damaged (${flag.type})`);
         return;
       }
 
-      console.log(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
+      debugLog(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
 
       const expectedAttackType = typeof flag.receivedAttackType === "string" ? flag.receivedAttackType : "any";
       if (expectedAttackType !== "any") {
         const receivedAttackTypes = getReceivedAttackCategories(workflow, item);
         if (!receivedAttackTypes.has(expectedAttackType)) {
-          console.log(`[${MODULE_ID}] damaged bloqué par type d’attaque`);
+          debugLog(`[${MODULE_ID}] damaged bloqué par type d’attaque`);
           return;
         }
       }
@@ -640,14 +640,14 @@ export function registerTriggers() {
       if (expectedDamageTypes.length > 0) {
         const receivedDamageTypes = getReceivedDamageTypes(damageItem, workflow);
         if (!receivedDamageTypes.length) {
-          console.log(`[${MODULE_ID}] Types de dégâts reçus indisponibles pour le filtre damaged`);
+          debugLog(`[${MODULE_ID}] Types de dégâts reçus indisponibles pour le filtre damaged`);
         } else if (!receivedDamageTypes.some(type => expectedDamageTypes.includes(type))) {
-          console.log(`[${MODULE_ID}] damaged bloqué par type de dégâts`);
+          debugLog(`[${MODULE_ID}] damaged bloqué par type de dégâts`);
           return;
         }
       }
 
-      console.log(`[${MODULE_ID}] damaged autorisé`);
+      debugLog(`[${MODULE_ID}] damaged autorisé`);
 
       const now = Date.now();
       const lastTriggered = actor.getFlag(MODULE_ID, "_lastDamagedTrigger") ?? 0;
@@ -658,7 +658,7 @@ export function registerTriggers() {
         ?? workflow?.attackingToken?.document?.uuid
         ?? null;
       const itemUuid = item?.uuid ?? null;
-      console.log(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
+      debugLog(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
       window.setTimeout(async () => {
         try {
           const delayedActor = fromUuidSync(actorUuid);
@@ -694,7 +694,7 @@ export function registerTriggers() {
       const actor = token.actor;
       const flag = actor?.getFlag(MODULE_ID, "activeBuff");
       if (!flag || flag.type !== "healed") return;
-      console.log(`[${MODULE_ID}] Déclencheur healed sur ${actor.name}`);
+      debugLog(`[${MODULE_ID}] Déclencheur healed sur ${actor.name}`);
       const fakeWorkflow = {
         actor,
         item: item ?? null,
@@ -716,7 +716,7 @@ export function registerTriggers() {
     const skills = activeBuff?.buffs?.skills;
     if (skills?.length && (skills.includes("all") || skills.includes(skillId))) {
       config.advantage = true;
-      console.log(`[${MODULE_ID}] Avantage compétence ${skillId} appliqué sur ${actor.name}`);
+      debugLog(`[${MODULE_ID}] Avantage compétence ${skillId} appliqué sur ${actor.name}`);
     }
   });
 
@@ -724,28 +724,28 @@ export function registerTriggers() {
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
     if (activeBuff?.buffs?.skillMode === "advantage") {
       config.advantage = true;
-      console.log(`[${MODULE_ID}] Avantage caractéristique appliqué sur ${actor.name}`);
+      debugLog(`[${MODULE_ID}] Avantage caractéristique appliqué sur ${actor.name}`);
     } else if (activeBuff?.buffs?.skillMode === "disadvantage") {
       config.disadvantage = true;
-      console.log(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
+      debugLog(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
     }
   });
 
 
   Hooks.on("dnd5e.preRollAttack", async (...args) => {
-    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAttack : ${summarizeRollHookArgs(args)}`);
+    debugLog(`[${MODULE_ID}] Debug dnd5e.preRollAttack : ${summarizeRollHookArgs(args)}`);
   });
 
   Hooks.on("dnd5e.preRollSavingThrow", async (...args) => {
-    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollSavingThrow : ${summarizeRollHookArgs(args)}`);
+    debugLog(`[${MODULE_ID}] Debug dnd5e.preRollSavingThrow : ${summarizeRollHookArgs(args)}`);
   });
 
   Hooks.on("dnd5e.preRollAbilitySave", async (...args) => {
-    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAbilitySave : ${summarizeRollHookArgs(args)}`);
+    debugLog(`[${MODULE_ID}] Debug dnd5e.preRollAbilitySave : ${summarizeRollHookArgs(args)}`);
   });
 
   Hooks.on("dnd5e.preRollAbilityCheck", async (...args) => {
-    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAbilityCheck : ${summarizeRollHookArgs(args)}`);
+    debugLog(`[${MODULE_ID}] Debug dnd5e.preRollAbilityCheck : ${summarizeRollHookArgs(args)}`);
   });
 
   Hooks.on("dnd5e.postBuildAttackRollConfig", async (process, rollConfig) => {
@@ -791,7 +791,7 @@ export function registerTriggers() {
     const key = `${actor.uuid}|${ability}|${dc}`;
     const lastTriggered = recentConcentrationRolls.get(key) ?? 0;
     if (now - lastTriggered < 500) {
-      console.log(`[${MODULE_ID}] Jet de concentration doublon ignoré`);
+      debugLog(`[${MODULE_ID}] Jet de concentration doublon ignoré`);
       return false;
     }
     recentConcentrationRolls.set(key, now);
@@ -807,14 +807,14 @@ export function registerTriggers() {
         const itemName = effect.name;
         await actor.unsetFlag(MODULE_ID, "activeBuff");
         await refreshBuffIndicator(actor, itemName, [], activeBuff);
-        console.log(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
+        debugLog(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
         if (activeBuff?.duration?.concentration) {
           const concentrationEffect = actor.effects.find(
             (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
           );
           if (concentrationEffect) {
             await concentrationEffect.delete();
-            console.log(`[${MODULE_ID}] Concentration retirée sur ${actor.name}`);
+            debugLog(`[${MODULE_ID}] Concentration retirée sur ${actor.name}`);
           }
         }
         return;
@@ -835,24 +835,24 @@ export function registerTriggers() {
 function handleAttackTrigger(workflow, flag) {
   if (flag.type === "passive") return;
   const triggerType = workflow.activity?.actionType ?? flag.type;
-  console.log(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
+  debugLog(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
   if (!doesAttackConditionMatch(workflow, flag)) return;
   if (!workflowMatchesStoredTarget(workflow, flag)) return;
   applyEffect(workflow, flag);
 }
 
 async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = null) {
-  console.log(`[${MODULE_ID}] Déclencheur ${triggerType} pour ${actor.name}`);
+  debugLog(`[${MODULE_ID}] Déclencheur ${triggerType} pour ${actor.name}`);
 
   let cibles;
   if (overrideTargets !== null) {
     cibles = overrideTargets;
   } else {
     cibles = [];
-    console.log(`[${MODULE_ID}] Trigger de tour : aucune cible de déclenchement implicite`);
+    debugLog(`[${MODULE_ID}] Trigger de tour : aucune cible de déclenchement implicite`);
   }
   if (overrideTargets !== null) {
-    console.log(`[${MODULE_ID}] Cibles explicites pour ${triggerType} : ${cibles.length}`);
+    debugLog(`[${MODULE_ID}] Cibles explicites pour ${triggerType} : ${cibles.length}`);
   }
 
   const targetsSet = new Set(cibles);

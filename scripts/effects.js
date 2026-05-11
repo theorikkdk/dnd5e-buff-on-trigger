@@ -1,4 +1,4 @@
-import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, SKILL_IDS } from "./constants.js";
+import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, SKILL_IDS, debugLog } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
 
 const DAMAGE_LABEL_KEYS = {
@@ -175,7 +175,7 @@ async function removeStoredTargetIndicator(ownerActor, flag) {
   for (const effect of existing) {
     await effect.delete();
   }
-  console.log(`[${MODULE_ID}] Indicateur de marque retir� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque retir� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
 }
 
 export async function refreshStoredTargetIndicator(ownerActor, previousFlag = null) {
@@ -208,7 +208,7 @@ export async function refreshStoredTargetIndicator(ownerActor, previousFlag = nu
     flags: { [MODULE_ID]: metadata.effectFlags },
     duration: {},
   }]);
-  console.log(`[${MODULE_ID}] Indicateur de marque ajout� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque ajout� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
 }
 
 async function resolveSaveDC(workflow, flag) {
@@ -217,7 +217,7 @@ async function resolveSaveDC(workflow, flag) {
 
   if (source === "fixed") {
     if (fixedDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed`);
     }
     return fixedDc;
   }
@@ -226,7 +226,7 @@ async function resolveSaveDC(workflow, flag) {
     const originItem = await resolveDocumentFromUuid(flag.itemUuid) ?? workflow.item ?? null;
     const itemDc = readNumericSaveDCFromItem(originItem);
     if (itemDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${itemDc} via origin-item`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${itemDc} via origin-item`);
       return itemDc;
     }
 
@@ -236,12 +236,12 @@ async function resolveSaveDC(workflow, flag) {
       ?? null;
     const actorDc = readNumericSaveDCFromActor(originActor);
     if (actorDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${actorDc} via origin-actor`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${actorDc} via origin-actor`);
       return actorDc;
     }
 
     if (fixedDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
     }
     return fixedDc;
   }
@@ -249,18 +249,18 @@ async function resolveSaveDC(workflow, flag) {
   if (source === "owner") {
     const ownerDc = readNumericSaveDCFromActor(workflow.actor);
     if (ownerDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${ownerDc} via owner`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${ownerDc} via owner`);
       return ownerDc;
     }
 
     if (fixedDc !== null) {
-      console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
     }
     return fixedDc;
   }
 
   if (fixedDc !== null) {
-    console.log(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+    debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
   }
   return fixedDc;
 }
@@ -398,9 +398,9 @@ export async function buildFormulaRollData(workflow, flag) {
     stored: storedData
   };
 
-  console.log(`[${MODULE_ID}] Donn�es de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
+  debugLog(`[${MODULE_ID}] Donn�es de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
   if (attackerActor) {
-    console.log(`[${MODULE_ID}] Source formule attacker : ${attackerActor.name}`);
+    debugLog(`[${MODULE_ID}] Source formule attacker : ${attackerActor.name}`);
   }
   return foundry.utils.mergeObject(foundry.utils.deepClone(baseRollData), aliasRollData);
 }
@@ -635,9 +635,9 @@ function isTurnTriggerType(type) {
 
 function resolveTriggerTargetTokens(workflow, flag, effectType = "effet") {
   if (isTurnTriggerType(flag.type)) {
-    console.log(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
+    debugLog(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
     if ((flag.condition ?? "hit") !== "hit") {
-      console.log(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (${effectType})`);
+      debugLog(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (${effectType})`);
     }
     return new Set();
   }
@@ -715,7 +715,7 @@ async function resolveConfiguredSavingThrows(workflow, flag) {
 
     const saveRoll = saveRolls[0];
     const success = saveRoll.total >= saveDc;
-    console.log(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} â€” ${success ? "rÃ©ussite" : "Ã©chec"}`);
+    debugLog(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} â€” ${success ? "rÃ©ussite" : "Ã©chec"}`);
     if (success) saveResults.successes.add(tokenKey);
     else saveResults.failures.add(tokenKey);
     saveResults.resolvedCount += 1;
@@ -817,7 +817,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     flags: { [MODULE_ID]: { targetIndicator: true } },
     duration: {},
   }]);
-  console.log(`[${MODULE_ID}] Indicateur posÃ© sur ${targetActor.name}`);
+  debugLog(`[${MODULE_ID}] Indicateur posÃ© sur ${targetActor.name}`);
 }
 
 export async function removeTargetIndicator(targetActor, itemName) {
@@ -838,7 +838,7 @@ function resolveTargets(workflow, flag) {
     if (!token) return new Set();
     const targetIds = new Set((workflow.targets ?? []).map((t) => t.id));
     if (!targetIds.has(token.id)) {
-      console.log(`[${MODULE_ID}] Mode target â€” cible fixe non visÃ©e, pas de dÃ©clenchement`);
+      debugLog(`[${MODULE_ID}] Mode target â€” cible fixe non visÃ©e, pas de dÃ©clenchement`);
       return new Set();
     }
     if (condition === "hit" && !hitIds.has(token.id)) return new Set();
@@ -848,9 +848,9 @@ function resolveTargets(workflow, flag) {
 
   // "self" et "ally" : mÃªme logique, les cibles viennent du workflow
   if (isTurnTriggerType(flag.type)) {
-    console.log(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
+    debugLog(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
     if (condition !== "hit") {
-      console.log(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (ciblage par d�faut)`);
+      debugLog(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (ciblage par d�faut)`);
     }
     return new Set();
   }
@@ -878,11 +878,11 @@ function resolveBonusDamageTargets(workflow, flag) {
         ? ([...(workflow.hitTargets ?? workflow.targets ?? [])].find((token) => token?.actor?.id !== workflow.actor?.id) ?? null)
         : null);
     if (!attackerToken && flag.type === "damaged") {
-      console.log(`[${MODULE_ID}] Attaquant introuvable pour le trigger damaged`);
+      debugLog(`[${MODULE_ID}] Attaquant introuvable pour le trigger damaged`);
       return new Set();
     }
     if (attackerToken) {
-      console.log(`[${MODULE_ID}] Cibles d�g�ts bonus r�solues : mode=attacker, cibles=${attackerToken.name}`);
+      debugLog(`[${MODULE_ID}] Cibles d�g�ts bonus r�solues : mode=attacker, cibles=${attackerToken.name}`);
     }
     return attackerToken ? new Set([attackerToken]) : new Set();
   }
@@ -995,12 +995,12 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
   try {
     if (flag.chargesRemaining !== null) {
       const newCharges = flag.chargesRemaining - 1;
-      console.log(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
+      debugLog(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
       if (newCharges <= 0) {
         const actor = workflow.actor;
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-        console.log(`[${MODULE_ID}] Buff Ã©puisÃ© â€” toutes les charges consommÃ©es`);
+        debugLog(`[${MODULE_ID}] Buff Ã©puisÃ© â€” toutes les charges consommÃ©es`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
         for (const e of mechEffects ?? []) await e.delete();
         const concentrationEffect = actor?.effects.find(
@@ -1008,7 +1008,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         );
         if (concentrationEffect) {
           await concentrationEffect.delete();
-          console.log(`[${MODULE_ID}] Concentration retirÃ©e (charges Ã©puisÃ©es) sur ${actor.name}`);
+          debugLog(`[${MODULE_ID}] Concentration retirÃ©e (charges Ã©puisÃ©es) sur ${actor.name}`);
         }
         await refreshBuffIndicator(actor, flag.itemName, [], flag);
         for (const token of targets) {
@@ -1016,13 +1016,13 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         }
       } else {
         await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
-        console.log(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
+        debugLog(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
       }
     } else if ((options.forceConsume || workflow.item !== null) && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      console.log(`[${MODULE_ID}] Buff consommÃ© sur ${actor?.name}`);
+      debugLog(`[${MODULE_ID}] Buff consommÃ© sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
       for (const e of mechEffects ?? []) await e.delete();
       const concentrationEffect = actor?.effects.find(
@@ -1030,7 +1030,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       );
       if (concentrationEffect) {
         await concentrationEffect.delete();
-        console.log(`[${MODULE_ID}] Concentration retirÃ©e sur ${actor?.name}`);
+        debugLog(`[${MODULE_ID}] Concentration retirÃ©e sur ${actor?.name}`);
       }
       await refreshBuffIndicator(actor, flag.itemName, [], flag);
       for (const token of targets) {
@@ -1080,12 +1080,12 @@ export function applyRollModifierToConfig(actor, rollType, config, options = {})
 
     const rollTypes = Array.isArray(rollModifier.rollTypes) ? rollModifier.rollTypes : [];
     if (!rollTypes.includes(rollType)) {
-      console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
+      debugLog(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
       return false;
     }
 
     if (shouldBlockTriggerFrequency(actor, flag)) {
-      console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : fr\u00e9quence d\u00e9j\u00e0 utilis\u00e9e`);
+      debugLog(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : fr\u00e9quence d\u00e9j\u00e0 utilis\u00e9e`);
       return false;
     }
 
@@ -1149,7 +1149,7 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
     await markTriggerFrequencyUsage(actor);
     await consumeOrDecrementCharges(workflow, flag, getRollModifierTargets(actor, flag), { forceConsume: true });
     metadata.consumed = true;
-    console.log(`[${MODULE_ID}] Modificateur de jet appliqu\u00e9 : ${metadata.formula} sur ${rollType}`);
+    debugLog(`[${MODULE_ID}] Modificateur de jet appliqu\u00e9 : ${metadata.formula} sur ${rollType}`);
     return true;
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans finalizeRollModifierApplication :`, error);
@@ -1272,7 +1272,7 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
       duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
       flags: { [MODULE_ID]: { mechanicalBuff: true } },
     }]);
-    console.log(`[${MODULE_ID}] Buffs m�caniques appliqu�s sur ${actor.name}`);
+    debugLog(`[${MODULE_ID}] Buffs m�caniques appliqu�s sur ${actor.name}`);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyMechanicalBuffs :`, error);
   }
@@ -1287,7 +1287,7 @@ export async function applyBonusDamage(workflow, flag) {
       return;
     }
 
-    console.log(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} â€” cibles : ${targets.size}`);
+    debugLog(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} â€” cibles : ${targets.size}`);
 
     const configuredCriticalMode = game.settings.get(MODULE_ID, "bonusDamageCriticalMode");
     const criticalMode = ["system", "doubleDice", "maxBaseDice", "neverDouble"].includes(configuredCriticalMode)
@@ -1300,7 +1300,7 @@ export async function applyBonusDamage(workflow, flag) {
       ? getDnd5eCriticalSettings()
       : null;
     if (systemCriticalSettings?.detected?.length) {
-      console.log(`[${MODULE_ID}] R�glages critiques dnd5e d�tect�s : maximizeDice=${systemCriticalSettings.maximizeDice}, multiplyModifiers=${systemCriticalSettings.multiplyModifiers}`);
+      debugLog(`[${MODULE_ID}] R�glages critiques dnd5e d�tect�s : maximizeDice=${systemCriticalSettings.maximizeDice}, multiplyModifiers=${systemCriticalSettings.multiplyModifiers}`);
     }
     if (critical && (criticalMode === "system" || criticalMode === "doubleDice" || criticalMode === "maxBaseDice")) {
       // Bonus damage is rolled separately from native dnd5e/Midi-QOL damage resolution,
@@ -1321,7 +1321,7 @@ export async function applyBonusDamage(workflow, flag) {
         formula = doubleDiceFormula(formula);
       }
       if (formula !== flag.damage.formula) {
-        console.log(`[${MODULE_ID}] Critique : formule des dÃ©gÃ¢ts bonus ajustÃ©e`);
+        debugLog(`[${MODULE_ID}] Critique : formule des dÃ©gÃ¢ts bonus ajustÃ©e`);
       }
     }
     let fullTargets = targets;
@@ -1355,7 +1355,7 @@ export async function applyBonusDamage(workflow, flag) {
     const rollData = await buildFormulaRollData(workflow, flag);
     const roll = await new Roll(formula, rollData).evaluate();
 
-    console.log(`[${MODULE_ID}] DÃ©gÃ¢ts bonus : ${roll.total} ${damageType}`);
+    debugLog(`[${MODULE_ID}] DÃ©gÃ¢ts bonus : ${roll.total} ${damageType}`);
 
     const halfDamage = Math.floor(roll.total / 2);
     const appliedResults = [
@@ -1472,7 +1472,7 @@ export async function applyStatusEffect(workflow, flag) {
     if (applyCondition !== "always") {
       const saveResults = workflow._botSaveResults;
       if (!saveResults || saveResults.resolvedCount <= 0) {
-        console.log(`[${MODULE_ID}] Statut ignor� : aucun r�sultat de sauvegarde disponible`);
+        debugLog(`[${MODULE_ID}] Statut ignor� : aucun r�sultat de sauvegarde disponible`);
         return;
       }
 
@@ -1494,7 +1494,7 @@ export async function applyStatusEffect(workflow, flag) {
       if (!targetActor) continue;
 
       await targetActor.toggleStatusEffect(statusId, { active: true });
-      console.log(`[${MODULE_ID}] Statut ${statusId} appliquÃ© sur ${targetActor.name}`);
+      debugLog(`[${MODULE_ID}] Statut ${statusId} appliquÃ© sur ${targetActor.name}`);
     }
 
     if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
@@ -1540,7 +1540,7 @@ export async function applyBonusHealing(workflow, flag) {
 
       await targetActor.update({ "system.attributes.hp.value": newHp });
       healedTargets.push({ name: targetActor.name, amount: appliedHeal });
-      console.log(`[${MODULE_ID}] Soin bonus : ${appliedHeal} PV vers ${targetActor.name}`);
+      debugLog(`[${MODULE_ID}] Soin bonus : ${appliedHeal} PV vers ${targetActor.name}`);
     }
 
     if (!healedTargets.length) return;
@@ -1598,7 +1598,7 @@ export async function applyTemporaryHp(workflow, flag) {
 
       await targetActor.update({ "system.attributes.hp.temp": newTempHp });
       updatedTargets.push({ name: targetActor.name, amount: newTempHp });
-      console.log(`[${MODULE_ID}] PV temporaires : ${newTempHp} vers ${targetActor.name}`);
+      debugLog(`[${MODULE_ID}] PV temporaires : ${newTempHp} vers ${targetActor.name}`);
     }
 
     if (!updatedTargets.length) return;
@@ -1618,12 +1618,12 @@ export async function applyTemporaryHp(workflow, flag) {
 
 export async function applyEffect(workflow, flag) {
   if (!flag.damage && !flag.status && !flag.healing && !flag.temporaryHp) {
-    console.log(`[${MODULE_ID}] Aucun effet configurÃ© dans le flag`);
+    debugLog(`[${MODULE_ID}] Aucun effet configurÃ© dans le flag`);
     return;
   }
 
   if (await shouldBlockTriggerFrequency(workflow.actor, flag)) {
-    console.log(`[${MODULE_ID}] DÃ©clenchement ignorÃ© : frÃ©quence dÃ©jÃ  utilisÃ©e`);
+    debugLog(`[${MODULE_ID}] DÃ©clenchement ignorÃ© : frÃ©quence dÃ©jÃ  utilisÃ©e`);
     return;
   }
 

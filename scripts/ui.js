@@ -1,4 +1,4 @@
-ï»¿import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS } from "./constants.js";
+import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, debugLog } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 
@@ -105,7 +105,7 @@ function normalizeGlobalTargetMode(targetMode) {
 function getTargetModeLabel(targetMode) {
   const normalizedTargetMode = normalizeGlobalTargetMode(targetMode);
   if (game.i18n.lang?.startsWith("fr")) {
-    return normalizedTargetMode === "target" ? "Sur la cible sÃ©lectionnÃ©e" : "Sur le lanceur";
+    return normalizedTargetMode === "target" ? "Sur la cible sélectionnée" : "Sur le lanceur";
   }
   return normalizedTargetMode === "target" ? "On the selected target" : "On the caster";
 }
@@ -328,7 +328,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (raw.temporaryHp?.formula) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.temporaryHp"),
-      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(temporaryHpTargetMode)} â€¢ ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
+      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(temporaryHpTargetMode)} • ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
     });
   }
 
@@ -347,7 +347,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     const saveDcSource = raw.save.dcSource ?? "fixed";
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
-      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} â€¢ ${saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource)} â€¢ ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
+      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} • ${saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource)} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
     });
   } else {
     summary.push({
@@ -375,7 +375,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (mechanicalSummary.length) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.mechanical"),
-      value: mechanicalSummary.join(" â€¢ ")
+      value: mechanicalSummary.join(" • ")
     });
   }
 
@@ -747,7 +747,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         });
       }
     }
-    console.log(`[${MODULE_ID}] Configuration sauvegardÃ©e sur ${this.item.name}`);
+    debugLog(`[${MODULE_ID}] Configuration sauvegardée sur ${this.item.name}`);
   }
 }
 
@@ -832,7 +832,7 @@ window.botAddTag = function(selectEl, targetId) {
   const tag = document.createElement('span');
   tag.className = 'bot-tag';
   tag.dataset.value = value;
-  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this, \'' + targetId + '\')">âœ•</span>';
+  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this, \'' + targetId + '\')">?</span>';
   tagsDiv.appendChild(tag);
   botUpdateHidden(targetId);
   selectEl.value = '';
@@ -953,7 +953,7 @@ window.botInsertFormulaVariable = function(buttonEl, variableName) {
 };
 
 export function registerItemSheetButton() {
-  console.log(`[${MODULE_ID}] registerItemSheetButton enregistrÃ©`);
+  debugLog(`[${MODULE_ID}] registerItemSheetButton enregistré`);
 
   Hooks.on("renderItemSheet5e", (app, html) => {
     const item = app?.item ?? app?.document ?? app?.object;
