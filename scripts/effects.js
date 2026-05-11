@@ -986,7 +986,7 @@ function resolveTargets(workflow, flag) {
     return new Set([token]);
   }
 
-  // "self" et "ally" : mÃªme logique, les cibles viennent du workflow
+  // "self" : les cibles viennent du workflow
   if (isTurnTriggerType(flag.type)) {
     debugLog(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
     if (condition !== "hit") {

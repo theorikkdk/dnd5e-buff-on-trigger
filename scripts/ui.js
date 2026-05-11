@@ -104,10 +104,7 @@ function normalizeGlobalTargetMode(targetMode) {
 
 function getTargetModeLabel(targetMode) {
   const normalizedTargetMode = normalizeGlobalTargetMode(targetMode);
-  if (game.i18n.lang?.startsWith("fr")) {
-    return normalizedTargetMode === "target" ? "Sur la cible sélectionnée" : "Sur le lanceur";
-  }
-  return normalizedTargetMode === "target" ? "On the selected target" : "On the caster";
+  return game.i18n.localize(`BOT.ui.targetMode.${normalizedTargetMode === "target" ? "target" : "self"}`);
 }
 
 function getConditionLabel(condition) {
@@ -836,7 +833,7 @@ window.botAddTag = function(selectEl, targetId) {
   const tag = document.createElement('span');
   tag.className = 'bot-tag';
   tag.dataset.value = value;
-  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this, \'' + targetId + '\')">?</span>';
+  tag.innerHTML = label + ' <span class="bot-tag-remove" onclick="botRemoveTag(this, \'' + targetId + '\')">&times;</span>';
   tagsDiv.appendChild(tag);
   botUpdateHidden(targetId);
   selectEl.value = '';
@@ -1003,6 +1000,4 @@ export function registerItemSheetButton() {
     }
   });
 }
-
-
 

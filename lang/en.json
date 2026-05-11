@@ -41,7 +41,6 @@
   "BOT.ui.targetMode.label": "Where should the buff be placed?",
   "BOT.ui.targetMode.self": "On the caster",
   "BOT.ui.targetMode.target": "On the selected target",
-  "BOT.ui.targetMode.ally": "On an ally (defensive buff)",
   "BOT.ui.tabs.trigger": "Trigger",
   "BOT.ui.tabs.damageEffects": "Damage & Effects",
   "BOT.ui.tabs.buffs": "Buffs",

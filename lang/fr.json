@@ -41,7 +41,6 @@
   "BOT.ui.targetMode.label": "Où placer le buff ?",
   "BOT.ui.targetMode.self": "Sur le lanceur",
   "BOT.ui.targetMode.target": "Sur la cible sélectionnée",
-  "BOT.ui.targetMode.ally": "Sur un allié (buff défensif)",
   "BOT.ui.tabs.trigger": "Déclencheur",
   "BOT.ui.tabs.damageEffects": "Dégâts & Effets",
   "BOT.ui.tabs.buffs": "Buffs",
