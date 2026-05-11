@@ -4,6 +4,20 @@
     <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
+  <section class="bot-preset-panel">
+    <div class="bot-preset-row">
+      <label>{{localize "BOT.ui.presets.load"}}</label>
+      <select name="presetId" onchange="botUpdatePresetDescription(this)">
+        <option value="">{{localize "BOT.ui.presets.none"}}</option>
+        {{#each presets}}
+          <option value="{{id}}" data-description="{{description}}">{{label}}</option>
+        {{/each}}
+      </select>
+      <button type="button" onclick="botApplyPreset(this)">{{localize "BOT.ui.presets.apply"}}</button>
+    </div>
+    <p class="hint bot-preset-description" id="bot-preset-description">{{localize "BOT.ui.presets.selectHint"}}</p>
+    <p class="hint bot-preset-warning">{{localize "BOT.ui.presets.warning"}}</p>
+  </section>
   <!-- Navigation par onglets -->
   <div class="bot-tabs">
     <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">{{localize "BOT.ui.tabs.trigger"}}</button>
@@ -122,6 +136,7 @@
           <input type="text" name="damageFormula" value="{{flag.damage.formula}}" placeholder="2d6" class="bot-input-flex" />
           <label class="bot-label-sm">{{localize "BOT.ui.damageType.label"}}</label>
           <select name="damageType" class="bot-input-flex">
+            <option value="" {{#unless flag.damage.type}}selected{{/unless}}>{{localize "BOT.ui.damageType.none"}}</option>
             <option value="acid"        {{#if flag.damageTypeAcid}}selected{{/if}}>{{localize "BOT.damageTypes.acid"}}</option>
             <option value="bludgeoning" {{#if flag.damageTypeBludgeoning}}selected{{/if}}>{{localize "BOT.damageTypes.bludgeoning"}}</option>
             <option value="cold"        {{#if flag.damageTypeCold}}selected{{/if}}>{{localize "BOT.damageTypes.cold"}}</option>

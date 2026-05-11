@@ -1,6 +1,7 @@
 import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, debugLog } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
+import { BUFF_PRESETS } from "./presets.js";
 
 const getSkillLabels = () => ({
   acr: game.i18n.localize("BOT.skills.acr"),
@@ -454,12 +455,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       input.addEventListener("click", () => {
         if (form) form.__botLastFormulaInput = input;
       });
-      input.addEventListener("input", () => {
-        if (form) {
-          window.botUpdateEffectSectionsUI(form);
-          window.botUpdateRollModifierUI(form);
-        }
-      });
     }
     const healingEnabled = this.element.querySelector?.('[name="healingEnabled"]');
     if (healingEnabled) healingEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
@@ -492,6 +487,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const armorProfLabels = getArmorProfLabels();
     const languageLabels = getLanguageLabels();
     const statusOptions = getStatusOptions(raw.status?.id ?? null);
+    const presets = BUFF_PRESETS.map((preset) => ({
+      id: preset.id,
+      label: game.i18n.localize(preset.label),
+      description: game.i18n.localize(preset.description),
+    }));
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const labels = {
       skills: skillLabels,
@@ -643,6 +643,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     return {
       ...await super._prepareContext(options),
       flag,
+      presets,
     };
   }
 
@@ -671,7 +672,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         triggerFrequency: data.triggerFrequency ?? "none",
         damage: data.damageFormula ? {
           formula: data.damageFormula,
-          type: data.damageType,
+          type: data.damageType || null,
           ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
         } : null,
         healing: data.healingEnabled && data.healingFormula ? {
@@ -752,6 +753,280 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
   }
 }
 
+function getPresetById(id) {
+  return BUFF_PRESETS.find((preset) => preset.id === id) ?? null;
+}
+
+function clonePresetFlag(preset) {
+  return foundry.utils.deepClone(preset.flag ?? {});
+}
+
+function buildDefaultBuffConfig() {
+  return {
+    targetMode: "self",
+    rememberTargetOnActivation: false,
+    requireStoredTargetMatch: false,
+    type: "passive",
+    condition: "hit",
+    receivedAttackType: "any",
+    receivedDamageTypes: [],
+    consumeOnTrigger: true,
+    triggerFrequency: "none",
+    charges: null,
+    damage: null,
+    save: null,
+    status: null,
+    healing: null,
+    temporaryHp: null,
+    rollModifier: null,
+    buffs: {
+      ac: null,
+      attackMode: null,
+      saveMode: null,
+      skillMode: null,
+      skills: [],
+      skillBonusSkills: [],
+      skillBonus: null,
+      skillBonusAll: null,
+      saveBonus: null,
+      attackBonus: null,
+      speed: null,
+      weaponProfs: [],
+      armorProfs: [],
+      languages: [],
+      darkvision: null,
+      blindsight: null,
+      tremorsense: null,
+      truesight: null,
+      sensesSpecial: null,
+      passivePerception: null,
+      resistances: [],
+      vulnerabilities: [],
+      immunities: [],
+    },
+  };
+}
+
+function isPlainObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeBuffConfig(base, override) {
+  const result = foundry.utils.deepClone(base);
+  for (const [key, value] of Object.entries(override ?? {})) {
+    if (isPlainObject(value) && isPlainObject(result[key])) {
+      result[key] = mergeBuffConfig(result[key], value);
+    } else {
+      result[key] = foundry.utils.deepClone(value);
+    }
+  }
+  return result;
+}
+
+function buildPresetConfig(preset) {
+  return mergeBuffConfig(buildDefaultBuffConfig(), clonePresetFlag(preset));
+}
+
+function setFormValue(form, name, value) {
+  const field = form?.querySelector?.(`[name="${name}"]`);
+  if (!field) return;
+  if (field.type === "checkbox") {
+    field.checked = !!value;
+  } else {
+    field.value = value ?? "";
+  }
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function clearTagList(targetId, form = document) {
+  const tags = form.querySelector?.(`#tags-${targetId}`) ?? document.getElementById(`tags-${targetId}`);
+  const hidden = form.querySelector?.(`#hidden-${targetId}`) ?? document.getElementById(`hidden-${targetId}`);
+  if (tags) tags.innerHTML = "";
+  if (hidden) hidden.value = "";
+}
+
+function setTagList(form, targetId, values = []) {
+  clearTagList(targetId, form);
+  const tags = form.querySelector?.(`#tags-${targetId}`);
+  const select = form.querySelector?.(`#tags-${targetId} + select, select[onchange*="${targetId}"]`);
+  const hidden = form.querySelector?.(`#hidden-${targetId}`);
+  const cleanValues = values.filter(Boolean);
+  if (!tags || !hidden) return;
+
+  for (const value of cleanValues) {
+    const label = [...(select?.options ?? [])].find((option) => option.value === value)?.text ?? value;
+    const tag = document.createElement("span");
+    tag.className = "bot-tag";
+    tag.dataset.value = value;
+    tag.innerHTML = `${label} <span class="bot-tag-remove" onclick="botRemoveTag(this, '${targetId}')">&times;</span>`;
+    tags.appendChild(tag);
+  }
+  hidden.value = cleanValues.join(",");
+}
+
+function formHasDraftConfiguration(form) {
+  const app = form?.__botApp;
+  if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
+  const relevantFields = [
+    "enabled", "rememberTargetOnActivation", "requireStoredTargetMatch", "damageFormula", "healingFormula",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "saveAbility", "charges",
+    "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
+    "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
+  ];
+  return relevantFields.some((name) => {
+    const field = form?.querySelector?.(`[name="${name}"]`);
+    if (!field) return false;
+    if (field.type === "checkbox") return field.checked;
+    return String(field.value ?? "").trim() !== "";
+  }) || [
+    "receivedDamageTypesList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
+    "buffVulnsList", "buffImmunitiesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
+  ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
+}
+
+function setPanelOpen(form, id, open) {
+  const panel = form?.querySelector?.(`#${id}`);
+  if (panel) panel.open = !!open;
+}
+
+function getSummaryLabels() {
+  const statusOptions = getStatusOptions(null);
+  return {
+    skills: getSkillLabels(),
+    damageTypes: getDamageLabels(),
+    weaponProfs: getWeaponProfLabels(),
+    armorProfs: getArmorProfLabels(),
+    languages: getLanguageLabels(),
+    statuses: Object.fromEntries(statusOptions.map((option) => [option.value, option.label])),
+  };
+}
+
+function updateSummaryFromFlag(form, flag) {
+  const list = form?.querySelector?.(".bot-summary-list");
+  if (!list) return;
+  const app = form.__botApp;
+  const itemDurationRounds = app?.item ? getItemDurationInRounds(app.item) : null;
+  const summary = buildConfigSummary(flag, getSummaryLabels(), itemDurationRounds);
+  list.replaceChildren(...summary.map((entry) => {
+    const item = document.createElement("div");
+    item.className = "bot-summary-item";
+    const label = document.createElement("span");
+    label.className = "bot-summary-label";
+    label.textContent = entry.label;
+    const value = document.createElement("span");
+    value.className = "bot-summary-value";
+    value.textContent = entry.value;
+    item.append(label, value);
+    return item;
+  }));
+}
+
+function applyPresetFlagToForm(form, flag) {
+  const rollTypes = flag.rollModifier?.rollTypes ?? [];
+
+  setFormValue(form, "enabled", true);
+  setFormValue(form, "targetMode", normalizeGlobalTargetMode(flag.targetMode));
+  setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
+  setFormValue(form, "requireStoredTargetMatch", !!flag.requireStoredTargetMatch);
+  setFormValue(form, "type", flag.type ?? "passive");
+  setFormValue(form, "condition", flag.condition ?? "hit");
+  setFormValue(form, "receivedAttackType", flag.receivedAttackType ?? "any");
+  setTagList(form, "receivedDamageTypesList", flag.receivedDamageTypes ?? []);
+
+  setFormValue(form, "rollModifierEnabled", !!flag.rollModifier?.enabled);
+  setFormValue(form, "rollModifierFormula", flag.rollModifier?.formula ?? "");
+  setFormValue(form, "rollModifierAttack", rollTypes.includes("attack"));
+  setFormValue(form, "rollModifierSave", rollTypes.includes("save"));
+  setFormValue(form, "rollModifierAbility", rollTypes.includes("ability"));
+  setFormValue(form, "rollModifierSkill", rollTypes.includes("skill"));
+
+  setFormValue(form, "damageFormula", flag.damage?.formula ?? "");
+  setFormValue(form, "damageType", flag.damage?.type ?? "");
+  setFormValue(form, "damageTargetMode", flag.damage?.targetMode ?? "triggerTarget");
+
+  setFormValue(form, "saveAbility", flag.save?.ability ?? "");
+  setFormValue(form, "saveDC", flag.save?.dc ?? 15);
+  setFormValue(form, "saveDcSource", flag.save?.dcSource ?? "fixed");
+  setFormValue(form, "saveEffect", flag.save?.effect ?? "half");
+
+  setFormValue(form, "statusId", flag.status?.id ?? "");
+  setFormValue(form, "statusTargetMode", flag.status?.targetMode ?? "triggerTarget");
+  setFormValue(form, "statusApplyCondition", flag.status?.applyCondition ?? "always");
+
+  setFormValue(form, "healingEnabled", !!flag.healing?.formula);
+  setFormValue(form, "healingFormula", flag.healing?.formula ?? "");
+  setFormValue(form, "healingTargetMode", normalizeHealingTargetMode(flag.healing?.targetMode));
+  setFormValue(form, "temporaryHpEnabled", !!flag.temporaryHp?.formula);
+  setFormValue(form, "temporaryHpFormula", flag.temporaryHp?.formula ?? "");
+  setFormValue(form, "temporaryHpTargetMode", normalizeTemporaryHpTargetMode(flag.temporaryHp?.targetMode));
+  setFormValue(form, "temporaryHpMode", flag.temporaryHp?.mode ?? "keepHighest");
+
+  setFormValue(form, "consumeOnTrigger", flag.consumeOnTrigger ?? true);
+  setFormValue(form, "triggerFrequency", flag.triggerFrequency ?? "none");
+  setFormValue(form, "charges", flag.charges ?? "");
+
+  setFormValue(form, "buffAttackMode", flag.buffs?.attackMode ?? "none");
+  setFormValue(form, "buffSaveMode", flag.buffs?.saveMode ?? "none");
+  setFormValue(form, "buffSkillMode", flag.buffs?.skillMode ?? "none");
+  setFormValue(form, "buffAC", flag.buffs?.ac ?? "");
+  setFormValue(form, "buffAttackBonus", flag.buffs?.attackBonus ?? "");
+  setFormValue(form, "buffSaveBonus", flag.buffs?.saveBonus ?? "");
+  setFormValue(form, "buffSkillBonus", flag.buffs?.skillBonus ?? "");
+  setFormValue(form, "buffSkillBonusAll", flag.buffs?.skillBonusAll ?? "");
+  setFormValue(form, "buffSpeed", flag.buffs?.speed?.value ?? "");
+  setFormValue(form, "buffSpeedType", flag.buffs?.speed?.type ?? "walk");
+  setFormValue(form, "buffDarkvision", flag.buffs?.darkvision ?? "");
+  setFormValue(form, "buffBlindSight", flag.buffs?.blindsight ?? "");
+  setFormValue(form, "buffTremorSense", flag.buffs?.tremorsense ?? "");
+  setFormValue(form, "buffTrueSight", flag.buffs?.truesight ?? "");
+  setFormValue(form, "buffSensesSpecial", flag.buffs?.sensesSpecial ?? "");
+  setFormValue(form, "buffPassivePerception", flag.buffs?.passivePerception ?? "");
+
+  setTagList(form, "buffSkillAdvantageList", flag.buffs?.skills ?? []);
+  setTagList(form, "buffSkillBonusList", flag.buffs?.skillBonusSkills ?? []);
+  setTagList(form, "buffResistancesList", flag.buffs?.resistances ?? []);
+  setTagList(form, "buffVulnsList", flag.buffs?.vulnerabilities ?? []);
+  setTagList(form, "buffImmunitiesList", flag.buffs?.immunities ?? []);
+  setTagList(form, "buffWeaponProfsList", flag.buffs?.weaponProfs ?? []);
+  setTagList(form, "buffArmorProfsList", flag.buffs?.armorProfs ?? []);
+  setTagList(form, "buffLanguagesList", flag.buffs?.languages ?? []);
+
+  setPanelOpen(form, "bot-roll-modifier-panel", !!flag.rollModifier?.enabled);
+  setPanelOpen(form, "bot-damage-panel", !!flag.damage?.formula);
+  setPanelOpen(form, "bot-save-panel", !!flag.save?.ability);
+  setPanelOpen(form, "bot-status-panel", !!flag.status?.id);
+
+  window.botUpdateStoredTargetUI(form.querySelector('[name="targetMode"]'));
+  window.botUpdateTriggerUI(form.querySelector('[name="type"]'));
+  window.botUpdateSaveDcUI(form.querySelector('[name="saveDcSource"]'));
+  window.botUpdateEffectSectionsUI(form);
+  window.botUpdateRollModifierUI(form);
+  updateSummaryFromFlag(form, flag);
+}
+
+window.botUpdatePresetDescription = function(selectEl) {
+  const form = selectEl.closest("form");
+  const description = selectEl.selectedOptions?.[0]?.dataset?.description
+    || game.i18n.localize("BOT.ui.presets.selectHint");
+  const descriptionEl = form?.querySelector?.("#bot-preset-description");
+  if (descriptionEl) descriptionEl.textContent = description;
+};
+
+window.botApplyPreset = function(buttonEl) {
+  const form = buttonEl.closest("form");
+  const select = form?.querySelector?.('[name="presetId"]');
+  const preset = getPresetById(select?.value);
+  if (!preset) return;
+
+  if (formHasDraftConfiguration(form)) {
+    const confirmed = window.confirm(game.i18n.localize("BOT.ui.presets.confirmReplace"));
+    if (!confirmed) return;
+  }
+
+  applyPresetFlagToForm(form, buildPresetConfig(preset));
+  debugLog(`[${MODULE_ID}] Preset applied: ${preset.id}`);
+};
 window.botShowTab = function(btn, tabId) {
   const form = btn.closest('form');
   form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
