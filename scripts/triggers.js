@@ -1,8 +1,86 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
+
+function resolveRollHookActor(config) {
+  return config?.subject?.getFlag
+    ? config.subject
+    : config?.subject?.actor?.getFlag
+      ? config.subject.actor
+      : config?.actor?.getFlag
+        ? config.actor
+        : config?.item?.actor?.getFlag
+          ? config.item.actor
+          : null;
+}
+
+function getRollHookConfig(args) {
+  return args.find((arg) => arg && typeof arg === "object" && !Array.isArray(arg) && !arg.getFlag && (
+    Array.isArray(arg.rolls)
+    || arg.parts !== undefined
+    || arg.bonus !== undefined
+    || arg.subject !== undefined
+    || arg.actor !== undefined
+    || arg.data !== undefined
+    || arg.advantage !== undefined
+    || arg.disadvantage !== undefined
+  )) ?? null;
+}
+
+function summarizeRollHookArgs(args) {
+  return args.map((arg, index) => {
+    if (Array.isArray(arg)) return `${index}:array(${arg.length})`;
+    if (!arg || typeof arg !== "object") return `${index}:${typeof arg}`;
+    const ctor = arg.constructor?.name ?? "object";
+    const keys = Object.keys(arg).slice(0, 10).join(",");
+    const subject = arg.subject?.name ?? arg.subject?.item?.name ?? arg.subject?.constructor?.name ?? "none";
+    const actor = arg.actor?.name ?? arg.subject?.actor?.name ?? arg.item?.actor?.name ?? "none";
+    const rolls = Array.isArray(arg.rolls) ? arg.rolls.length : "none";
+    const firstRoll = Array.isArray(arg.rolls) ? arg.rolls[0] : null;
+    return `${index}:${ctor}{keys=${keys}; subject=${subject}; actor=${actor}; rolls=${rolls}; parts=${Array.isArray(arg.parts)}; bonus=${arg.bonus !== undefined}; roll0.parts=${Array.isArray(firstRoll?.parts)}; roll0.bonus=${firstRoll?.bonus !== undefined}}`;
+  }).join(" | ");
+}
+
+async function handleRollModifierHook(hookName, rollType, ...args) {
+  const config = getRollHookConfig(args);
+  const actor = resolveRollHookActor(config) ?? args.find((arg) => arg?.getFlag) ?? null;
+  if (!actor?.getFlag || !config) {
+    console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible (${hookName})`);
+    console.debug?.(`[${MODULE_ID}] Debug ${hookName} : ${summarizeRollHookArgs(args)}`);
+    return;
+  }
+  console.debug?.(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, subject=${config.subject?.constructor?.name ?? "none"}, rolls=${config.rolls?.length ?? 0}, roll0.parts=${Array.isArray(config.rolls?.[0]?.parts)}, roll0.bonus=${config.rolls?.[0]?.bonus !== undefined}, config.parts=${Array.isArray(config.parts)}, config.bonus=${config.bonus !== undefined}`);
+  if (rollType === "ability" && (config.skill || config.tool)) {
+    console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
+    return;
+  }
+  await applyRollModifierToConfig(actor, rollType, config);
+}
+
+function handleRollModifierBuildHook(hookName, rollType, process, rollConfig) {
+  const actor = resolveRollHookActor(process);
+  if (!actor?.getFlag || !rollConfig) {
+    console.warn(`[${MODULE_ID}] Modificateur de jet non appliqué : configuration dnd5e incompatible (${hookName})`);
+    console.debug?.(`[${MODULE_ID}] Debug ${hookName} : processKeys=${Object.keys(process ?? {}).join(",")}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}`);
+    return;
+  }
+  console.debug?.(`[${MODULE_ID}] Debug ${hookName} : acteur=${actor.name}, processSubject=${process?.subject?.constructor?.name ?? "none"}, rollKeys=${Object.keys(rollConfig ?? {}).join(",")}, parts=${Array.isArray(rollConfig.parts)}, bonus=${rollConfig.bonus !== undefined}, formula=${rollConfig.formula ?? "none"}, options=${Object.keys(rollConfig.options ?? {}).join(",")}`);
+  if (rollType === "ability" && (process.skill || process.tool)) {
+    console.log(`[${MODULE_ID}] Modificateur de jet ignoré : type non compatible`);
+    return;
+  }
+  const applied = applyRollModifierToConfig(actor, rollType, rollConfig, { consume: false });
+  if (applied) process._botRollModifier = rollConfig._botRollModifier;
+}
+
+async function handleRollModifierFinalHook(hookName, rollType, rolls, process) {
+  const actor = resolveRollHookActor(process);
+  const metadata = process?._botRollModifier;
+  if (!actor?.getFlag || !metadata) return;
+  await finalizeRollModifierApplication(actor, rollType, metadata, rolls);
+}
 
 function getReceivedAttackCategories(workflow, item) {
   const actionType = workflow?.activity?.actionType
@@ -486,30 +564,76 @@ export function registerTriggers() {
     }
   });
 
-  Hooks.on("dnd5e.preRollSkill", (config, skillId) => {
+  Hooks.on("dnd5e.preRollSkill", async (config, skillId) => {
     const actor = config.subject ?? config.actor ?? null;
     if (!actor?.getFlag) return;
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
     const skills = activeBuff?.buffs?.skills;
-    if (!skills?.length) return;
-    if (skills.includes("all") || skills.includes(skillId)) {
+    if (skills?.length && (skills.includes("all") || skills.includes(skillId))) {
       config.advantage = true;
       console.log(`[${MODULE_ID}] Avantage compétence ${skillId} appliqué sur ${actor.name}`);
     }
   });
 
-  Hooks.on("dnd5e.preRollAbility", (actor, config, abilityId) => {
+  Hooks.on("dnd5e.preRollAbility", async (actor, config, abilityId) => {
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    if (!activeBuff?.buffs?.skillMode) return;
-    if (activeBuff.buffs.skillMode === "advantage") {
+    if (activeBuff?.buffs?.skillMode === "advantage") {
       config.advantage = true;
       console.log(`[${MODULE_ID}] Avantage caractéristique appliqué sur ${actor.name}`);
-    } else if (activeBuff.buffs.skillMode === "disadvantage") {
+    } else if (activeBuff?.buffs?.skillMode === "disadvantage") {
       config.disadvantage = true;
       console.log(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
     }
   });
 
+
+  Hooks.on("dnd5e.preRollAttack", async (...args) => {
+    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAttack : ${summarizeRollHookArgs(args)}`);
+  });
+
+  Hooks.on("dnd5e.preRollSavingThrow", async (...args) => {
+    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollSavingThrow : ${summarizeRollHookArgs(args)}`);
+  });
+
+  Hooks.on("dnd5e.preRollAbilitySave", async (...args) => {
+    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAbilitySave : ${summarizeRollHookArgs(args)}`);
+  });
+
+  Hooks.on("dnd5e.preRollAbilityCheck", async (...args) => {
+    console.debug?.(`[${MODULE_ID}] Debug dnd5e.preRollAbilityCheck : ${summarizeRollHookArgs(args)}`);
+  });
+
+  Hooks.on("dnd5e.postBuildAttackRollConfig", async (process, rollConfig) => {
+    handleRollModifierBuildHook("dnd5e.postBuildAttackRollConfig", "attack", process, rollConfig);
+  });
+
+  Hooks.on("dnd5e.postBuildSavingThrowRollConfig", async (process, rollConfig) => {
+    handleRollModifierBuildHook("dnd5e.postBuildSavingThrowRollConfig", "save", process, rollConfig);
+  });
+
+  Hooks.on("dnd5e.postBuildAbilityCheckRollConfig", async (process, rollConfig) => {
+    handleRollModifierBuildHook("dnd5e.postBuildAbilityCheckRollConfig", "ability", process, rollConfig);
+  });
+
+  Hooks.on("dnd5e.postBuildSkillRollConfig", async (process, rollConfig) => {
+    handleRollModifierBuildHook("dnd5e.postBuildSkillRollConfig", "skill", process, rollConfig);
+  });
+
+  Hooks.on("dnd5e.postAttackRollConfiguration", async (rolls, process) => {
+    await handleRollModifierFinalHook("dnd5e.postAttackRollConfiguration", "attack", rolls, process);
+  });
+
+  Hooks.on("dnd5e.postSavingThrowRollConfiguration", async (rolls, process) => {
+    await handleRollModifierFinalHook("dnd5e.postSavingThrowRollConfiguration", "save", rolls, process);
+  });
+
+  Hooks.on("dnd5e.postAbilityCheckRollConfiguration", async (rolls, process) => {
+    await handleRollModifierFinalHook("dnd5e.postAbilityCheckRollConfiguration", "ability", rolls, process);
+  });
+
+  Hooks.on("dnd5e.postSkillRollConfiguration", async (rolls, process) => {
+    await handleRollModifierFinalHook("dnd5e.postSkillRollConfiguration", "skill", rolls, process);
+  });
   Hooks.on("dnd5e.preRollConcentration", (rollConfig, dialogConfig, messageConfig) => {
     const actor = rollConfig?.subject ?? null;
     if (!actor?.uuid) return true;

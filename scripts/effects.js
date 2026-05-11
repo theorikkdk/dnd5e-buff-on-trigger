@@ -306,12 +306,59 @@ function buildActorFormulaSource(actor) {
   };
 }
 
+function assignSafeRollModifierData(target, safeData) {
+  target.data ??= {};
+  target.data.spellLevel = safeData.spellLevel;
+  target.data.prof = safeData.prof;
+  target.data.str = safeData.str;
+  target.data.dex = safeData.dex;
+  target.data.con = safeData.con;
+  target.data.int = safeData.int;
+  target.data.wis = safeData.wis;
+  target.data.cha = safeData.cha;
+  target.data.origin = safeData.origin;
+  target.data.owner = safeData.owner;
+  target.data.target = safeData.target;
+  target.data.attacker = safeData.attacker;
+  target.data.stored = safeData.stored;
+}
+
+function buildSafeRollModifierData(actor, flag) {
+  const originActor = flag.originActorUuid ? fromUuidSync(flag.originActorUuid) : null;
+  const ownerActor = actor ?? null;
+  const storedActor = resolveStoredTargetActor(flag);
+  const sourceItem = (flag.originItemUuid ?? flag.itemUuid) ? fromUuidSync(flag.originItemUuid ?? flag.itemUuid) : null;
+  const originData = buildActorFormulaSource(originActor ?? ownerActor ?? null);
+  const ownerData = buildActorFormulaSource(ownerActor);
+  const emptyData = buildActorFormulaSource(null);
+  const storedData = buildActorFormulaSource(storedActor);
+  const rawSpellLevel = flag.originSpellLevel ?? readItemBaseSpellLevel(sourceItem);
+  const spellLevel = Math.max(1, normalizeFormulaNumber(rawSpellLevel, 1));
+
+  return {
+    spellLevel,
+    prof: originData.prof,
+    str: { mod: originData.str.mod },
+    dex: { mod: originData.dex.mod },
+    con: { mod: originData.con.mod },
+    int: { mod: originData.int.mod },
+    wis: { mod: originData.wis.mod },
+    cha: { mod: originData.cha.mod },
+    origin: originData,
+    owner: ownerData,
+    target: emptyData,
+    attacker: emptyData,
+    stored: storedData
+  };
+}
+
+
 function getFirstResolvedTargetToken(workflow, flag) {
   // Multi-target workflows currently expose only the first resolved trigger target to @target.* variables.
   return [...resolveTriggerTargetTokens(workflow, flag, "formule")][0] ?? null;
 }
 
-async function buildFormulaRollData(workflow, flag) {
+export async function buildFormulaRollData(workflow, flag) {
   const originActor = await resolveActorFromUuid(flag.originActorUuid);
   const ownerActor = workflow.actor ?? null;
   const targetActor = getFirstResolvedTargetToken(workflow, flag)?.actor ?? null;
@@ -687,7 +734,7 @@ function getCurrentTriggerUsage() {
   };
 }
 
-async function shouldBlockTriggerFrequency(actor, flag) {
+export function shouldBlockTriggerFrequency(actor, flag) {
   const frequency = flag.triggerFrequency ?? "none";
   if (frequency === "none") return false;
 
@@ -708,7 +755,7 @@ async function shouldBlockTriggerFrequency(actor, flag) {
   return false;
 }
 
-async function markTriggerFrequencyUsage(actor) {
+export async function markTriggerFrequencyUsage(actor) {
   const currentUsage = getCurrentTriggerUsage();
   if (!currentUsage || !actor?.setFlag) return;
 
@@ -944,7 +991,7 @@ function resolveTemporaryHpTargets(workflow, flag) {
   return new Set();
 }
 
-async function consumeOrDecrementCharges(workflow, flag, targets) {
+async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) {
   try {
     if (flag.chargesRemaining !== null) {
       const newCharges = flag.chargesRemaining - 1;
@@ -971,7 +1018,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
         await workflow.actor?.setFlag(MODULE_ID, "activeBuff", { ...flag, chargesRemaining: newCharges });
         console.log(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
       }
-    } else if (workflow.item !== null && flag.consumeOnTrigger !== false) {
+    } else if ((options.forceConsume || workflow.item !== null) && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
@@ -996,6 +1043,119 @@ async function consumeOrDecrementCharges(workflow, flag, targets) {
   }
 }
 
+function appendRollModifierPart(config, formula, safeData) {
+  if (!config || typeof config !== "object") return false;
+
+  const appendToRollConfig = (rollConfig) => {
+    if (!rollConfig || typeof rollConfig !== "object") return false;
+
+    if (!Array.isArray(rollConfig.parts)) rollConfig.parts = [];
+    rollConfig.parts.push(formula);
+    assignSafeRollModifierData(rollConfig, safeData);
+    return true;
+  };
+
+  if (Array.isArray(config.rolls)) {
+    const targetRoll = config.rolls.find((rollConfig) => rollConfig && typeof rollConfig === "object");
+    if (appendToRollConfig(targetRoll)) return true;
+  }
+
+  return appendToRollConfig(config);
+}
+
+function getRollModifierTargets(actor, flag) {
+  const targets = new Set();
+  const storedTarget = flag?.targetTokenId ? canvas?.tokens?.get?.(flag.targetTokenId) : null;
+  if (storedTarget) targets.add(storedTarget);
+  for (const token of actor?.getActiveTokens?.() ?? []) targets.add(token);
+  return targets;
+}
+
+export function applyRollModifierToConfig(actor, rollType, config, options = {}) {
+  try {
+    if (!actor?.getFlag) return false;
+    const flag = actor.getFlag(MODULE_ID, "activeBuff");
+    const rollModifier = flag?.rollModifier;
+    if (!rollModifier?.enabled || !rollModifier.formula) return false;
+
+    const rollTypes = Array.isArray(rollModifier.rollTypes) ? rollModifier.rollTypes : [];
+    if (!rollTypes.includes(rollType)) {
+      console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
+      return false;
+    }
+
+    if (shouldBlockTriggerFrequency(actor, flag)) {
+      console.log(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : fr\u00e9quence d\u00e9j\u00e0 utilis\u00e9e`);
+      return false;
+    }
+
+    const workflow = {
+      actor,
+      item: null,
+      token: actor.getActiveTokens?.()[0] ?? null,
+      targets: new Set(),
+      hitTargets: new Set(),
+      missedTargets: new Set(),
+    };
+    const safeData = buildSafeRollModifierData(actor, flag);
+    if (!appendRollModifierPart(config, rollModifier.formula, safeData)) {
+      console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible`);
+      return false;
+    }
+
+    config._botRollModifier = { actorUuid: actor.uuid, rollType, formula: rollModifier.formula };
+    if (options.consume !== false) {
+      finalizeRollModifierApplication(actor, rollType, config._botRollModifier, [config]);
+    }
+    return true;
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans applyRollModifierToConfig :`, error);
+    return false;
+  }
+}
+
+function rollContainsModifierFormula(roll, formula) {
+  const expected = String(formula ?? "").replace(/\s+/g, "");
+  if (!expected) return false;
+  const candidates = [
+    roll?.formula,
+    roll?._formula,
+    roll?.terms?.map?.((term) => term.formula ?? term.expression ?? term.total ?? term.number)?.join("+"),
+    roll?.parts?.join?.("+")
+  ].filter(Boolean).map((value) => String(value).replace(/\s+/g, ""));
+  return candidates.some((value) => value.includes(expected));
+}
+
+export async function finalizeRollModifierApplication(actor, rollType, metadata, rolls = []) {
+  try {
+    if (!actor?.getFlag || !metadata?.formula || metadata.consumed) return false;
+    const rollList = Array.isArray(rolls) ? rolls : [];
+    if (!rollList.some((roll) => rollContainsModifierFormula(roll, metadata.formula))) {
+      console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible`);
+      return false;
+    }
+
+    const flag = actor.getFlag(MODULE_ID, "activeBuff");
+    if (!flag?.rollModifier?.enabled) return false;
+
+    const workflow = {
+      actor,
+      item: null,
+      token: actor.getActiveTokens?.()[0] ?? null,
+      targets: new Set(),
+      hitTargets: new Set(),
+      missedTargets: new Set(),
+    };
+    await markTriggerFrequencyUsage(actor);
+    await consumeOrDecrementCharges(workflow, flag, getRollModifierTargets(actor, flag), { forceConsume: true });
+    metadata.consumed = true;
+    console.log(`[${MODULE_ID}] Modificateur de jet appliqu\u00e9 : ${metadata.formula} sur ${rollType}`);
+    return true;
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans finalizeRollModifierApplication :`, error);
+    return false;
+  }
+}
 export function buildMechanicalChanges(flag) {
   if (!flag.buffs) return [];
   const {

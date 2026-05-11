@@ -90,6 +90,27 @@
   <!-- Onglet 2 : Dégâts & Effets -->
   <div id="bot-tab-damage" class="bot-tab-panel" style="display:none">
       <p class="hint">{{localize "BOT.ui.effectTargets.help"}}</p>
+      <details class="bot-collapsible-panel bot-effect-panel" id="bot-roll-modifier-panel" {{#if flag.rollModifierEnabled}}open{{/if}}>
+        <summary class="bot-collapsible-summary">{{localize "BOT.ui.rollModifier.title"}}{{#if flag.rollModifierFormula}} — {{flag.rollModifierFormula}}{{/if}}</summary>
+        <div class="bot-collapsible-body">
+          <div class="form-group">
+            <label>{{localize "BOT.ui.rollModifier.enabled"}}</label>
+            <input type="checkbox" name="rollModifierEnabled" {{#if flag.rollModifierEnabled}}checked{{/if}} />
+          </div>
+          <div id="bot-roll-modifier-details" {{#unless flag.rollModifierEnabled}}style="display:none"{{/unless}}>
+            <div class="bot-row">
+              <label class="bot-label-sm">{{localize "BOT.ui.rollModifier.formula"}}</label>
+              <input type="text" name="rollModifierFormula" value="{{flag.rollModifierFormula}}" placeholder="1d4" class="bot-input-flex" />
+            </div>
+            <div class="bot-skill-grid">
+              <label><input type="checkbox" name="rollModifierAttack" {{#if flag.rollModifierTypeAttack}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.attack"}}</label>
+              <label><input type="checkbox" name="rollModifierSave" {{#if flag.rollModifierTypeSave}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.save"}}</label>
+              <label><input type="checkbox" name="rollModifierAbility" {{#if flag.rollModifierTypeAbility}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.ability"}}</label>
+              <label><input type="checkbox" name="rollModifierSkill" {{#if flag.rollModifierTypeSkill}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.skill"}}</label>
+            </div>
+          </div>
+        </div>
+      </details>
       <details class="bot-collapsible-panel bot-effect-panel" id="bot-damage-panel" {{#if flag.damage.formula}}open{{/if}}>
       <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.damage"}}{{#if flag.damage.formula}} — {{flag.damage.formula}}{{/if}}</summary>
       <div class="bot-collapsible-body">

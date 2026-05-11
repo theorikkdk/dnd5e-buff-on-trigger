@@ -126,6 +126,14 @@ function getTemporaryHpModeLabel(mode) {
   return game.i18n.localize(`BOT.ui.temporaryHp.mode.${mode ?? "keepHighest"}`);
 }
 
+function getRollModifierTypeLabel(type) {
+  return game.i18n.localize(`BOT.ui.rollModifier.rollTypes.${type}`);
+}
+
+function getRollModifierTypesLabel(types = []) {
+  return types.map(getRollModifierTypeLabel).filter(Boolean).join(", ");
+}
+
 function getTriggerFrequencyLabel(frequency) {
   return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
 }
@@ -324,6 +332,17 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     });
   }
 
+  if (raw.rollModifier?.enabled && raw.rollModifier?.formula) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.rollModifier"),
+      value: raw.rollModifier.formula
+    });
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.rollModifierTypes"),
+      value: getRollModifierTypesLabel(raw.rollModifier.rollTypes ?? []) || game.i18n.localize("BOT.ui.summary.notConfigured")
+    });
+  }
+
   if (raw.save?.ability) {
     const saveDcSource = raw.save.dcSource ?? "fixed";
     summary.push({
@@ -426,7 +445,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (triggerSelect) window.botUpdateTriggerUI(triggerSelect);
     const saveDcSourceSelect = this.element.querySelector?.('[name="saveDcSource"]');
     if (saveDcSourceSelect) window.botUpdateSaveDcUI(saveDcSourceSelect);
-    const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"]') ?? [];
+    const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]') ?? [];
     for (const input of formulaInputs) {
       input.addEventListener("focus", () => {
         if (form) form.__botLastFormulaInput = input;
@@ -435,13 +454,18 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         if (form) form.__botLastFormulaInput = input;
       });
       input.addEventListener("input", () => {
-        if (form) window.botUpdateEffectSectionsUI(form);
+        if (form) {
+          window.botUpdateEffectSectionsUI(form);
+          window.botUpdateRollModifierUI(form);
+        }
       });
     }
     const healingEnabled = this.element.querySelector?.('[name="healingEnabled"]');
     if (healingEnabled) healingEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const temporaryHpEnabled = this.element.querySelector?.('[name="temporaryHpEnabled"]');
     if (temporaryHpEnabled) temporaryHpEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    const rollModifierEnabled = this.element.querySelector?.('[name="rollModifierEnabled"]');
+    if (rollModifierEnabled) rollModifierEnabled.addEventListener("change", () => window.botUpdateRollModifierUI(form));
     const statusSelect = this.element.querySelector?.('[name="statusId"]');
     if (statusSelect) statusSelect.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const targetModeSelect = this.element.querySelector?.('[name="targetMode"]');
@@ -449,7 +473,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     this.element.querySelectorAll?.('.bot-collapsible-panel')?.forEach((panel) => {
       panel.addEventListener("toggle", () => this.resizeToContent());
     });
-    if (form) window.botUpdateEffectSectionsUI(form);
+    if (form) {
+      window.botUpdateEffectSectionsUI(form);
+      window.botUpdateRollModifierUI(form);
+    }
   }
 
   async _prepareContext(options) {
@@ -535,6 +562,12 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       temporaryHpModeKeepHighest: (raw.temporaryHp?.mode ?? "keepHighest") === "keepHighest",
       temporaryHpModeReplace:    raw.temporaryHp?.mode === "replace",
       temporaryHpModeAdd:        raw.temporaryHp?.mode === "add",
+      rollModifierEnabled:       !!raw.rollModifier?.enabled,
+      rollModifierFormula:       raw.rollModifier?.formula ?? "",
+      rollModifierTypeAttack:    (raw.rollModifier?.rollTypes ?? []).includes("attack"),
+      rollModifierTypeSave:      (raw.rollModifier?.rollTypes ?? []).includes("save"),
+      rollModifierTypeAbility:   (raw.rollModifier?.rollTypes ?? []).includes("ability"),
+      rollModifierTypeSkill:     (raw.rollModifier?.rollTypes ?? []).includes("skill"),
       skillAdvantageOptions,
       skillBonusOptions,
       resistanceOptions,
@@ -646,6 +679,16 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           formula: data.temporaryHpFormula,
           targetMode: normalizeTemporaryHpTargetMode(data.temporaryHpTargetMode),
           mode: data.temporaryHpMode ?? "keepHighest",
+        } : null,
+        rollModifier: data.rollModifierEnabled && data.rollModifierFormula ? {
+          enabled: true,
+          formula: data.rollModifierFormula,
+          rollTypes: [
+            data.rollModifierAttack ? "attack" : null,
+            data.rollModifierSave ? "save" : null,
+            data.rollModifierAbility ? "ability" : null,
+            data.rollModifierSkill ? "skill" : null,
+          ].filter(Boolean),
         } : null,
           save: data.saveAbility ? {
             ability: data.saveAbility,
@@ -829,6 +872,18 @@ window.botUpdateEffectSectionsUI = function(form) {
   if (app) app.resizeToContent();
 };
 
+window.botUpdateRollModifierUI = function(form) {
+  if (!form) return;
+  const details = form.querySelector('#bot-roll-modifier-details');
+  const enabled = form.querySelector('[name="rollModifierEnabled"]');
+  if (details && enabled) {
+    details.style.display = enabled.checked ? "" : "none";
+  }
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
 window.botUpdateTargetModeOptions = function(form, triggerType) {
   if (!form) return;
 
@@ -873,7 +928,7 @@ window.botUpdateTargetModeOptions = function(form, triggerType) {
 window.botInsertFormulaVariable = function(buttonEl, variableName) {
   const form = buttonEl.closest('form');
   const input = form?.__botLastFormulaInput
-    ?? form?.querySelector?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"]');
+    ?? form?.querySelector?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]');
   if (!input) return;
 
   const start = input.selectionStart ?? input.value.length;
