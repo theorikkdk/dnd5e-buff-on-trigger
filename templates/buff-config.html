@@ -24,6 +24,7 @@
     <section class="bot-inline-panel" id="bot-stored-target-group" {{#unless flag.showStoredTargetSection}}style="display:none"{{/unless}}>
       <h3 class="bot-summary-title">{{localize "BOT.ui.storedTarget.title"}}</h3>
       <p class="hint">{{localize "BOT.ui.storedTarget.help"}}</p>
+      <p class="hint">{{localize "BOT.ui.storedTarget.changeTargetHelp"}}</p>
       <div class="form-group">
         <label>{{localize "BOT.ui.storedTarget.rememberTargetOnActivation"}}</label>
         <input type="checkbox" name="rememberTargetOnActivation" {{#if flag.rememberTargetOnActivation}}checked{{/if}} />
@@ -31,13 +32,6 @@
       <div class="form-group">
         <label>{{localize "BOT.ui.storedTarget.requireStoredTargetMatch"}}</label>
         <input type="checkbox" name="requireStoredTargetMatch" {{#if flag.requireStoredTargetMatch}}checked{{/if}} />
-      </div>
-      <div class="form-group">
-        <label>{{localize "BOT.ui.storedTarget.recastBehavior.label"}}</label>
-        <select name="storedTargetRecastBehavior">
-          <option value="normal" {{#if flag.storedTargetRecastBehaviorNormal}}selected{{/if}}>{{localize "BOT.ui.storedTarget.recastBehavior.normal"}}</option>
-          <option value="moveStoredTarget" {{#if flag.storedTargetRecastBehaviorMoveStoredTarget}}selected{{/if}}>{{localize "BOT.ui.storedTarget.recastBehavior.moveStoredTarget"}}</option>
-        </select>
       </div>
     </section>
     <div class="form-group">

@@ -485,20 +485,6 @@ export function registerTriggers() {
           return;
         }
 
-        if (
-          activeFlag.storedTargetRecastBehavior === "moveStoredTarget"
-          && activeFlag.rememberTargetOnActivation === true
-          && existingBuffs.length
-        ) {
-          if (existingBuffs.length > 1) {
-            ui.notifications.warn(game.i18n.localize("BOT.notifications.multipleActiveMarksFound"));
-            console.log(`[${MODULE_ID}] DÃ©placement de marque annulÃ© â€” plusieurs marques compatibles`);
-            return;
-          }
-          await moveStoredTarget(existingBuffs[0].actor, existingBuffs[0].activeBuff, selectedTargetToken);
-          return;
-        }
-
         if (existingBuffs.length) {
           for (const existing of existingBuffs) {
             await clearExistingBuffInstance(existing.actor, existing.activeBuff);

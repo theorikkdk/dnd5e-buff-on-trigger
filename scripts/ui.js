@@ -138,10 +138,6 @@ function getTriggerFrequencyLabel(frequency) {
   return game.i18n.localize(`BOT.ui.triggerFrequency.${frequency ?? "none"}`);
 }
 
-function getStoredTargetRecastBehaviorLabel(behavior) {
-  return game.i18n.localize(`BOT.ui.storedTarget.recastBehavior.${behavior ?? "normal"}`);
-}
-
 function getDamageTargetModeLabel(targetMode) {
   return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
 }
@@ -291,13 +287,6 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
-
-  if (raw.rememberTargetOnActivation) {
-    summary.push({
-      label: game.i18n.localize("BOT.ui.summary.storedTargetRecastBehavior"),
-      value: getStoredTargetRecastBehaviorLabel(raw.storedTargetRecastBehavior)
-    });
-  }
 
   if (["mwak", "rwak", "msak", "rsak"].includes(raw.type)) {
     summary.push({ label: game.i18n.localize("BOT.ui.summary.condition"), value: getConditionLabel(raw.condition) });
@@ -528,8 +517,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
       requireStoredTargetMatch: !!raw.requireStoredTargetMatch,
-      storedTargetRecastBehaviorNormal: (raw.storedTargetRecastBehavior ?? "normal") === "normal",
-      storedTargetRecastBehaviorMoveStoredTarget: raw.storedTargetRecastBehavior === "moveStoredTarget",
       typePassive:           raw.type === "passive",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
@@ -672,7 +659,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         targetMode: normalizeGlobalTargetMode(data.targetMode),
         rememberTargetOnActivation: data.rememberTargetOnActivation ?? false,
         requireStoredTargetMatch: data.requireStoredTargetMatch ?? false,
-        storedTargetRecastBehavior: data.storedTargetRecastBehavior ?? "normal",
         type: data.type,
         condition: data.condition,
         receivedAttackType: data.receivedAttackType ?? "any",
