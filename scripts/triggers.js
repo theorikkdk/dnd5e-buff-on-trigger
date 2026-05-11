@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
 
@@ -241,6 +241,142 @@ function doesAttackConditionMatch(workflow, flag) {
   return false;
 }
 
+function collectBuffCarrierEntries() {
+  const carrierEntries = new Map();
+  const addCarrier = (actor, tokenDocument = null) => {
+    if (!actor?.getFlag) return;
+    const key = actor.uuid
+      ?? tokenDocument?.uuid
+      ?? (tokenDocument?.id && tokenDocument?.parent?.id ? `${tokenDocument.parent.id}.${tokenDocument.id}` : null)
+      ?? actor.id
+      ?? null;
+    if (!key || carrierEntries.has(key)) return;
+    carrierEntries.set(key, { actor, tokenDocument });
+  };
+
+  for (const actor of game.actors.contents) addCarrier(actor);
+
+  if (canvas?.tokens?.placeables) {
+    for (const token of canvas.tokens.placeables) addCarrier(token.actor ?? null, token.document ?? null);
+  }
+
+  if (canvas?.scene?.tokens) {
+    for (const tokenDocument of canvas.scene.tokens) addCarrier(tokenDocument.actor ?? null, tokenDocument);
+  }
+
+  if (game?.scenes?.contents) {
+    for (const scene of game.scenes.contents) {
+      for (const tokenDocument of scene.tokens ?? []) addCarrier(tokenDocument.actor ?? null, tokenDocument);
+    }
+  }
+
+  return [...carrierEntries.values()];
+}
+
+function getBuffItemUuid(flag) {
+  return flag?.originItemUuid ?? flag?.itemUuid ?? null;
+}
+
+function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
+  const newOriginActorUuid = newFlag?.originActorUuid ?? null;
+  const newItemUuid = getBuffItemUuid(newFlag);
+  return !!newOriginActorUuid
+    && !!newItemUuid
+    && existingFlag?.originActorUuid === newOriginActorUuid
+    && getBuffItemUuid(existingFlag) === newItemUuid;
+}
+
+function findExistingBuffInstances(newFlag) {
+  return collectBuffCarrierEntries()
+    .map(({ actor }) => ({ actor, activeBuff: actor.getFlag(MODULE_ID, "activeBuff") }))
+    .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
+}
+
+function getStoredTargetName(flag) {
+  const token = flag?.storedTargetTokenUuid && typeof fromUuidSync === "function"
+    ? fromUuidSync(flag.storedTargetTokenUuid)?.object
+    : null;
+  const actor = token?.actor
+    ?? (flag?.storedTargetActorUuid && typeof fromUuidSync === "function" ? fromUuidSync(flag.storedTargetActorUuid) : null);
+  return token?.name ?? actor?.name ?? game.i18n.localize("BOT.ui.summary.notConfigured");
+}
+
+function getControlledToken() {
+  const controlled = canvas?.tokens?.controlled ?? [];
+  if (!controlled.length) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.selectMarkOwner"));
+    return null;
+  }
+  if (controlled.length > 1) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.selectSingleMarkOwner"));
+    return null;
+  }
+  return controlled[0] ?? null;
+}
+
+function getSingleUserTarget() {
+  const targetSet = game.user?.targets ?? new Set();
+  const targets = typeof targetSet.first === "function" ? [targetSet.first()].filter(Boolean) : [...targetSet];
+  if (!targets.length) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.targetNewCreature"));
+    return null;
+  }
+  if (targets.length > 1) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.targetSingleCreature"));
+    return null;
+  }
+  return targets[0] ?? null;
+}
+
+async function clearExistingBuffInstance(actor, activeBuff) {
+  if (!actor?.unsetFlag || !activeBuff) return;
+  const itemName = activeBuff.itemName;
+  await actor.unsetFlag(MODULE_ID, "activeBuff");
+  await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+  const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
+  for (const effect of mechEffects) await effect.delete();
+  await refreshBuffIndicator(actor, itemName, [], activeBuff);
+}
+
+async function moveStoredTarget(actor, activeBuff, newTargetToken) {
+  if (!actor?.setFlag || !activeBuff?.rememberTargetOnActivation || !newTargetToken?.actor) return false;
+  const previousFlag = foundry.utils.deepClone(activeBuff);
+  const previousName = getStoredTargetName(previousFlag);
+  const nextName = newTargetToken.name ?? newTargetToken.actor.name;
+  const updatedFlag = {
+    ...activeBuff,
+    targetTokenId: newTargetToken.id ?? null,
+    storedTargetTokenUuid: newTargetToken.document?.uuid ?? newTargetToken.uuid ?? null,
+    storedTargetActorUuid: newTargetToken.actor.uuid ?? null,
+  };
+
+  await actor.setFlag(MODULE_ID, "activeBuff", updatedFlag);
+  const nextFlag = actor.getFlag(MODULE_ID, "activeBuff") ?? updatedFlag;
+  await refreshStoredTargetIndicator(actor, previousFlag);
+  const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
+    ? fromUuidSync(nextFlag.originActorUuid)?.name ?? actor.name
+    : actor.name;
+  console.log(`[${MODULE_ID}] Cible mÃ©morisÃ©e changÃ©e : ${previousName} â†’ ${nextName}`);
+  console.log(`[${MODULE_ID}] Indicateur de marque ajoutÃ© sur ${nextName}, origine ${originName}`);
+  return true;
+}
+
+export async function changeStoredTarget() {
+  const ownerToken = getControlledToken();
+  if (!ownerToken?.actor) return false;
+
+  const newTargetToken = getSingleUserTarget();
+  if (!newTargetToken?.actor) return false;
+
+  const activeBuff = ownerToken.actor.getFlag(MODULE_ID, "activeBuff");
+  if (!activeBuff?.rememberTargetOnActivation) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.noActiveMarkFound"));
+    return false;
+  }
+
+  return moveStoredTarget(ownerToken.actor, activeBuff, newTargetToken);
+}
+
 async function clearConcentrationLinkedBuffs(sourceActor) {
   const sourceActorUuid = sourceActor?.uuid ?? null;
   const sourceActorId = sourceActor?.id ?? null;
@@ -341,11 +477,33 @@ export function registerTriggers() {
         const sourceActorName = workflow.actor.name;
         const shouldRememberTarget = targetMode === "target" || activeFlag.rememberTargetOnActivation === true;
         const selectedTargetToken = shouldRememberTarget ? getExactlyOneSelectedTarget() : null;
+        const existingBuffs = findExistingBuffInstances(activeFlag);
 
         if (shouldRememberTarget && !selectedTargetToken?.actor) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
           console.log(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
           return;
+        }
+
+        if (
+          activeFlag.storedTargetRecastBehavior === "moveStoredTarget"
+          && activeFlag.rememberTargetOnActivation === true
+          && existingBuffs.length
+        ) {
+          if (existingBuffs.length > 1) {
+            ui.notifications.warn(game.i18n.localize("BOT.notifications.multipleActiveMarksFound"));
+            console.log(`[${MODULE_ID}] DÃ©placement de marque annulÃ© â€” plusieurs marques compatibles`);
+            return;
+          }
+          await moveStoredTarget(existingBuffs[0].actor, existingBuffs[0].activeBuff, selectedTargetToken);
+          return;
+        }
+
+        if (existingBuffs.length) {
+          for (const existing of existingBuffs) {
+            await clearExistingBuffInstance(existing.actor, existing.activeBuff);
+          }
+          console.log(`[${MODULE_ID}] Ancien buff remplacÃ© : ${workflow.item.name}`);
         }
 
         if (targetMode === "target") {

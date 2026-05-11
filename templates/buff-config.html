@@ -32,6 +32,13 @@
         <label>{{localize "BOT.ui.storedTarget.requireStoredTargetMatch"}}</label>
         <input type="checkbox" name="requireStoredTargetMatch" {{#if flag.requireStoredTargetMatch}}checked{{/if}} />
       </div>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.storedTarget.recastBehavior.label"}}</label>
+        <select name="storedTargetRecastBehavior">
+          <option value="normal" {{#if flag.storedTargetRecastBehaviorNormal}}selected{{/if}}>{{localize "BOT.ui.storedTarget.recastBehavior.normal"}}</option>
+          <option value="moveStoredTarget" {{#if flag.storedTargetRecastBehaviorMoveStoredTarget}}selected{{/if}}>{{localize "BOT.ui.storedTarget.recastBehavior.moveStoredTarget"}}</option>
+        </select>
+      </div>
     </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.trigger.label"}}</label>

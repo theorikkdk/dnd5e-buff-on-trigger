@@ -1,6 +1,6 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON } from "./constants.js";
 import { syncItemDurationFlag } from "./duration.js";
-import { registerTriggers } from "./triggers.js";
+import { changeStoredTarget, registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 
 Hooks.once("init", () => {
@@ -49,6 +49,15 @@ Hooks.once("setup", () => {
 
 Hooks.once("ready", () => {
   console.log(`[${MODULE_ID}] Module ready`);
+  const module = game.modules.get(MODULE_ID);
+  if (module) {
+    module.api = {
+      ...(module.api ?? {}),
+      changeStoredTarget,
+    };
+  }
+
+  ensureChangeStoredTargetMacro();
   registerTriggers();
   registerItemSheetButton();
 
@@ -56,4 +65,19 @@ Hooks.once("ready", () => {
     await syncItemDurationFlag(item, options);
   });
 });
+
+async function ensureChangeStoredTargetMacro() {
+  if (!game.user?.isGM || !game.macros || typeof Macro === "undefined") return;
+  const name = game.i18n.localize("BOT.macro.changeStoredTarget.name");
+  const existing = game.macros.find((macro) => macro.flags?.[MODULE_ID]?.utility === "changeStoredTarget");
+  if (existing) return;
+
+  await Macro.create({
+    name,
+    type: "script",
+    command: `game.modules.get("${MODULE_ID}").api.changeStoredTarget();`,
+    img: STORED_TARGET_ICON,
+    flags: { [MODULE_ID]: { utility: "changeStoredTarget" } },
+  });
+}
 
