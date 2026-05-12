@@ -4,8 +4,9 @@
     <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
-  <section class="bot-preset-panel">
-    <div class="bot-preset-heading">{{localize "BOT.ui.presets.title"}}</div>
+  <details class="bot-preset-panel bot-collapsible-panel" open>
+    <summary class="bot-collapsible-summary bot-preset-summary">{{localize "BOT.ui.presets.title"}}</summary>
+    <div class="bot-preset-body">
     <p class="hint bot-preset-help">{{localize "BOT.ui.presets.help"}}</p>
     <div class="bot-preset-select-row">
       <label>{{localize "BOT.ui.presets.shortLabel"}}</label>
@@ -27,7 +28,8 @@
       <button type="button" class="bot-delete-preset-btn" data-bot-preset-action="delete" title="{{localize "BOT.ui.presets.deleteCustomTitle"}}" disabled>{{localize "BOT.ui.presets.deleteCustom"}}</button>
     </div>
     <p class="hint bot-preset-description" id="bot-preset-description">{{localize "BOT.ui.presets.selectHint"}}</p>
-  </section>
+    </div>
+  </details>
   <!-- Navigation par onglets -->
   <div class="bot-tabs">
     <button type="button" class="bot-tab-btn bot-tab-active" onclick="botShowTab(this,'bot-tab-trigger')">{{localize "BOT.ui.tabs.trigger"}}</button>
@@ -365,6 +367,8 @@
       </div>
 
       <div id="bot-subtab-combat" class="bot-subtab-panel">
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.generalAdvantages"}}</h4>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
           <select name="buffAttackMode">
@@ -389,7 +393,10 @@
             <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
         </div>
-        <div class="bot-row">
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.abilities"}}</h4>
+        <div class="bot-row bot-responsive-grid">
           <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.abilities.checkAdvantage"}}</label>
             <div class="bot-tag-picker">
@@ -415,7 +422,7 @@
             </div>
           </div>
         </div>
-        <div class="bot-row">
+        <div class="bot-row bot-responsive-grid">
           <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.abilities.saveAdvantage"}}</label>
             <div class="bot-tag-picker">
@@ -441,7 +448,10 @@
             </div>
           </div>
         </div>
-        <div class="bot-row">
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.fixedBonuses"}}</h4>
+        <div class="bot-row bot-responsive-grid">
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
             <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" class="bot-input-xs" />
@@ -451,9 +461,12 @@
             <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" class="bot-input-xs" />
           </div>
         </div>
+        </section>
       </div>
 
       <div id="bot-subtab-skills" class="bot-subtab-panel" style="display:none">
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.skillAdvantages"}}</h4>
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.skills.advantage"}}</label>
           <div class="bot-tag-picker">
@@ -466,7 +479,10 @@
             <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        <div class="bot-row">
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.skillBonuses"}}</h4>
+        <div class="bot-row bot-responsive-grid">
           <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.skills.bonus"}}</label>
             <div class="bot-tag-picker">
@@ -484,17 +500,26 @@
             <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" class="bot-input-full" />
           </div>
         </div>
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.allSkillBonus"}}</h4>
         <div class="form-group">
           <label>{{localize "BOT.ui.skills.bonusAll"}}</label>
           <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="{{localize "BOT.ui.skills.bonusAllPlaceholder"}}" />
         </div>
+        </section>
       </div>
 
       <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.armorClass"}}</h4>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.acBonus"}}</label>
           <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" class="bot-input-xs" />
         </div>
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.damageTraits"}}</h4>
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.resistances"}}</label>
           <div class="bot-tag-picker">
@@ -531,6 +556,9 @@
             <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.conditionTraits"}}</h4>
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.conditionImmunities"}}</label>
           <div class="bot-tag-picker">
@@ -543,6 +571,7 @@
             <input type="hidden" name="buffConditionImmunitiesList" id="hidden-buffConditionImmunitiesList" value="{{#each flag.conditionImmunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
+        </section>
       </div>
 
       <div id="bot-subtab-capacities" class="bot-subtab-panel" style="display:none">
