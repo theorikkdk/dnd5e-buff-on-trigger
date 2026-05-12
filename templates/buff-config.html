@@ -14,6 +14,7 @@
         {{/each}}
       </select>
       <button type="button" onclick="botApplyPreset(this)">{{localize "BOT.ui.presets.apply"}}</button>
+      <button type="button" onclick="botResetBuffConfig(this)">{{localize "BOT.ui.presets.reset"}}</button>
     </div>
     <p class="hint bot-preset-description" id="bot-preset-description">{{localize "BOT.ui.presets.selectHint"}}</p>
     <p class="hint bot-preset-warning">{{localize "BOT.ui.presets.warning"}}</p>
@@ -186,15 +187,29 @@
           </select>
         </div>
         <div class="bot-row bot-save-row">
+          <label class="bot-label-sm">{{localize "BOT.ui.saveTiming.label"}}</label>
+          <select name="saveTiming" class="bot-input-flex" onchange="botUpdateSaveTimingUI(this)">
+            <option value="trigger" {{#if flag.saveTimingTrigger}}selected{{/if}}>{{localize "BOT.ui.saveTiming.trigger"}}</option>
+            <option value="activation" {{#if flag.saveTimingActivation}}selected{{/if}}>{{localize "BOT.ui.saveTiming.activation"}}</option>
+            <option value="both" {{#if flag.saveTimingBoth}}selected{{/if}}>{{localize "BOT.ui.saveTiming.both"}}</option>
+          </select>
+        </div>
+        <p class="hint">{{localize "BOT.ui.saveTiming.help"}}</p>
+        <div class="bot-row bot-save-row">
           <div id="bot-save-dc-group" class="bot-save-dc-group" {{#unless flag.saveDcSourceFixed}}style="display:none"{{/unless}}>
             <label class="bot-label-sm">{{localize "BOT.ui.dc.label"}}</label>
             <input type="number" name="saveDC" value="{{flag.saveDC}}" placeholder="15" min="1" max="30" class="bot-input-xs" />
           </div>
-          <label class="bot-label-sm bot-save-success-label">{{localize "BOT.ui.success.label"}}</label>
-          <select name="saveEffect" class="bot-input-sm bot-save-effect-select">
+          <label class="bot-label-sm bot-save-success-label bot-save-trigger-control" {{#unless flag.showSaveTriggerEffect}}style="display:none"{{/unless}}>{{localize "BOT.ui.success.label"}}</label>
+          <select name="saveEffect" class="bot-input-sm bot-save-effect-select bot-save-trigger-control" {{#unless flag.showSaveTriggerEffect}}style="display:none"{{/unless}}>
             <option value="none" {{#if flag.saveEffectNone}}selected{{/if}}>{{localize "BOT.ui.saveEffect.none"}}</option>
             <option value="half" {{#if flag.saveEffectHalf}}selected{{/if}}>{{localize "BOT.ui.saveEffect.half"}}</option>
             <option value="full" {{#if flag.saveEffectFull}}selected{{/if}}>{{localize "BOT.ui.saveEffect.full"}}</option>
+          </select>
+          <label class="bot-label-sm bot-save-activation-control" {{#unless flag.showSaveActivationApply}}style="display:none"{{/unless}}>{{localize "BOT.ui.activationApplyOn.label"}}</label>
+          <select name="saveActivationApplyOn" class="bot-input-flex bot-save-activation-control" {{#unless flag.showSaveActivationApply}}style="display:none"{{/unless}}>
+            <option value="failure" {{#if flag.saveActivationApplyOnFailure}}selected{{/if}}>{{localize "BOT.ui.activationApplyOn.failure"}}</option>
+            <option value="success" {{#if flag.saveActivationApplyOnSuccess}}selected{{/if}}>{{localize "BOT.ui.activationApplyOn.success"}}</option>
           </select>
         </div>
       </div>

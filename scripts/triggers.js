@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
 
@@ -440,6 +440,48 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
   debugLog(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
 }
 
+function shouldRollActivationSave(flag) {
+  const timing = flag?.save?.timing ?? "trigger";
+  return !!flag?.save?.ability && (timing === "activation" || timing === "both");
+}
+
+async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetToken) {
+  if (!shouldRollActivationSave(activeFlag)) return true;
+
+  if (!targetToken?.actor) {
+    debugLog(`[${MODULE_ID}] JS d'activation ignoré : aucune cible claire`);
+    return true;
+  }
+
+  const saveDc = await resolveSaveDC(workflow, activeFlag);
+  if (saveDc === null) {
+    debugLog(`[${MODULE_ID}] JS d'activation ignoré : DD indisponible`);
+    return true;
+  }
+
+  const saveRolls = await targetToken.actor.rollSavingThrow(
+    {
+      ability: activeFlag.save.ability,
+      target: saveDc,
+      targetValue: saveDc,
+      dc: saveDc,
+    },
+    { configure: false },
+    { create: true }
+  );
+  const saveRoll = saveRolls?.[0] ?? null;
+  if (!saveRoll) {
+    debugLog(`[${MODULE_ID}] Buff non appliqué : JS d'activation indisponible`);
+    return false;
+  }
+
+  const success = saveRoll.total >= saveDc;
+  const applyOn = activeFlag.save.activationApplyOn ?? "failure";
+  const shouldApply = applyOn === "success" ? success : !success;
+  debugLog(`[${MODULE_ID}] JS d'activation ${activeFlag.save.ability} ${saveRoll.total} vs DD ${saveDc} — ${success ? "réussite" : "échec"} — buff ${shouldApply ? "appliqué" : "ignoré"}`);
+  return shouldApply;
+}
+
 export function registerTriggers() {
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
@@ -482,6 +524,12 @@ export function registerTriggers() {
         if (shouldRememberTarget && !selectedTargetToken?.actor) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
           debugLog(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
+          return;
+        }
+
+        const activationSaveTarget = targetMode === "target" ? selectedTargetToken : null;
+        if (!await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget)) {
+          debugLog(`[${MODULE_ID}] Activation annulée — JS d'activation non satisfait`);
           return;
         }
 
@@ -870,4 +918,3 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
     await refreshBuffIndicator(actor, flag.itemName, [], flag);
   }
 }
-

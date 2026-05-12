@@ -26,6 +26,13 @@ export const BUFF_PRESETS = [
         formula: "-1d4",
         rollTypes: ["attack", "save"],
       },
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "cha",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+      },
       consumeOnTrigger: false,
     },
   },
@@ -97,4 +104,3 @@ export const BUFF_PRESETS = [
     },
   },
 ];
-

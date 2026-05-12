@@ -158,6 +158,13 @@ function getSaveDcSourceLabel(source) {
   return game.i18n.localize(`BOT.ui.saveDcSource.${source ?? "fixed"}`);
 }
 
+function getSaveTimingLabel(timing) {
+  return game.i18n.localize(`BOT.ui.saveTiming.${timing ?? "trigger"}`);
+}
+
+function getActivationApplyOnLabel(value) {
+  return game.i18n.localize(`BOT.ui.activationApplyOn.${value ?? "failure"}`);
+}
 function getAbilityLabel(ability) {
   return ability ? game.i18n.localize(`BOT.abilities.${ability}`) : game.i18n.localize("BOT.ui.none");
 }
@@ -349,9 +356,17 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
 
   if (raw.save?.ability) {
     const saveDcSource = raw.save.dcSource ?? "fixed";
+    const saveTiming = raw.save.timing ?? "trigger";
+    const parts = [
+      game.i18n.localize(`BOT.abilities.${raw.save.ability}`),
+      saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource),
+      getSaveTimingLabel(saveTiming),
+    ];
+    if (saveTiming === "activation" || saveTiming === "both") parts.push(`${game.i18n.localize("BOT.ui.activationApplyOn.summary")} ${getActivationApplyOnLabel(raw.save.activationApplyOn)}`);
+    if (saveTiming === "trigger" || saveTiming === "both") parts.push(`${game.i18n.localize("BOT.ui.success.label")} ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`);
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
-      value: `${game.i18n.localize(`BOT.abilities.${raw.save.ability}`)} • ${saveDcSource === "fixed" ? `${getSaveDcSourceLabel("fixed")} ${raw.save.dc ?? game.i18n.localize("BOT.ui.summary.notConfigured")}` : getSaveDcSourceLabel(saveDcSource)} • ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`
+      value: parts.join(" • ")
     });
   } else {
     summary.push({
@@ -447,6 +462,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (triggerSelect) window.botUpdateTriggerUI(triggerSelect);
     const saveDcSourceSelect = this.element.querySelector?.('[name="saveDcSource"]');
     if (saveDcSourceSelect) window.botUpdateSaveDcUI(saveDcSourceSelect);
+    const saveTimingSelect = this.element.querySelector?.('[name="saveTiming"]');
+    if (saveTimingSelect) window.botUpdateSaveTimingUI(saveTimingSelect);
     const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]') ?? [];
     for (const input of formulaInputs) {
       input.addEventListener("focus", () => {
@@ -596,6 +613,13 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveDcSourceFixed:     (raw.save?.dcSource ?? "fixed") === "fixed",
       saveDcSourceOrigin:    raw.save?.dcSource === "origin",
       saveDcSourceOwner:     raw.save?.dcSource === "owner",
+      saveTimingTrigger:     (raw.save?.timing ?? "trigger") === "trigger",
+      saveTimingActivation:  raw.save?.timing === "activation",
+      saveTimingBoth:        raw.save?.timing === "both",
+      showSaveTriggerEffect: ["trigger", "both"].includes(raw.save?.timing ?? "trigger"),
+      showSaveActivationApply: ["activation", "both"].includes(raw.save?.timing ?? "trigger"),
+      saveActivationApplyOnFailure: (raw.save?.activationApplyOn ?? "failure") === "failure",
+      saveActivationApplyOnSuccess: raw.save?.activationApplyOn === "success",
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
       saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
       saveEffectFull:        raw.save?.effect === "full",
@@ -698,6 +722,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             ability: data.saveAbility,
             dc: Number(data.saveDC),
             dcSource: data.saveDcSource ?? "fixed",
+            timing: data.saveTiming ?? "trigger",
+            activationApplyOn: data.saveActivationApplyOn ?? "failure",
             effect: data.saveEffect
           } : null,
           status: data.statusId ? {
@@ -948,6 +974,8 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveAbility", flag.save?.ability ?? "");
   setFormValue(form, "saveDC", flag.save?.dc ?? 15);
   setFormValue(form, "saveDcSource", flag.save?.dcSource ?? "fixed");
+  setFormValue(form, "saveTiming", flag.save?.timing ?? "trigger");
+  setFormValue(form, "saveActivationApplyOn", flag.save?.activationApplyOn ?? "failure");
   setFormValue(form, "saveEffect", flag.save?.effect ?? "half");
 
   setFormValue(form, "statusId", flag.status?.id ?? "");
@@ -1000,6 +1028,7 @@ function applyPresetFlagToForm(form, flag) {
   window.botUpdateStoredTargetUI(form.querySelector('[name="targetMode"]'));
   window.botUpdateTriggerUI(form.querySelector('[name="type"]'));
   window.botUpdateSaveDcUI(form.querySelector('[name="saveDcSource"]'));
+  window.botUpdateSaveTimingUI(form.querySelector('[name="saveTiming"]'));
   window.botUpdateEffectSectionsUI(form);
   window.botUpdateRollModifierUI(form);
   updateSummaryFromFlag(form, flag);
@@ -1027,6 +1056,22 @@ window.botApplyPreset = function(buttonEl) {
   applyPresetFlagToForm(form, buildPresetConfig(preset));
   debugLog(`[${MODULE_ID}] Preset applied: ${preset.id}`);
 };
+
+window.botResetBuffConfig = function(buttonEl) {
+  const form = buttonEl.closest("form");
+  if (!form) return;
+
+  const confirmed = window.confirm(game.i18n.localize("BOT.ui.presets.confirmReset"));
+  if (!confirmed) return;
+
+  applyPresetFlagToForm(form, buildDefaultBuffConfig());
+  const presetSelect = form.querySelector?.('[name="presetId"]');
+  if (presetSelect) {
+    presetSelect.value = "";
+    window.botUpdatePresetDescription(presetSelect);
+  }
+  debugLog(`[${MODULE_ID}] Buff configuration reset`);
+};
 window.botShowTab = function(btn, tabId) {
   const form = btn.closest('form');
   form.querySelectorAll('.bot-tab-panel').forEach(p => p.style.display = 'none');
@@ -1035,6 +1080,25 @@ window.botShowTab = function(btn, tabId) {
   btn.classList.add('bot-tab-active');
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botUpdateSaveTimingUI = function(selectEl) {
+  const form = selectEl?.closest?.('form');
+  if (!form) return;
+
+  const timing = selectEl.value || "trigger";
+  const showTriggerControls = timing === "trigger" || timing === "both";
+  const showActivationControls = timing === "activation" || timing === "both";
+
+  form.querySelectorAll?.(".bot-save-trigger-control")?.forEach((el) => {
+    el.style.display = showTriggerControls ? "" : "none";
+  });
+  form.querySelectorAll?.(".bot-save-activation-control")?.forEach((el) => {
+    el.style.display = showActivationControls ? "" : "none";
+  });
+
+  const app = form?.__botApp ?? selectEl.closest?.(".application")?.__botApp;
   if (app) app.resizeToContent();
 };
 
