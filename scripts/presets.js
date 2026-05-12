@@ -488,4 +488,208 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "haste",
+    label: "BOT.presets.haste.label",
+    description: "BOT.presets.haste.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        ac: 2,
+        savingThrowAdvantages: ["dex"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "falseLife",
+    label: "BOT.presets.falseLife.label",
+    description: "BOT.presets.falseLife.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      temporaryHp: {
+        formula: "1d4 + 4 + ((@spellLevel - 1) * 5)",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEnergyAcid",
+    label: "BOT.presets.protectionFromEnergyAcid.label",
+    description: "BOT.presets.protectionFromEnergy.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        resistances: ["acid"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEnergyCold",
+    label: "BOT.presets.protectionFromEnergyCold.label",
+    description: "BOT.presets.protectionFromEnergy.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        resistances: ["cold"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEnergyFire",
+    label: "BOT.presets.protectionFromEnergyFire.label",
+    description: "BOT.presets.protectionFromEnergy.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        resistances: ["fire"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEnergyLightning",
+    label: "BOT.presets.protectionFromEnergyLightning.label",
+    description: "BOT.presets.protectionFromEnergy.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        resistances: ["lightning"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEnergyThunder",
+    label: "BOT.presets.protectionFromEnergyThunder.label",
+    description: "BOT.presets.protectionFromEnergy.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        resistances: ["thunder"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityBullsStrength",
+    label: "BOT.presets.enhanceAbilityBullsStrength.label",
+    description: "BOT.presets.enhanceAbilityBullsStrength.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        abilityCheckAdvantages: ["str"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityCatsGrace",
+    label: "BOT.presets.enhanceAbilityCatsGrace.label",
+    description: "BOT.presets.enhanceAbilityCatsGrace.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        abilityCheckAdvantages: ["dex"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityBearsEndurance",
+    label: "BOT.presets.enhanceAbilityBearsEndurance.label",
+    description: "BOT.presets.enhanceAbilityBearsEndurance.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      temporaryHp: {
+        formula: "2d6",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      buffs: {
+        abilityCheckAdvantages: ["con"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityEaglesSplendor",
+    label: "BOT.presets.enhanceAbilityEaglesSplendor.label",
+    description: "BOT.presets.enhanceAbilityEaglesSplendor.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        abilityCheckAdvantages: ["cha"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityFoxsCunning",
+    label: "BOT.presets.enhanceAbilityFoxsCunning.label",
+    description: "BOT.presets.enhanceAbilityFoxsCunning.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        abilityCheckAdvantages: ["int"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "enhanceAbilityOwlsWisdom",
+    label: "BOT.presets.enhanceAbilityOwlsWisdom.label",
+    description: "BOT.presets.enhanceAbilityOwlsWisdom.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        abilityCheckAdvantages: ["wis"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
