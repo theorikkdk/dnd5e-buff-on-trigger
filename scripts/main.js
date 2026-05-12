@@ -13,6 +13,13 @@ Hooks.once("init", () => {
     default: false,
   });
 
+  game.settings.register(MODULE_ID, "customPresets", {
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {},
+  });
+
   game.settings.register(MODULE_ID, "bonusDamageCriticalMode", {
     name: "BOT.settings.bonusDamageCriticalMode.name",
     hint: "BOT.settings.bonusDamageCriticalMode.hint",

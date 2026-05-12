@@ -1,23 +1,32 @@
-﻿  <!-- En-tête toujours visible -->
+  <!-- En-tête toujours visible -->
 <div class="buff-on-trigger-config">
   <div class="form-group">
     <label>{{localize "BOT.ui.enable"}}</label>
     <input type="checkbox" name="enabled" {{#if flag.type}}checked{{/if}} />
   </div>
   <section class="bot-preset-panel">
-    <div class="bot-preset-row">
-      <label>{{localize "BOT.ui.presets.load"}}</label>
-      <select name="presetId" onchange="botUpdatePresetDescription(this)">
+    <div class="bot-preset-heading">{{localize "BOT.ui.presets.title"}}</div>
+    <p class="hint bot-preset-help">{{localize "BOT.ui.presets.help"}}</p>
+    <div class="bot-preset-select-row">
+      <label>{{localize "BOT.ui.presets.shortLabel"}}</label>
+      <select name="presetId" onchange="botUpdatePresetDescription(this); botUpdatePresetActions(this)">
         <option value="">{{localize "BOT.ui.presets.none"}}</option>
         {{#each presets}}
-          <option value="{{id}}" data-description="{{description}}">{{label}}</option>
+          <option value="{{id}}" data-description="{{description}}" data-source="{{source}}">{{label}}</option>
         {{/each}}
       </select>
-      <button type="button" onclick="botApplyPreset(this)">{{localize "BOT.ui.presets.apply"}}</button>
-      <button type="button" onclick="botResetBuffConfig(this)">{{localize "BOT.ui.presets.reset"}}</button>
+    </div>
+    <div class="bot-preset-actions bot-preset-main-actions">
+      <button type="button" data-bot-preset-action="apply" title="{{localize "BOT.ui.presets.applyTitle"}}">{{localize "BOT.ui.presets.apply"}}</button>
+      <button type="button" data-bot-preset-action="reset" title="{{localize "BOT.ui.presets.resetTitle"}}">{{localize "BOT.ui.presets.reset"}}</button>
+    </div>
+    <div class="bot-preset-actions bot-preset-custom-actions">
+      <button type="button" data-bot-preset-action="save" title="{{localize "BOT.ui.presets.saveCustomTitle"}}">{{localize "BOT.ui.presets.saveCustom"}}</button>
+      <button type="button" data-bot-preset-action="export" title="{{localize "BOT.ui.presets.exportCustomTitle"}}">{{localize "BOT.ui.presets.exportCustom"}}</button>
+      <button type="button" data-bot-preset-action="import" title="{{localize "BOT.ui.presets.importCustomTitle"}}">{{localize "BOT.ui.presets.importCustom"}}</button>
+      <button type="button" class="bot-delete-preset-btn" data-bot-preset-action="delete" title="{{localize "BOT.ui.presets.deleteCustomTitle"}}" disabled>{{localize "BOT.ui.presets.deleteCustom"}}</button>
     </div>
     <p class="hint bot-preset-description" id="bot-preset-description">{{localize "BOT.ui.presets.selectHint"}}</p>
-    <p class="hint bot-preset-warning">{{localize "BOT.ui.presets.warning"}}</p>
   </section>
   <!-- Navigation par onglets -->
   <div class="bot-tabs">

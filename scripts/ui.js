@@ -483,6 +483,21 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (statusSelect) statusSelect.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const targetModeSelect = this.element.querySelector?.('[name="targetMode"]');
     if (targetModeSelect) window.botUpdateStoredTargetUI(targetModeSelect);
+    const presetSelect = this.element.querySelector?.('[name="presetId"]');
+    if (presetSelect) window.botUpdatePresetActions(presetSelect);
+    this.element.querySelectorAll?.('[data-bot-preset-action]')?.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const action = button.dataset.botPresetAction;
+        if (action === "apply") window.botApplyPreset(button);
+        else if (action === "reset") window.botResetBuffConfig(button);
+        else if (action === "save") window.botSaveCustomPreset(button);
+        else if (action === "export") window.botExportCustomPresets(button);
+        else if (action === "import") window.botImportCustomPresets(button);
+        else if (action === "delete") window.botDeleteCustomPreset(button);
+      });
+    });
     this.element.querySelectorAll?.('.bot-collapsible-panel')?.forEach((panel) => {
       panel.addEventListener("toggle", () => this.resizeToContent());
     });
@@ -504,11 +519,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const armorProfLabels = getArmorProfLabels();
     const languageLabels = getLanguageLabels();
     const statusOptions = getStatusOptions(raw.status?.id ?? null);
-    const presets = BUFF_PRESETS.map((preset) => ({
-      id: preset.id,
-      label: game.i18n.localize(preset.label),
-      description: game.i18n.localize(preset.description),
-    }));
+    const presets = getPresetOptions();
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const labels = {
       skills: skillLabels,
@@ -782,8 +793,187 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
   }
 }
 
+function getCustomPresets() {
+  try {
+    const presets = game.settings.get(MODULE_ID, "customPresets") ?? {};
+    return isPlainObject(presets) ? presets : {};
+  } catch {
+    return {};
+  }
+}
+
+function getBuiltInPresets() {
+  return BUFF_PRESETS.map((preset) => ({ ...preset, source: "builtIn" }));
+}
+
+function getAllPresets() {
+  const customPresets = Object.values(getCustomPresets())
+    .filter((preset) => preset?.label && isPlainObject(preset.flag))
+    .map((preset) => ({ ...preset, source: "custom" }));
+  return [...getBuiltInPresets(), ...customPresets];
+}
+
+function getPresetOptions() {
+  return getAllPresets().map((preset) => {
+    const label = preset.source === "custom"
+      ? game.i18n.format("BOT.ui.presets.customPrefix", { label: preset.label })
+      : game.i18n.localize(preset.label);
+    const description = preset.source === "custom"
+      ? (preset.description ?? "")
+      : game.i18n.localize(preset.description);
+    return {
+      id: preset.id,
+      label,
+      description,
+      source: preset.source,
+    };
+  });
+}
+
+function getUniqueCustomPresetId(baseLabel = "preset", existing = getCustomPresets()) {
+  const slug = String(baseLabel)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    || "preset";
+  let id = `custom-${slug}`;
+  let index = 2;
+  while (existing[id] || BUFF_PRESETS.some((preset) => preset.id === id)) {
+    id = `custom-${slug}-${index}`;
+    index += 1;
+  }
+  return id;
+}
+
+function readFormValue(form, name, fallback = "") {
+  const field = form?.querySelector?.(`[name="${name}"]`);
+  if (!field) return fallback;
+  if (field.type === "checkbox") return field.checked;
+  return field.value ?? fallback;
+}
+
+function readNumberFormValue(form, name) {
+  const value = String(readFormValue(form, name, "")).trim();
+  return value ? Number(value) : null;
+}
+
+function readCsvFormValue(form, name) {
+  return String(readFormValue(form, name, ""))
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function buildBuffConfigFromForm(form) {
+  const rollTypes = [
+    readFormValue(form, "rollModifierAttack") ? "attack" : null,
+    readFormValue(form, "rollModifierSave") ? "save" : null,
+    readFormValue(form, "rollModifierAbility") ? "ability" : null,
+    readFormValue(form, "rollModifierSkill") ? "skill" : null,
+  ].filter(Boolean);
+  const damageFormula = String(readFormValue(form, "damageFormula", "")).trim();
+  const healingFormula = String(readFormValue(form, "healingFormula", "")).trim();
+  const temporaryHpFormula = String(readFormValue(form, "temporaryHpFormula", "")).trim();
+  const rollModifierFormula = String(readFormValue(form, "rollModifierFormula", "")).trim();
+  const saveAbility = String(readFormValue(form, "saveAbility", "")).trim();
+  const statusId = String(readFormValue(form, "statusId", "")).trim();
+  const speedValue = readNumberFormValue(form, "buffSpeed");
+
+  return mergeBuffConfig(buildDefaultBuffConfig(), {
+    targetMode: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")),
+    rememberTargetOnActivation: !!readFormValue(form, "rememberTargetOnActivation"),
+    requireStoredTargetMatch: !!readFormValue(form, "requireStoredTargetMatch"),
+    type: readFormValue(form, "type", "passive"),
+    condition: readFormValue(form, "condition", "hit"),
+    receivedAttackType: readFormValue(form, "receivedAttackType", "any"),
+    receivedDamageTypes: readCsvFormValue(form, "receivedDamageTypesList"),
+    consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
+    triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
+    charges: readNumberFormValue(form, "charges"),
+    damage: damageFormula ? {
+      formula: damageFormula,
+      type: readFormValue(form, "damageType", "") || null,
+      targetMode: readFormValue(form, "damageTargetMode", "triggerTarget"),
+    } : null,
+    save: saveAbility ? {
+      ability: saveAbility,
+      dc: Number(readFormValue(form, "saveDC", 15)),
+      dcSource: readFormValue(form, "saveDcSource", "fixed"),
+      timing: readFormValue(form, "saveTiming", "trigger"),
+      activationApplyOn: readFormValue(form, "saveActivationApplyOn", "failure"),
+      effect: readFormValue(form, "saveEffect", "half"),
+    } : null,
+    status: statusId ? {
+      id: statusId,
+      targetMode: readFormValue(form, "statusTargetMode", "triggerTarget"),
+      applyCondition: readFormValue(form, "statusApplyCondition", "always"),
+    } : null,
+    healing: readFormValue(form, "healingEnabled") && healingFormula ? {
+      formula: healingFormula,
+      targetMode: normalizeHealingTargetMode(readFormValue(form, "healingTargetMode", "triggerTarget")),
+    } : null,
+    temporaryHp: readFormValue(form, "temporaryHpEnabled") && temporaryHpFormula ? {
+      formula: temporaryHpFormula,
+      targetMode: normalizeTemporaryHpTargetMode(readFormValue(form, "temporaryHpTargetMode", "triggerTarget")),
+      mode: readFormValue(form, "temporaryHpMode", "keepHighest"),
+    } : null,
+    rollModifier: readFormValue(form, "rollModifierEnabled") && rollModifierFormula ? {
+      enabled: true,
+      formula: rollModifierFormula,
+      rollTypes,
+    } : null,
+    buffs: {
+      ac: readNumberFormValue(form, "buffAC"),
+      attackMode: readFormValue(form, "buffAttackMode", "none") !== "none" ? readFormValue(form, "buffAttackMode") : null,
+      saveMode: readFormValue(form, "buffSaveMode", "none") !== "none" ? readFormValue(form, "buffSaveMode") : null,
+      skillMode: readFormValue(form, "buffSkillMode", "none") !== "none" ? readFormValue(form, "buffSkillMode") : null,
+      skills: readCsvFormValue(form, "buffSkillAdvantageList"),
+      skillBonusSkills: readCsvFormValue(form, "buffSkillBonusList"),
+      skillBonus: readFormValue(form, "buffSkillBonus", "") || null,
+      skillBonusAll: readFormValue(form, "buffSkillBonusAll", "") || null,
+      saveBonus: readFormValue(form, "buffSaveBonus", "") || null,
+      attackBonus: readFormValue(form, "buffAttackBonus", "") || null,
+      speed: speedValue ? { value: speedValue, type: readFormValue(form, "buffSpeedType", "walk") } : null,
+      weaponProfs: readCsvFormValue(form, "buffWeaponProfsList"),
+      armorProfs: readCsvFormValue(form, "buffArmorProfsList"),
+      languages: readCsvFormValue(form, "buffLanguagesList"),
+      darkvision: readNumberFormValue(form, "buffDarkvision"),
+      blindsight: readNumberFormValue(form, "buffBlindSight"),
+      tremorsense: readNumberFormValue(form, "buffTremorSense"),
+      truesight: readNumberFormValue(form, "buffTrueSight"),
+      sensesSpecial: readFormValue(form, "buffSensesSpecial", "") || null,
+      passivePerception: readNumberFormValue(form, "buffPassivePerception"),
+      resistances: readCsvFormValue(form, "buffResistancesList"),
+      vulnerabilities: readCsvFormValue(form, "buffVulnsList"),
+      immunities: readCsvFormValue(form, "buffImmunitiesList"),
+    },
+  });
+}
+
+function refreshPresetSelect(form, selectedId = "") {
+  const select = form?.querySelector?.('[name="presetId"]');
+  if (!select) return;
+  select.replaceChildren();
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = game.i18n.localize("BOT.ui.presets.none");
+  select.appendChild(empty);
+  for (const preset of getPresetOptions()) {
+    const option = document.createElement("option");
+    option.value = preset.id;
+    option.dataset.description = preset.description ?? "";
+    option.dataset.source = preset.source ?? "builtIn";
+    option.textContent = preset.label;
+    select.appendChild(option);
+  }
+  select.value = selectedId;
+  window.botUpdatePresetDescription(select);
+  window.botUpdatePresetActions(select);
+}
 function getPresetById(id) {
-  return BUFF_PRESETS.find((preset) => preset.id === id) ?? null;
+  return getAllPresets().find((preset) => preset.id === id) ?? null;
 }
 
 function clonePresetFlag(preset) {
@@ -1045,6 +1235,203 @@ window.botUpdatePresetDescription = function(selectEl) {
   if (descriptionEl) descriptionEl.textContent = description;
 };
 
+window.botUpdatePresetActions = function(selectEl) {
+  const form = selectEl?.closest?.("form");
+  const deleteButton = form?.querySelector?.(".bot-delete-preset-btn");
+  if (!deleteButton) return;
+  deleteButton.disabled = selectEl?.selectedOptions?.[0]?.dataset?.source !== "custom";
+};
+
+async function promptCustomPresetData() {
+  if (!globalThis.Dialog) {
+    const label = window.prompt(game.i18n.localize("BOT.ui.presets.promptName"));
+    if (!label?.trim()) return null;
+    const description = window.prompt(game.i18n.localize("BOT.ui.presets.promptDescription")) ?? "";
+    return { label: label.trim(), description: description.trim() };
+  }
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+    const content = `
+      <form class="bot-custom-preset-dialog">
+        <div class="form-group">
+          <label>${game.i18n.localize("BOT.ui.presets.promptName")}</label>
+          <input type="text" name="label" autofocus />
+        </div>
+        <div class="form-group">
+          <label>${game.i18n.localize("BOT.ui.presets.promptDescription")}</label>
+          <input type="text" name="description" />
+        </div>
+      </form>`;
+    new Dialog({
+      title: game.i18n.localize("BOT.ui.presets.saveDialogTitle"),
+      content,
+      buttons: {
+        save: {
+          label: game.i18n.localize("BOT.ui.presets.saveCustom"),
+          callback: (html) => {
+            const root = html?.[0] ?? html;
+            const label = root?.querySelector?.('[name="label"]')?.value?.trim() ?? "";
+            if (!label) return finish(null);
+            const description = root?.querySelector?.('[name="description"]')?.value?.trim() ?? "";
+            finish({ label, description });
+          },
+        },
+        cancel: {
+          label: game.i18n.localize("BOT.ui.presets.cancel"),
+          callback: () => finish(null),
+        },
+      },
+      default: "save",
+      close: () => finish(null),
+    }).render(true);
+  });
+}
+
+window.botSaveCustomPreset = async function(buttonEl) {
+  try {
+    const form = buttonEl.closest("form");
+    if (!form) return;
+
+    const presetData = await promptCustomPresetData();
+    if (!presetData) return;
+
+    const customPresets = foundry.utils.deepClone(getCustomPresets());
+    const id = getUniqueCustomPresetId(presetData.label, customPresets);
+    customPresets[id] = {
+      id,
+      label: presetData.label,
+      description: presetData.description,
+      flag: buildBuffConfigFromForm(form),
+      source: "custom",
+    };
+    await game.settings.set(MODULE_ID, "customPresets", customPresets);
+    refreshPresetSelect(form, id);
+    ui.notifications.info(game.i18n.localize("BOT.notifications.customPresetSaved"));
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans botSaveCustomPreset :`, error);
+  }
+};
+function downloadPresetJson(payload) {
+  const filename = "dnd5e-buff-on-trigger-presets.json";
+  if (typeof globalThis.saveDataToFile === "function") {
+    globalThis.saveDataToFile(payload, "application/json", filename);
+    return;
+  }
+
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+window.botExportCustomPresets = function() {
+  try {
+    const presets = Object.values(getCustomPresets()).filter((preset) => preset?.label && isPlainObject(preset.flag));
+    if (!presets.length) {
+      ui.notifications.info(game.i18n.localize("BOT.notifications.noCustomPresetsToExport"));
+      return;
+    }
+
+    const payload = JSON.stringify({ module: MODULE_ID, version: "1", presets }, null, 2);
+    downloadPresetJson(payload);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans botExportCustomPresets :`, error);
+  }
+};
+function normalizeImportedPreset(preset, existing) {
+  if (!preset?.label || !isPlainObject(preset.flag)) return null;
+  const id = getUniqueCustomPresetId(preset.id ?? preset.label, existing);
+  return {
+    id,
+    label: String(preset.label),
+    description: String(preset.description ?? ""),
+    flag: mergeBuffConfig(buildDefaultBuffConfig(), preset.flag),
+    source: "custom",
+  };
+}
+
+function readJsonFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result ?? "")), { once: true });
+    reader.addEventListener("error", () => reject(reader.error), { once: true });
+    reader.readAsText(file);
+  });
+}
+
+window.botImportCustomPresets = function(buttonEl) {
+  const form = buttonEl.closest("form");
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json,application/json";
+  input.style.display = "none";
+  document.body.appendChild(input);
+  input.addEventListener("cancel", () => input.remove(), { once: true });
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    input.remove();
+    if (!file) return;
+    try {
+      const text = await readJsonFile(file);
+      const data = JSON.parse(text);
+      if (data.module && data.module !== MODULE_ID) {
+        ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportWrongModule"));
+        return;
+      }
+      if (!Array.isArray(data.presets)) {
+        ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));
+        return;
+      }
+
+      const customPresets = foundry.utils.deepClone(getCustomPresets());
+      let importedCount = 0;
+      for (const preset of data.presets) {
+        const normalized = normalizeImportedPreset(preset, customPresets);
+        if (!normalized) continue;
+        customPresets[normalized.id] = normalized;
+        importedCount += 1;
+      }
+      await game.settings.set(MODULE_ID, "customPresets", customPresets);
+      refreshPresetSelect(form);
+      ui.notifications.info(game.i18n.format("BOT.notifications.customPresetImported", { count: importedCount }));
+    } catch (error) {
+      console.warn(`[${MODULE_ID}] Import de presets invalide`, error);
+      ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));
+    }
+  }, { once: true });
+  input.click();
+};
+window.botDeleteCustomPreset = async function(buttonEl) {
+  const form = buttonEl.closest("form");
+  const select = form?.querySelector?.('[name="presetId"]');
+  const id = select?.value;
+  const preset = getPresetById(id);
+  if (!preset) return;
+  if (preset.source !== "custom") {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.builtInPresetCannotDelete"));
+    return;
+  }
+  const confirmed = window.confirm(game.i18n.format("BOT.ui.presets.confirmDelete", { name: preset.label }));
+  if (!confirmed) return;
+
+  const customPresets = foundry.utils.deepClone(getCustomPresets());
+  delete customPresets[id];
+  await game.settings.set(MODULE_ID, "customPresets", customPresets);
+  refreshPresetSelect(form);
+  ui.notifications.info(game.i18n.format("BOT.notifications.customPresetDeleted", { name: preset.label }));
+};
 window.botApplyPreset = function(buttonEl) {
   const form = buttonEl.closest("form");
   const select = form?.querySelector?.('[name="presetId"]');
@@ -1072,6 +1459,7 @@ window.botResetBuffConfig = function(buttonEl) {
   if (presetSelect) {
     presetSelect.value = "";
     window.botUpdatePresetDescription(presetSelect);
+    window.botUpdatePresetActions(presetSelect);
   }
   debugLog(`[${MODULE_ID}] Buff configuration reset`);
 };

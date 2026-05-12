@@ -46,20 +46,48 @@
   background: var(--color-bg-option, rgba(0, 0, 0, 0.03));
 }
 
-.bot-preset-row {
+.bot-preset-heading {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.bot-preset-help {
+  margin: 0 0 8px;
+}
+
+.bot-preset-select-row {
   display: grid;
-  grid-template-columns: minmax(120px, max-content) 1fr max-content;
+  grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
 }
 
-.bot-preset-row label {
+.bot-preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bot-preset-actions button {
+  flex: 0 1 auto;
+  min-width: 88px;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.bot-preset-main-actions button {
+  min-width: 104px;
+}
+
+.bot-preset-select-row label {
   font-weight: 700;
 }
 
-.bot-preset-description,
-.bot-preset-warning {
-  margin: 6px 0 0;
+.bot-preset-description {
+  margin: 8px 0 0;
+  max-height: 3.5em;
+  overflow: auto;
 }
 
 .buff-on-trigger-config label {
