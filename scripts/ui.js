@@ -164,6 +164,10 @@ function getStatusApplyConditionLabel(condition) {
   return game.i18n.localize(`BOT.ui.status.applyCondition.${condition ?? "always"}`);
 }
 
+function getStatusTimingLabel(timing) {
+  return game.i18n.localize(`BOT.ui.status.timing.${timing ?? "trigger"}`);
+}
+
 function getSaveDcSourceLabel(source) {
   return game.i18n.localize(`BOT.ui.saveDcSource.${source ?? "fixed"}`);
 }
@@ -424,7 +428,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (raw.status?.id) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.status"),
-      value: labels.statuses?.[raw.status.id] ?? raw.status.id
+      value: `${labels.statuses?.[raw.status.id] ?? raw.status.id}, ${getStatusTimingLabel(raw.status.timing)}`
     });
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.statusTarget"),
@@ -711,6 +715,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTargetModeAttacker: normalizeDamageTargetMode(raw.damage?.targetMode) === "attacker",
       damageTargetModeStoredTarget: normalizeDamageTargetMode(raw.damage?.targetMode) === "storedTarget",
       statusOptions,
+      statusTimingTrigger:      (raw.status?.timing ?? "trigger") === "trigger",
+      statusTimingActivation:   raw.status?.timing === "activation",
+      statusTimingBoth:         raw.status?.timing === "both",
       statusTargetModeTriggerTarget: (raw.status?.targetMode ?? "triggerTarget") === "triggerTarget",
       statusTargetModeSelf: raw.status?.targetMode === "self",
       statusTargetModeAttacker: raw.status?.targetMode === "attacker",
@@ -810,6 +817,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
           } : null,
           status: data.statusId ? {
             id: data.statusId,
+            timing: data.statusTiming ?? "trigger",
             ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {}),
             applyCondition: data.statusApplyCondition ?? "always"
           } : null,
@@ -982,6 +990,7 @@ function buildBuffConfigFromForm(form) {
     } : null,
     status: statusId ? {
       id: statusId,
+      timing: readFormValue(form, "statusTiming", "trigger"),
       targetMode: readFormValue(form, "statusTargetMode", "triggerTarget"),
       applyCondition: readFormValue(form, "statusApplyCondition", "always"),
     } : null,
@@ -1263,6 +1272,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveEffect", flag.save?.effect ?? "half");
 
   setFormValue(form, "statusId", flag.status?.id ?? "");
+  setFormValue(form, "statusTiming", flag.status?.timing ?? "trigger");
   setFormValue(form, "statusTargetMode", flag.status?.targetMode ?? "triggerTarget");
   setFormValue(form, "statusApplyCondition", flag.status?.applyCondition ?? "always");
 
@@ -1697,9 +1707,13 @@ window.botUpdateEffectSectionsUI = function(form) {
     temporaryHpDetails.style.display = temporaryHpEnabled.checked ? "" : "none";
   }
 
+  const statusTimingRow = form.querySelector('#bot-status-timing-row');
   const statusTargetRow = form.querySelector('#bot-status-target-row');
   const statusApplyConditionRow = form.querySelector('#bot-status-apply-condition-row');
   const statusSelect = form.querySelector('[name="statusId"]');
+  if (statusTimingRow && statusSelect) {
+    statusTimingRow.style.display = statusSelect.value ? "" : "none";
+  }
   if (statusTargetRow && statusSelect) {
     statusTargetRow.style.display = statusSelect.value ? "" : "none";
   }

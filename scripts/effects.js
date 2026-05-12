@@ -1791,7 +1791,7 @@ export async function applyBonusDamage(workflow, flag) {
   }
 }
 
-export async function applyStatusEffect(workflow, flag) {
+export async function applyStatusEffect(workflow, flag, options = {}) {
   try {
     let targets = resolveStatusTargets(workflow, flag);
 
@@ -1830,7 +1830,7 @@ export async function applyStatusEffect(workflow, flag) {
       debugLog(`[${MODULE_ID}] Statut ${statusId} appliquÃ© sur ${targetActor.name}`);
     }
 
-    if (!flag.damage) await consumeOrDecrementCharges(workflow, flag, targets);
+    if (!flag.damage && options.skipConsume !== true) await consumeOrDecrementCharges(workflow, flag, targets);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyStatusEffect :`, error);
   }
@@ -1951,7 +1951,8 @@ export async function applyTemporaryHp(workflow, flag, options = {}) {
 
 export async function applyEffect(workflow, flag) {
   const shouldApplyTemporaryHpOnTrigger = !!flag.temporaryHp && ["trigger", "both"].includes(flag.temporaryHp?.timing ?? "trigger");
-  if (!flag.damage && !flag.status && !flag.healing && !shouldApplyTemporaryHpOnTrigger) {
+  const shouldApplyStatusOnTrigger = !!flag.status && ["trigger", "both"].includes(flag.status?.timing ?? "trigger");
+  if (!flag.damage && !shouldApplyStatusOnTrigger && !flag.healing && !shouldApplyTemporaryHpOnTrigger) {
     debugLog(`[${MODULE_ID}] Aucun effet configurÃ© dans le flag`);
     return false;
   }
@@ -1975,13 +1976,13 @@ export async function applyEffect(workflow, flag) {
 
   const shouldResolveSaveBeforeEffects = !!flag.save?.ability
     && (flag.save?.timing ?? "trigger") !== "activation"
-    && (!!flag.damage || (flag.status && (flag.status?.applyCondition ?? "always") !== "always"));
+    && (!!flag.damage || (shouldApplyStatusOnTrigger && (flag.status?.applyCondition ?? "always") !== "always"));
   if (shouldResolveSaveBeforeEffects) {
     await resolveConfiguredSavingThrows(workflow, flag);
   }
 
   if (flag.damage) await applyBonusDamage(workflow, flag);
-  if (flag.status) await applyStatusEffect(workflow, flag);
+  if (shouldApplyStatusOnTrigger) await applyStatusEffect(workflow, flag);
   if (flag.healing) await applyBonusHealing(workflow, flag);
   if (shouldApplyTemporaryHpOnTrigger) await applyTemporaryHp(workflow, flag);
   return true;

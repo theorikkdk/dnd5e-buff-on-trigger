@@ -261,6 +261,14 @@
             <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
           </select>
         </div>
+        <div class="bot-row" id="bot-status-timing-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+          <label class="bot-label-sm">{{localize "BOT.ui.status.timing.label"}}</label>
+          <select name="statusTiming" class="bot-input-flex">
+            <option value="trigger" {{#if flag.statusTimingTrigger}}selected{{/if}}>{{localize "BOT.ui.status.timing.trigger"}}</option>
+            <option value="activation" {{#if flag.statusTimingActivation}}selected{{/if}}>{{localize "BOT.ui.status.timing.activation"}}</option>
+            <option value="both" {{#if flag.statusTimingBoth}}selected{{/if}}>{{localize "BOT.ui.status.timing.both"}}</option>
+          </select>
+        </div>
         <div class="bot-row" id="bot-status-apply-condition-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
           <label class="bot-label-sm">{{localize "BOT.ui.status.applyCondition.label"}}</label>
           <select name="statusApplyCondition" class="bot-input-flex">

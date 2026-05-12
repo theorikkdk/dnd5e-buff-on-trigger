@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
 
@@ -393,6 +393,35 @@ async function applyActivationTemporaryHp(carrierActor, carrierToken, activeFlag
   };
   await applyTemporaryHp(workflow, activeFlag, { skipConsume: true });
 }
+
+function getTokenResolutionKey(token) {
+  return token?.document?.uuid ?? token?.uuid ?? token?.id ?? null;
+}
+
+async function applyActivationStatus(carrierActor, carrierToken, activeFlag, sourceWorkflow, activationSaveResults) {
+  if (!activeFlag?.status?.id) return;
+  if (!["activation", "both"].includes(activeFlag.status?.timing ?? "trigger")) return;
+
+  const token = carrierToken
+    ?? sourceWorkflow?.token
+    ?? carrierActor?.getActiveTokens?.()?.[0]
+    ?? null;
+  if (!token?.actor) {
+    debugLog(`[${MODULE_ID}] Statut d'activation ignoré : aucune cible claire`);
+    return;
+  }
+
+  const workflow = {
+    ...sourceWorkflow,
+    actor: carrierActor,
+    token,
+    targets: new Set([token]),
+    hitTargets: new Set([token]),
+    missedTargets: new Set(),
+    _botSaveResults: activationSaveResults ?? null,
+  };
+  await applyStatusEffect(workflow, activeFlag, { skipConsume: true });
+}
 async function clearExistingBuffInstance(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
@@ -511,17 +540,17 @@ function shouldRollActivationSave(flag) {
 }
 
 async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetToken) {
-  if (!shouldRollActivationSave(activeFlag)) return true;
+  if (!shouldRollActivationSave(activeFlag)) return { shouldApply: true, saveResults: null };
 
   if (!targetToken?.actor) {
     debugLog(`[${MODULE_ID}] JS d'activation ignoré : aucune cible claire`);
-    return true;
+    return { shouldApply: true, saveResults: null };
   }
 
   const saveDc = await resolveSaveDC(workflow, activeFlag);
   if (saveDc === null) {
     debugLog(`[${MODULE_ID}] JS d'activation ignoré : DD indisponible`);
-    return true;
+    return { shouldApply: true, saveResults: null };
   }
 
   const saveRolls = await targetToken.actor.rollSavingThrow(
@@ -537,14 +566,25 @@ async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetTo
   const saveRoll = saveRolls?.[0] ?? null;
   if (!saveRoll) {
     debugLog(`[${MODULE_ID}] Buff non appliqué : JS d'activation indisponible`);
-    return false;
+    return { shouldApply: false, saveResults: null };
   }
 
   const success = saveRoll.total >= saveDc;
   const applyOn = activeFlag.save.activationApplyOn ?? "failure";
   const shouldApply = applyOn === "success" ? success : !success;
+  const tokenKey = getTokenResolutionKey(targetToken);
+  const saveResults = {
+    successes: new Set(),
+    failures: new Set(),
+    resolvedCount: tokenKey ? 1 : 0,
+    dc: saveDc,
+  };
+  if (tokenKey) {
+    if (success) saveResults.successes.add(tokenKey);
+    else saveResults.failures.add(tokenKey);
+  }
   debugLog(`[${MODULE_ID}] JS d'activation ${activeFlag.save.ability} ${saveRoll.total} vs DD ${saveDc} — ${success ? "réussite" : "échec"} — buff ${shouldApply ? "appliqué" : "ignoré"}`);
-  return shouldApply;
+  return { shouldApply, saveResults };
 }
 
 export function registerTriggers() {
@@ -600,7 +640,8 @@ export function registerTriggers() {
 
         const selfToken = workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? { actor: workflow.actor };
         const activationSaveTarget = effectiveTargetMode === "target" ? selectedTargetToken : (shouldFallbackToSelf ? selfToken : null);
-        if (!await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget)) {
+        const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
+        if (!activationSave.shouldApply) {
           debugLog(`[${MODULE_ID}] Activation annulée — JS d'activation non satisfait`);
           return;
         }
@@ -625,6 +666,7 @@ export function registerTriggers() {
             await refreshBuffIndicator(selectedTargetToken.actor);
           }
           await applyActivationTemporaryHp(selectedTargetToken.actor, selectedTargetToken, activeFlag, workflow);
+          await applyActivationStatus(selectedTargetToken.actor, selectedTargetToken, activeFlag, workflow, activationSave.saveResults);
         } else {
           if (selectedTargetToken?.actor) {
             activeFlag.targetTokenId = selectedTargetToken.id;
@@ -647,6 +689,7 @@ export function registerTriggers() {
             }
           }
           await applyActivationTemporaryHp(workflow.actor, workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null, activeFlag, workflow);
+          await applyActivationStatus(workflow.actor, workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null, activeFlag, workflow, activationSave.saveResults);
         }
         return;
       }
