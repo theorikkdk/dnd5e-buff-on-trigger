@@ -147,8 +147,13 @@ function getChargesSummary(charges) {
   return game.i18n.format(count === 1 ? "BOT.ui.chargeSummary.one" : "BOT.ui.chargeSummary.many", { count });
 }
 
+function normalizeDamageTargetMode(targetMode) {
+  if (targetMode === "target") return "triggerTarget";
+  return ["triggerTarget", "self", "attacker", "storedTarget"].includes(targetMode) ? targetMode : "triggerTarget";
+}
+
 function getDamageTargetModeLabel(targetMode) {
-  return game.i18n.localize(`BOT.ui.damage.targetMode.${targetMode ?? "legacy"}`);
+  return game.i18n.localize(`BOT.ui.damage.targetMode.${normalizeDamageTargetMode(targetMode)}`);
 }
 
 function getStatusTargetModeLabel(targetMode) {
@@ -698,10 +703,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
-      damageTargetModeTriggerTarget: (raw.damage?.targetMode ?? "triggerTarget") === "triggerTarget",
-      damageTargetModeSelf: raw.damage?.targetMode === "self",
-      damageTargetModeAttacker: raw.damage?.targetMode === "attacker",
-      damageTargetModeStoredTarget: raw.damage?.targetMode === "storedTarget",
+      damageTargetModeTriggerTarget: normalizeDamageTargetMode(raw.damage?.targetMode) === "triggerTarget",
+      damageTargetModeSelf: normalizeDamageTargetMode(raw.damage?.targetMode) === "self",
+      damageTargetModeAttacker: normalizeDamageTargetMode(raw.damage?.targetMode) === "attacker",
+      damageTargetModeStoredTarget: normalizeDamageTargetMode(raw.damage?.targetMode) === "storedTarget",
       statusOptions,
       statusTargetModeTriggerTarget: (raw.status?.targetMode ?? "triggerTarget") === "triggerTarget",
       statusTargetModeSelf: raw.status?.targetMode === "self",
@@ -748,7 +753,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         await this.item.unsetFlag(MODULE_ID, "buffTrigger");
       } else {
         const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
-        const submittedDamageTargetMode = data.damageTargetMode ?? "triggerTarget";
+        const submittedDamageTargetMode = normalizeDamageTargetMode(data.damageTargetMode);
         const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
         const submittedStatusTargetMode = data.statusTargetMode ?? "triggerTarget";
         const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
@@ -960,7 +965,7 @@ function buildBuffConfigFromForm(form) {
     damage: damageFormula ? {
       formula: damageFormula,
       type: readFormValue(form, "damageType", "") || null,
-      targetMode: readFormValue(form, "damageTargetMode", "triggerTarget"),
+      targetMode: normalizeDamageTargetMode(readFormValue(form, "damageTargetMode", "triggerTarget")),
     } : null,
     save: saveAbility ? {
       ability: saveAbility,
@@ -1241,7 +1246,7 @@ function applyPresetFlagToForm(form, flag) {
 
   setFormValue(form, "damageFormula", flag.damage?.formula ?? "");
   setFormValue(form, "damageType", flag.damage?.type ?? "");
-  setFormValue(form, "damageTargetMode", flag.damage?.targetMode ?? "triggerTarget");
+  setFormValue(form, "damageTargetMode", normalizeDamageTargetMode(flag.damage?.targetMode));
 
   setFormValue(form, "saveAbility", flag.save?.ability ?? "");
   setFormValue(form, "saveDC", flag.save?.dc ?? 15);

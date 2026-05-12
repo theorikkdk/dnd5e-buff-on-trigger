@@ -1134,8 +1134,12 @@ function resolveTargets(workflow, flag) {
   return getWorkflowConditionTargets(workflow, condition);
 }
 
+function normalizeDamageTargetMode(value) {
+  if (value === "target") return "triggerTarget";
+  return ["triggerTarget", "self", "attacker", "storedTarget"].includes(value) ? value : "triggerTarget";
+}
 function resolveBonusDamageTargets(workflow, flag) {
-  const targetMode = flag.damage?.targetMode;
+  const targetMode = normalizeDamageTargetMode(flag.damage?.targetMode);
   if (!targetMode) return resolveTargets(workflow, flag);
 
   if (targetMode === "triggerTarget") {
@@ -1606,10 +1610,13 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
 
 export async function applyBonusDamage(workflow, flag) {
   try {
+    const rawDamageTargetMode = flag.damage?.targetMode;
+    const damageTargetMode = normalizeDamageTargetMode(rawDamageTargetMode);
+    debugLog(`[${MODULE_ID}] Cible dégâts bonus : raw=${rawDamageTargetMode ?? "absent"}, normalized=${damageTargetMode}`);
     const targets = resolveBonusDamageTargets(workflow, flag);
 
     if (!targets?.size) {
-      console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible valide (mode "${flag.damage?.targetMode ?? flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
+      console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible valide (mode "${damageTargetMode}", condition "${flag.condition ?? "hit"}")`);
       return;
     }
 

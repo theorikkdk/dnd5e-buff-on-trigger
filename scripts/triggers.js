@@ -120,6 +120,41 @@ function doesAttackTriggerMatch(triggerType, actionType) {
   return false;
 }
 
+function getWorkflowAttackActionType(workflow) {
+  const activity = workflow?.activity ?? null;
+  const attackMode = workflow?.attackMode
+    ?? workflow?.rollConfig?.attackMode
+    ?? workflow?.attackRoll?.options?.attackMode
+    ?? "";
+  const activityActionType = typeof activity?.getActionType === "function"
+    ? activity.getActionType(attackMode)
+    : null;
+  return activityActionType
+    ?? activity?.actionType
+    ?? workflow?.item?.system?.actionType
+    ?? activity?.system?.actionType
+    ?? workflow?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType
+    ?? null;
+}
+
+function resolveAttackBuffCarrier(workflow) {
+  const candidates = [];
+  const addCandidate = (actor, token = null, source = "unknown") => {
+    if (!actor?.getFlag) return;
+    const key = actor.uuid ?? actor.id ?? source;
+    if (candidates.some((candidate) => candidate.key === key || candidate.actor === actor)) return;
+    candidates.push({ actor, token, source, key });
+  };
+
+  addCandidate(workflow?.actor, workflow?.token ?? null, "workflow.actor");
+  addCandidate(workflow?.token?.actor, workflow?.token, "workflow.token.actor");
+  addCandidate(workflow?.attackingToken?.actor, workflow?.attackingToken, "workflow.attackingToken.actor");
+  addCandidate(workflow?.attackerToken?.actor, workflow?.attackerToken, "workflow.attackerToken.actor");
+  addCandidate(workflow?.item?.actor, workflow?.token ?? null, "workflow.item.actor");
+
+  return candidates.find(({ actor }) => actor.getFlag(MODULE_ID, "activeBuff")) ?? null;
+}
+
 function collectDamageTypes(value, types = new Set()) {
   if (!value) return types;
   if (Array.isArray(value)) {
@@ -518,14 +553,14 @@ export function registerTriggers() {
   Hooks.on("midi-qol.RollComplete", async (workflow) => {
     try {
       if (!workflow.actor) return;
-      if (!workflow.activity) return;
+      if (!workflow.activity && !workflow.item) return;
 
-      const actionType = workflow.activity.actionType;
+      const actionType = getWorkflowAttackActionType(workflow);
 
       // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
       const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
-      const flag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
-      if (buffConfig || flag) debugLog(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
+      const actorFlag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
+      if (buffConfig || actorFlag) debugLog(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
       if (buffConfig && !ATTACK_ACTION_TYPES.includes(actionType)) {
         const targetMode = buffConfig.targetMode === "ally" ? "target" : (buffConfig.targetMode ?? "self");
         const activeFlag = {
@@ -605,12 +640,22 @@ export function registerTriggers() {
         return;
       }
 
-      // Phase 2 : attaque → lit le marqueur sur l'acteur et déclenche l'effet
+      // Phase 2 : attaque → lit le marqueur sur le porteur réel du buff et déclenche l'effet
+      const carrier = resolveAttackBuffCarrier(workflow);
+      const flag = carrier?.actor?.getFlag(MODULE_ID, "activeBuff") ?? null;
+      debugLog(`[${MODULE_ID}] Trigger attaque inspecté : attaquant=${workflow.actor?.name ?? "inconnu"}, porteur=${carrier?.actor?.name ?? "aucun"}, source=${carrier?.source ?? "aucune"}, activeBuff=${Boolean(flag)}, trigger=${flag?.type ?? "aucun"}, actionType=${actionType ?? "aucun"}, match=${flag ? doesAttackTriggerMatch(flag.type, actionType) : false}, hitTargets=${workflow.hitTargets?.size ?? 0}, damageTargetMode=${flag?.damage?.targetMode ?? "aucun"}`);
       if (!flag) return;
       if (flag.type === "passive") return;
 
       if (doesAttackTriggerMatch(flag.type, actionType)) {
-        handleAttackTrigger(workflow, flag);
+        const triggerWorkflow = carrier?.actor && carrier.actor !== workflow.actor
+          ? {
+              ...workflow,
+              actor: carrier.actor,
+              token: carrier.token ?? workflow.token ?? carrier.actor.getActiveTokens?.()?.[0] ?? null,
+            }
+          : workflow;
+        handleAttackTrigger(triggerWorkflow, flag);
       }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans midi-qol.RollComplete :`, error);
@@ -917,8 +962,8 @@ export function registerTriggers() {
 
 function handleAttackTrigger(workflow, flag) {
   if (flag.type === "passive") return;
-  const triggerType = workflow.activity?.actionType ?? flag.type;
-  debugLog(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor.name}`);
+  const triggerType = getWorkflowAttackActionType(workflow) ?? flag.type;
+  debugLog(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor?.name ?? "inconnu"} : trigger configuré=${flag.type}, condition=${flag.condition ?? "hit"}, hitTargets=${workflow.hitTargets?.size ?? 0}, damageTargetMode=${flag.damage?.targetMode ?? "aucun"}`);
   if (!doesAttackConditionMatch(workflow, flag)) return;
   if (!workflowMatchesStoredTarget(workflow, flag)) return;
   applyEffect(workflow, flag);
