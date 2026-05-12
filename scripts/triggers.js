@@ -582,17 +582,24 @@ export function registerTriggers() {
         };
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
         const sourceActorName = workflow.actor.name;
-        const shouldRememberTarget = targetMode === "target" || activeFlag.rememberTargetOnActivation === true;
-        const selectedTargetToken = shouldRememberTarget ? getExactlyOneSelectedTarget() : null;
+        const selectedTargets = [...(game.user?.targets ?? [])];
+        const selectedTargetToken = selectedTargets.length === 1 ? selectedTargets[0] ?? null : null;
+        const canFallbackToSelf = targetMode === "target"
+          && activeFlag.fallbackToSelfIfNoTarget === true
+          && activeFlag.rememberTargetOnActivation !== true;
+        const shouldRequireTarget = targetMode === "target" || activeFlag.rememberTargetOnActivation === true;
+        const shouldFallbackToSelf = canFallbackToSelf && selectedTargets.length === 0;
+        const effectiveTargetMode = shouldFallbackToSelf ? "self" : targetMode;
         const existingBuffs = findExistingBuffInstances(activeFlag);
 
-        if (shouldRememberTarget && !selectedTargetToken?.actor) {
+        if (shouldRequireTarget && !shouldFallbackToSelf && !selectedTargetToken?.actor) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
           debugLog(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
           return;
         }
 
-        const activationSaveTarget = targetMode === "target" ? selectedTargetToken : null;
+        const selfToken = workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? { actor: workflow.actor };
+        const activationSaveTarget = effectiveTargetMode === "target" ? selectedTargetToken : (shouldFallbackToSelf ? selfToken : null);
         if (!await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget)) {
           debugLog(`[${MODULE_ID}] Activation annulée — JS d'activation non satisfait`);
           return;
@@ -605,7 +612,7 @@ export function registerTriggers() {
           debugLog(`[${MODULE_ID}] Ancien buff remplacÃ© : ${workflow.item.name}`);
         }
 
-        if (targetMode === "target") {
+        if (effectiveTargetMode === "target") {
           activeFlag.targetTokenId = selectedTargetToken.id;
           activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
           activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
@@ -623,6 +630,10 @@ export function registerTriggers() {
             activeFlag.targetTokenId = selectedTargetToken.id;
             activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
             activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
+          } else if (shouldFallbackToSelf) {
+            activeFlag.targetTokenId = null;
+            activeFlag.storedTargetTokenUuid = null;
+            activeFlag.storedTargetActorUuid = null;
           }
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
           debugLog(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);

@@ -47,13 +47,17 @@
         <option value="target" {{#if flag.targetModeTarget}}selected{{/if}}>{{localize "BOT.ui.targetMode.target"}}</option>
       </select>
     </div>
+    <div class="form-group" id="bot-fallback-self-group" {{#unless flag.showFallbackToSelfIfNoTarget}}style="display:none"{{/unless}}>
+      <label>{{localize "BOT.ui.fallbackToSelfIfNoTarget"}}</label>
+      <input type="checkbox" name="fallbackToSelfIfNoTarget" {{#if flag.fallbackToSelfIfNoTarget}}checked{{/if}} />
+    </div>
     <section class="bot-inline-panel" id="bot-stored-target-group" {{#unless flag.showStoredTargetSection}}style="display:none"{{/unless}}>
       <h3 class="bot-summary-title">{{localize "BOT.ui.storedTarget.title"}}</h3>
       <p class="hint">{{localize "BOT.ui.storedTarget.help"}}</p>
       <p class="hint">{{localize "BOT.ui.storedTarget.changeTargetHelp"}}</p>
       <div class="form-group">
         <label>{{localize "BOT.ui.storedTarget.rememberTargetOnActivation"}}</label>
-        <input type="checkbox" name="rememberTargetOnActivation" {{#if flag.rememberTargetOnActivation}}checked{{/if}} />
+        <input type="checkbox" name="rememberTargetOnActivation" onchange="botUpdateStoredTargetUI(this.form.querySelector('[name=targetMode]'))" {{#if flag.rememberTargetOnActivation}}checked{{/if}} />
       </div>
       <div class="form-group">
         <label>{{localize "BOT.ui.storedTarget.requireStoredTargetMatch"}}</label>

@@ -5,6 +5,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.bless.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -42,6 +43,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.guidance.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -58,6 +60,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.resistance.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -149,6 +152,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.heroism.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "turnStart",
       temporaryHp: {
         formula: "@origin.spell.mod",
@@ -239,6 +243,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.shieldOfFaith.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "passive",
       buffs: {
         ac: 2,
@@ -331,6 +336,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.holyWeapon.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "weaponAttack",
       condition: "hit",
       damage: {
@@ -362,6 +368,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.enlarge.description",
     flag: {
       targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
       type: "weaponAttack",
       condition: "hit",
       damage: {

@@ -339,6 +339,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   const summary = [
     { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
+  ...(raw.fallbackToSelfIfNoTarget ? [{ label: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTarget"), value: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTargetValue") }] : []),
     { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
@@ -596,6 +597,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       targetMode:            normalizeGlobalTargetMode(raw.targetMode),
       targetModeSelf:        normalizeGlobalTargetMode(raw.targetMode) === "self",
       targetModeTarget:      normalizeGlobalTargetMode(raw.targetMode) === "target",
+      showFallbackToSelfIfNoTarget: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation,
+      fallbackToSelfIfNoTarget: !!raw.fallbackToSelfIfNoTarget,
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
       requireStoredTargetMatch: !!raw.requireStoredTargetMatch,
@@ -760,6 +763,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         const flag = {
         targetMode: normalizeGlobalTargetMode(data.targetMode),
         rememberTargetOnActivation: data.rememberTargetOnActivation ?? false,
+        fallbackToSelfIfNoTarget: normalizeGlobalTargetMode(data.targetMode) === "target" && data.rememberTargetOnActivation !== true ? (data.fallbackToSelfIfNoTarget ?? false) : false,
         requireStoredTargetMatch: data.requireStoredTargetMatch ?? false,
         requireBearerTemporaryHp: data.requireBearerTemporaryHp ?? false,
         type: data.type,
@@ -953,6 +957,7 @@ function buildBuffConfigFromForm(form) {
   return mergeBuffConfig(buildDefaultBuffConfig(), {
     targetMode: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")),
     rememberTargetOnActivation: !!readFormValue(form, "rememberTargetOnActivation"),
+    fallbackToSelfIfNoTarget: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "fallbackToSelfIfNoTarget"),
     requireStoredTargetMatch: !!readFormValue(form, "requireStoredTargetMatch"),
     requireBearerTemporaryHp: !!readFormValue(form, "requireBearerTemporaryHp"),
     type: readFormValue(form, "type", "passive"),
@@ -1060,6 +1065,7 @@ function buildDefaultBuffConfig() {
   return {
     targetMode: "self",
     rememberTargetOnActivation: false,
+    fallbackToSelfIfNoTarget: false,
     requireStoredTargetMatch: false,
     requireBearerTemporaryHp: false,
     type: "passive",
@@ -1170,7 +1176,7 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "saveAbility", "charges",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
@@ -1230,6 +1236,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "enabled", true);
   setFormValue(form, "targetMode", normalizeGlobalTargetMode(flag.targetMode));
   setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
+  setFormValue(form, "fallbackToSelfIfNoTarget", !!flag.fallbackToSelfIfNoTarget);
   setFormValue(form, "requireStoredTargetMatch", !!flag.requireStoredTargetMatch);
   setFormValue(form, "requireBearerTemporaryHp", !!flag.requireBearerTemporaryHp);
   setFormValue(form, "type", flag.type ?? "passive");
@@ -1613,6 +1620,11 @@ window.botUpdateStoredTargetUI = function(selectEl) {
   const storedTargetGroup = form?.querySelector?.('#bot-stored-target-group');
   if (storedTargetGroup) {
     storedTargetGroup.style.display = selectEl.value === "self" ? "" : "none";
+  }
+  const fallbackGroup = form?.querySelector?.('#bot-fallback-self-group');
+  const rememberTargetInput = form?.querySelector?.('[name="rememberTargetOnActivation"]');
+  if (fallbackGroup) {
+    fallbackGroup.style.display = selectEl.value === "target" && !rememberTargetInput?.checked ? "" : "none";
   }
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
