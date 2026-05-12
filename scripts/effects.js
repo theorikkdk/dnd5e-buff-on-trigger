@@ -1048,12 +1048,106 @@ export async function markTriggerFrequencyUsage(actor) {
   });
 }
 
+function getLinkedStatusOriginItemUuid(flag) {
+  return flag?.originItemUuid ?? flag?.itemUuid ?? null;
+}
+
+function buildLinkedStatusBuffId(ownerActor, flag) {
+  return [
+    ownerActor?.uuid ?? null,
+    flag?.originActorUuid ?? null,
+    getLinkedStatusOriginItemUuid(flag),
+    flag?.itemName ?? null,
+    flag?.status?.id ?? null,
+  ].filter(Boolean).join("|");
+}
+
+function actorHasActiveStatus(actor, statusId) {
+  if (!actor || !statusId) return false;
+  if (actor.statuses?.has?.(statusId)) return true;
+  return actor.effects?.some((effect) => !effect.disabled && effect.statuses?.has?.(statusId)) ?? false;
+}
+
+function findStatusEffect(actor, statusId) {
+  if (!actor || !statusId) return null;
+  return actor.effects?.find((effect) => effect.statuses?.has?.(statusId) && !effect.disabled) ?? null;
+}
+
+function collectActorsForLinkedStatusCleanup() {
+  const actors = new Map();
+  const addActor = (actor) => {
+    if (!actor?.uuid || actors.has(actor.uuid)) return;
+    actors.set(actor.uuid, actor);
+  };
+
+  game.actors?.forEach?.(addActor);
+  canvas?.tokens?.placeables?.forEach?.((token) => addActor(token.actor));
+  game.scenes?.forEach?.((scene) => {
+    scene.tokens?.forEach?.((tokenDocument) => addActor(tokenDocument.actor));
+  });
+
+  return [...actors.values()];
+}
+
+function linkedStatusMatchesBuff(effect, ownerActor, flag) {
+  const effectFlag = effect?.flags?.[MODULE_ID];
+  if (effectFlag?.linkedStatus !== true) return false;
+  if (effectFlag.statusId !== flag?.status?.id) return false;
+
+  const expectedOriginActorUuid = flag?.originActorUuid ?? null;
+  const expectedOriginItemUuid = getLinkedStatusOriginItemUuid(flag);
+  const expectedOwnerActorUuid = ownerActor?.uuid ?? null;
+  const expectedBuffId = buildLinkedStatusBuffId(ownerActor, flag);
+
+  if (expectedOriginActorUuid && effectFlag.originActorUuid !== expectedOriginActorUuid) return false;
+  if (expectedOriginItemUuid && effectFlag.originItemUuid !== expectedOriginItemUuid) return false;
+  if (expectedOwnerActorUuid && effectFlag.ownerActorUuid !== expectedOwnerActorUuid) return false;
+  if (expectedBuffId && effectFlag.buffId !== expectedBuffId) return false;
+
+  return true;
+}
+
+async function cleanupLinkedStatusEffects(ownerActor, flag) {
+  if (!flag?.status?.removeWhenBuffEnds || !flag?.status?.id) return;
+
+  for (const actor of collectActorsForLinkedStatusCleanup()) {
+    const linkedEffects = actor.effects?.filter((effect) => linkedStatusMatchesBuff(effect, ownerActor, flag)) ?? [];
+    for (const effect of linkedEffects) {
+      await deleteDocumentIfExists(effect, `statut lie ${flag.status.id}`);
+      debugLog(`[${MODULE_ID}] Statut lie ${flag.status.id} retire de ${actor.name}`);
+    }
+  }
+}
+
+async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
+  if (!flag?.status?.removeWhenBuffEnds || !targetActor || !statusId) return;
+
+  const effect = findStatusEffect(targetActor, statusId);
+  if (!effect) {
+    debugLog(`[${MODULE_ID}] Statut ${statusId} applique sans ActiveEffect identifiable sur ${targetActor.name}`);
+    return;
+  }
+
+  const ownerActorUuid = ownerActor?.uuid ?? null;
+  const originItemUuid = getLinkedStatusOriginItemUuid(flag);
+  await effect.update({
+    [`flags.${MODULE_ID}.linkedStatus`]: true,
+    [`flags.${MODULE_ID}.originActorUuid`]: flag?.originActorUuid ?? null,
+    [`flags.${MODULE_ID}.originItemUuid`]: originItemUuid,
+    [`flags.${MODULE_ID}.ownerActorUuid`]: ownerActorUuid,
+    [`flags.${MODULE_ID}.statusId`]: statusId,
+    [`flags.${MODULE_ID}.buffId`]: buildLinkedStatusBuffId(ownerActor, flag),
+  });
+  debugLog(`[${MODULE_ID}] Statut lie ${statusId} marque sur ${targetActor.name}`);
+}
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = [], previousFlag = null) {
   try {
     const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
 
     if (existing) await deleteDocumentIfExists(existing, "indicateur actif");
+
+    await cleanupLinkedStatusEffects(actor, previousFlag);
 
     if (!activeBuff && itemName) {
       for (const token of canvas.tokens.placeables) {
@@ -1826,10 +1920,18 @@ export async function applyStatusEffect(workflow, flag, options = {}) {
       const targetActor = token.actor;
       if (!targetActor) continue;
 
+      const hadStatusBefore = actorHasActiveStatus(targetActor, statusId);
       await targetActor.toggleStatusEffect(statusId, { active: true });
       debugLog(`[${MODULE_ID}] Statut ${statusId} appliquÃ© sur ${targetActor.name}`);
-    }
 
+      if (flag.status?.removeWhenBuffEnds === true) {
+        if (hadStatusBefore) {
+          debugLog(`[${MODULE_ID}] Statut ${statusId} deja present sur ${targetActor.name}, non lie au buff`);
+        } else {
+          await markLinkedStatusEffect(targetActor, statusId, workflow.actor, flag);
+        }
+      }
+    }
     if (!flag.damage && options.skipConsume !== true) await consumeOrDecrementCharges(workflow, flag, targets);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyStatusEffect :`, error);

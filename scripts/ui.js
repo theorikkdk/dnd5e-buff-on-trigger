@@ -438,6 +438,12 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
       label: game.i18n.localize("BOT.ui.summary.statusApplyCondition"),
       value: getStatusApplyConditionLabel(raw.status.applyCondition)
     });
+    if (raw.status.removeWhenBuffEnds) {
+      summary.push({
+        label: game.i18n.localize("BOT.ui.summary.statusRemoveWhenBuffEnds"),
+        value: game.i18n.localize("BOT.ui.summary.statusRemovedWithBuff")
+      });
+    }
   }
 
   const mechanicalSummary = buildMechanicalSummary(raw, labels);
@@ -725,6 +731,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       statusApplyConditionAlways: (raw.status?.applyCondition ?? "always") === "always",
       statusApplyConditionSaveFailure: raw.status?.applyCondition === "saveFailure",
       statusApplyConditionSaveSuccess: raw.status?.applyCondition === "saveSuccess",
+      statusRemoveWhenBuffEnds: raw.status?.removeWhenBuffEnds === true,
       receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
       receivedAttackTypeMelee: raw.receivedAttackType === "melee",
       receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
@@ -819,7 +826,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             id: data.statusId,
             timing: data.statusTiming ?? "trigger",
             ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {}),
-            applyCondition: data.statusApplyCondition ?? "always"
+            applyCondition: data.statusApplyCondition ?? "always",
+            removeWhenBuffEnds: data.statusRemoveWhenBuffEnds ?? false
           } : null,
         charges: data.charges ? Number(data.charges) : null,
         buffs: (() => {
@@ -993,6 +1001,7 @@ function buildBuffConfigFromForm(form) {
       timing: readFormValue(form, "statusTiming", "trigger"),
       targetMode: readFormValue(form, "statusTargetMode", "triggerTarget"),
       applyCondition: readFormValue(form, "statusApplyCondition", "always"),
+      removeWhenBuffEnds: !!readFormValue(form, "statusRemoveWhenBuffEnds"),
     } : null,
     healing: readFormValue(form, "healingEnabled") && healingFormula ? {
       formula: healingFormula,
@@ -1186,7 +1195,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "saveAbility", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusRemoveWhenBuffEnds", "saveAbility", "charges",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
   ];
@@ -1275,6 +1284,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "statusTiming", flag.status?.timing ?? "trigger");
   setFormValue(form, "statusTargetMode", flag.status?.targetMode ?? "triggerTarget");
   setFormValue(form, "statusApplyCondition", flag.status?.applyCondition ?? "always");
+  setFormValue(form, "statusRemoveWhenBuffEnds", !!flag.status?.removeWhenBuffEnds);
 
   setFormValue(form, "healingEnabled", !!flag.healing?.formula);
   setFormValue(form, "healingFormula", flag.healing?.formula ?? "");
@@ -1710,6 +1720,7 @@ window.botUpdateEffectSectionsUI = function(form) {
   const statusTimingRow = form.querySelector('#bot-status-timing-row');
   const statusTargetRow = form.querySelector('#bot-status-target-row');
   const statusApplyConditionRow = form.querySelector('#bot-status-apply-condition-row');
+  const statusRemoveWhenBuffEndsRow = form.querySelector('#bot-status-remove-when-buff-ends-row');
   const statusSelect = form.querySelector('[name="statusId"]');
   if (statusTimingRow && statusSelect) {
     statusTimingRow.style.display = statusSelect.value ? "" : "none";
@@ -1719,6 +1730,9 @@ window.botUpdateEffectSectionsUI = function(form) {
   }
   if (statusApplyConditionRow && statusSelect) {
     statusApplyConditionRow.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusRemoveWhenBuffEndsRow && statusSelect) {
+    statusRemoveWhenBuffEndsRow.style.display = statusSelect.value ? "" : "none";
   }
 
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")

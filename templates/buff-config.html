@@ -277,6 +277,10 @@
             <option value="saveSuccess" {{#if flag.statusApplyConditionSaveSuccess}}selected{{/if}}>{{localize "BOT.ui.status.applyCondition.saveSuccess"}}</option>
           </select>
         </div>
+        <label class="bot-check-row" id="bot-status-remove-when-buff-ends-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+          <input type="checkbox" name="statusRemoveWhenBuffEnds" {{#if flag.statusRemoveWhenBuffEnds}}checked{{/if}}>
+          <span>{{localize "BOT.ui.status.removeWhenBuffEnds"}}</span>
+        </label>
       </div>
     </details>
 
