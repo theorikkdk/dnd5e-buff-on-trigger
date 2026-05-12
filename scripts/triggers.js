@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
 
@@ -336,6 +336,28 @@ function getSingleUserTarget() {
   return targets[0] ?? null;
 }
 
+async function applyActivationTemporaryHp(carrierActor, carrierToken, activeFlag, sourceWorkflow) {
+  if (!activeFlag?.temporaryHp?.formula) return;
+  if (!["activation", "both"].includes(activeFlag.temporaryHp?.timing ?? "trigger")) return;
+
+  const token = carrierToken
+    ?? sourceWorkflow?.token
+    ?? carrierActor?.getActiveTokens?.()?.[0]
+    ?? null;
+  const targets = token ? new Set([token]) : new Set();
+  const workflow = {
+    actor: carrierActor,
+    token,
+    item: sourceWorkflow?.item ?? null,
+    activity: sourceWorkflow?.activity ?? null,
+    castData: sourceWorkflow?.castData ?? null,
+    castLevel: sourceWorkflow?.castLevel ?? null,
+    targets,
+    hitTargets: targets,
+    missedTargets: new Set(),
+  };
+  await applyTemporaryHp(workflow, activeFlag, { skipConsume: true });
+}
 async function clearExistingBuffInstance(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
@@ -560,6 +582,7 @@ export function registerTriggers() {
           } else {
             await refreshBuffIndicator(selectedTargetToken.actor);
           }
+          await applyActivationTemporaryHp(selectedTargetToken.actor, selectedTargetToken, activeFlag, workflow);
         } else {
           if (selectedTargetToken?.actor) {
             activeFlag.targetTokenId = selectedTargetToken.id;
@@ -577,6 +600,7 @@ export function registerTriggers() {
               if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
             }
           }
+          await applyActivationTemporaryHp(workflow.actor, workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null, activeFlag, workflow);
         }
         return;
       }
@@ -734,6 +758,9 @@ export function registerTriggers() {
             hitTargets: attackerToken ? new Set([attackerToken]) : new Set(),
             missedTargets: new Set(),
             damageItem,
+            damageList: workflow?.damageList ?? null,
+            _botOriginalWorkflow: workflow ?? null,
+            _botOriginalDamageItem: damageItem ?? null,
           };
           handleAttackTrigger(fakeWorkflow, delayedFlag);
         } catch (error) {
@@ -920,8 +947,8 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
     missedTargets: new Set(),
   };
   if (!workflowMatchesStoredTarget(workflow, flag)) return;
-  await applyEffect(workflow, flag);
-  if (flag.consumeOnTrigger === true) {
+  const applied = await applyEffect(workflow, flag);
+  if (applied && flag.consumeOnTrigger === true) {
     await actor.unsetFlag(MODULE_ID, "activeBuff");
     await refreshBuffIndicator(actor, flag.itemName, [], flag);
   }

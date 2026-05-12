@@ -414,6 +414,89 @@ function readAbilityModifier(actor, ability) {
   return normalizeFormulaNumber(actor?.system?.abilities?.[ability]?.mod, 0);
 }
 
+function readTemporaryHp(actor) {
+  return normalizeFormulaNumber(actor?.system?.attributes?.hp?.temp, 0);
+}
+
+function normalizeTemporaryHpCandidate(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function readNestedValue(source, path) {
+  return path.split(".").reduce((current, key) => current?.[key], source);
+}
+
+function findTemporaryHpCandidate(source, paths, sourceLabel) {
+  if (!source) return null;
+  for (const path of paths) {
+    const value = normalizeTemporaryHpCandidate(readNestedValue(source, path));
+    if (value !== null) return { value, source: `${sourceLabel}.${path}` };
+  }
+  return null;
+}
+
+function getTokenIdentitySet(actor, workflow) {
+  const identities = new Set([actor?.uuid, actor?.id, workflow?.token?.id, workflow?.token?.uuid, workflow?.token?.document?.uuid].filter(Boolean));
+  for (const token of actor?.getActiveTokens?.() ?? []) {
+    if (token.id) identities.add(token.id);
+    if (token.uuid) identities.add(token.uuid);
+    if (token.document?.uuid) identities.add(token.document.uuid);
+  }
+  return identities;
+}
+
+function findTemporaryHpInDamageList(damageList, actor, workflow) {
+  if (!Array.isArray(damageList)) return null;
+  const identities = getTokenIdentitySet(actor, workflow);
+  const paths = [
+    "oldTempHP", "oldTempHp", "oldTemporaryHp", "tempHPBefore", "tempHpBefore", "temporaryHpBefore", "tempHP", "tempHp",
+    "oldHP.temp", "oldHp.temp", "oldHitPoints.temp", "hp.temp.old", "hp.temp.before"
+  ];
+  for (const entry of damageList) {
+    const entryIds = [
+      entry?.actorUuid, entry?.actor?.uuid, entry?.actor?.id,
+      entry?.tokenUuid, entry?.token?.uuid, entry?.token?.id, entry?.token?.document?.uuid,
+      entry?.targetUuid, entry?.target?.uuid, entry?.target?.id, entry?.target?.document?.uuid,
+    ].filter(Boolean);
+    if (entryIds.length && !entryIds.some((id) => identities.has(id))) continue;
+    const candidate = findTemporaryHpCandidate(entry, paths, "damageList");
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+function getBearerTemporaryHpForTrigger(workflow, actor, flag) {
+  const direct = normalizeTemporaryHpCandidate(workflow?._botBearerTemporaryHp?.value);
+  if (direct !== null) return { value: direct, source: workflow._botBearerTemporaryHp.source ?? "workflow._botBearerTemporaryHp" };
+
+  if (flag?.type === "damaged") {
+    const paths = [
+      "oldTempHP", "oldTempHp", "oldTemporaryHp", "tempHPBefore", "tempHpBefore", "temporaryHpBefore", "tempHP", "tempHp",
+      "oldHP.temp", "oldHp.temp", "oldHitPoints.temp", "hp.temp.old", "hp.temp.before"
+    ];
+    const candidates = [
+      [workflow?.damageItem, "workflow.damageItem"],
+      [workflow?._botOriginalDamageItem, "workflow._botOriginalDamageItem"],
+      [workflow?._botOriginalWorkflow?.damageItem, "workflow._botOriginalWorkflow.damageItem"],
+      [workflow?._botOriginalWorkflow, "workflow._botOriginalWorkflow"],
+      [workflow, "workflow"],
+    ];
+    for (const [source, label] of candidates) {
+      const candidate = findTemporaryHpCandidate(source, paths, label);
+      if (candidate) return candidate;
+    }
+    const listCandidate = findTemporaryHpInDamageList(
+      workflow?.damageList ?? workflow?._botOriginalWorkflow?.damageList,
+      actor,
+      workflow
+    );
+    if (listCandidate) return listCandidate;
+  }
+
+  return { value: readTemporaryHp(actor), source: "actor.system.attributes.hp.temp" };
+}
+
 function readProfBonus(actor) {
   return normalizeFormulaNumber(
     actor?.system?.attributes?.prof
@@ -1785,7 +1868,7 @@ export async function applyBonusHealing(workflow, flag) {
   }
 }
 
-export async function applyTemporaryHp(workflow, flag) {
+export async function applyTemporaryHp(workflow, flag, options = {}) {
   try {
     const targets = resolveTemporaryHpTargets(workflow, flag);
     if (!targets?.size) {
@@ -1837,21 +1920,31 @@ export async function applyTemporaryHp(workflow, flag) {
       speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
     });
 
-    if (!flag.damage && !flag.status && !flag.healing) await consumeOrDecrementCharges(workflow, flag, targets);
+    if (!options.skipConsume && !flag.damage && !flag.status && !flag.healing) await consumeOrDecrementCharges(workflow, flag, targets);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyTemporaryHp :`, error);
   }
 }
 
 export async function applyEffect(workflow, flag) {
-  if (!flag.damage && !flag.status && !flag.healing && !flag.temporaryHp) {
+  const shouldApplyTemporaryHpOnTrigger = !!flag.temporaryHp && ["trigger", "both"].includes(flag.temporaryHp?.timing ?? "trigger");
+  if (!flag.damage && !flag.status && !flag.healing && !shouldApplyTemporaryHpOnTrigger) {
     debugLog(`[${MODULE_ID}] Aucun effet configurÃ© dans le flag`);
-    return;
+    return false;
   }
 
   if (await shouldBlockTriggerFrequency(workflow.actor, flag)) {
     debugLog(`[${MODULE_ID}] DÃ©clenchement ignorÃ© : frÃ©quence dÃ©jÃ  utilisÃ©e`);
-    return;
+    return false;
+  }
+
+  if (flag.requireBearerTemporaryHp) {
+    const temporaryHpCondition = getBearerTemporaryHpForTrigger(workflow, workflow.actor, flag);
+    debugLog(`[${MODULE_ID}] Condition PV temporaires : valeur v�rifi�e = ${temporaryHpCondition.value}, source = ${temporaryHpCondition.source}`);
+    if (temporaryHpCondition.value <= 0) {
+      debugLog(`[${MODULE_ID}] D\u00e9clenchement ignor\u00e9 : le porteur n'a plus de PV temporaires`);
+      return false;
+    }
   }
 
   await markTriggerFrequencyUsage(workflow.actor);
@@ -1867,5 +1960,6 @@ export async function applyEffect(workflow, flag) {
   if (flag.damage) await applyBonusDamage(workflow, flag);
   if (flag.status) await applyStatusEffect(workflow, flag);
   if (flag.healing) await applyBonusHealing(workflow, flag);
-  if (flag.temporaryHp) await applyTemporaryHp(workflow, flag);
+  if (shouldApplyTemporaryHpOnTrigger) await applyTemporaryHp(workflow, flag);
+  return true;
 }

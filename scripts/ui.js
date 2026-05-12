@@ -124,6 +124,11 @@ function getTemporaryHpModeLabel(mode) {
   return game.i18n.localize(`BOT.ui.temporaryHp.mode.${mode ?? "keepHighest"}`);
 }
 
+function getTemporaryHpTimingLabel(timing) {
+  return game.i18n.localize(`BOT.ui.temporaryHp.timing.${timing ?? "trigger"}`);
+}
+
+
 function getRollModifierTypeLabel(type) {
   return game.i18n.localize(`BOT.ui.rollModifier.rollTypes.${type}`);
 }
@@ -315,6 +320,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
+  if (raw.requireBearerTemporaryHp) summary.push({ label: game.i18n.localize("BOT.ui.summary.temporaryHpCondition"), value: game.i18n.localize("BOT.ui.summary.temporaryHpConditionBearer") });
 
   if (ATTACK_TRIGGER_TYPES.includes(raw.type)) {
     summary.push({ label: game.i18n.localize("BOT.ui.summary.condition"), value: getConditionLabel(raw.condition) });
@@ -356,7 +362,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (raw.temporaryHp?.formula) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.temporaryHp"),
-      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(temporaryHpTargetMode)} • ${getTemporaryHpModeLabel(raw.temporaryHp.mode)})`
+      value: `${raw.temporaryHp.formula} (${getTemporaryHpTargetModeLabel(temporaryHpTargetMode)} - ${getTemporaryHpModeLabel(raw.temporaryHp.mode)} - ${getTemporaryHpTimingLabel(raw.temporaryHp.timing)})`
     });
   }
 
@@ -565,6 +571,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
       requireStoredTargetMatch: !!raw.requireStoredTargetMatch,
+      requireBearerTemporaryHp: !!raw.requireBearerTemporaryHp,
       typePassive:           raw.type === "passive",
       typeMwak:              raw.type === "mwak",
       typeRwak:              raw.type === "rwak",
@@ -607,6 +614,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       healingTargetModeStoredTarget: healingTargetMode === "storedTarget",
       temporaryHpEnabled:        !!raw.temporaryHp,
       temporaryHpFormula:        raw.temporaryHp?.formula ?? "",
+      temporaryHpTimingTrigger:    (raw.temporaryHp?.timing ?? "trigger") === "trigger",
+      temporaryHpTimingActivation: raw.temporaryHp?.timing === "activation",
+      temporaryHpTimingBoth:       raw.temporaryHp?.timing === "both",
       temporaryHpTargetModeTriggerTarget: temporaryHpTargetMode === "triggerTarget",
       temporaryHpTargetModeSelf: temporaryHpTargetMode === "self",
       temporaryHpTargetModeAttacker: temporaryHpTargetMode === "attacker",
@@ -719,6 +729,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         targetMode: normalizeGlobalTargetMode(data.targetMode),
         rememberTargetOnActivation: data.rememberTargetOnActivation ?? false,
         requireStoredTargetMatch: data.requireStoredTargetMatch ?? false,
+        requireBearerTemporaryHp: data.requireBearerTemporaryHp ?? false,
         type: data.type,
         condition: data.condition,
         receivedAttackType: data.receivedAttackType ?? "any",
@@ -739,6 +750,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         } : null,
         temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
           formula: data.temporaryHpFormula,
+          timing: data.temporaryHpTiming ?? "trigger",
           targetMode: normalizeTemporaryHpTargetMode(data.temporaryHpTargetMode),
           mode: data.temporaryHpMode ?? "keepHighest",
         } : null,
@@ -906,6 +918,7 @@ function buildBuffConfigFromForm(form) {
     targetMode: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")),
     rememberTargetOnActivation: !!readFormValue(form, "rememberTargetOnActivation"),
     requireStoredTargetMatch: !!readFormValue(form, "requireStoredTargetMatch"),
+    requireBearerTemporaryHp: !!readFormValue(form, "requireBearerTemporaryHp"),
     type: readFormValue(form, "type", "passive"),
     condition: readFormValue(form, "condition", "hit"),
     receivedAttackType: readFormValue(form, "receivedAttackType", "any"),
@@ -937,6 +950,7 @@ function buildBuffConfigFromForm(form) {
     } : null,
     temporaryHp: readFormValue(form, "temporaryHpEnabled") && temporaryHpFormula ? {
       formula: temporaryHpFormula,
+      timing: readFormValue(form, "temporaryHpTiming", "trigger"),
       targetMode: normalizeTemporaryHpTargetMode(readFormValue(form, "temporaryHpTargetMode", "triggerTarget")),
       mode: readFormValue(form, "temporaryHpMode", "keepHighest"),
     } : null,
@@ -1007,6 +1021,7 @@ function buildDefaultBuffConfig() {
     targetMode: "self",
     rememberTargetOnActivation: false,
     requireStoredTargetMatch: false,
+    requireBearerTemporaryHp: false,
     type: "passive",
     condition: "hit",
     receivedAttackType: "any",
@@ -1111,7 +1126,7 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "requireStoredTargetMatch", "damageFormula", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "saveAbility", "charges",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
@@ -1172,6 +1187,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "targetMode", normalizeGlobalTargetMode(flag.targetMode));
   setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
   setFormValue(form, "requireStoredTargetMatch", !!flag.requireStoredTargetMatch);
+  setFormValue(form, "requireBearerTemporaryHp", !!flag.requireBearerTemporaryHp);
   setFormValue(form, "type", flag.type ?? "passive");
   setFormValue(form, "condition", flag.condition ?? "hit");
   setFormValue(form, "receivedAttackType", flag.receivedAttackType ?? "any");
@@ -1204,6 +1220,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "healingTargetMode", normalizeHealingTargetMode(flag.healing?.targetMode));
   setFormValue(form, "temporaryHpEnabled", !!flag.temporaryHp?.formula);
   setFormValue(form, "temporaryHpFormula", flag.temporaryHp?.formula ?? "");
+  setFormValue(form, "temporaryHpTiming", flag.temporaryHp?.timing ?? "trigger");
   setFormValue(form, "temporaryHpTargetMode", normalizeTemporaryHpTargetMode(flag.temporaryHp?.targetMode));
   setFormValue(form, "temporaryHpMode", flag.temporaryHp?.mode ?? "keepHighest");
 

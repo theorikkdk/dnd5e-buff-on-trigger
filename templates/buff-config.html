@@ -115,6 +115,13 @@
         </div>
       </div>
     </section>
+    <section class="bot-inline-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.additionalConditions.title"}}</h3>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.additionalConditions.requireBearerTemporaryHp"}}</label>
+        <input type="checkbox" name="requireBearerTemporaryHp" {{#if flag.requireBearerTemporaryHp}}checked{{/if}} />
+      </div>
+    </section>
   </div>
 
   <!-- Onglet 2 : Dégâts & Effets -->
@@ -319,6 +326,14 @@
         <div class="bot-row">
           <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.formula"}}</label>
           <input type="text" name="temporaryHpFormula" value="{{flag.temporaryHpFormula}}" placeholder="1d6" class="bot-input-flex" />
+          <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.timing.label"}}</label>
+          <select name="temporaryHpTiming" class="bot-input-flex">
+            <option value="trigger" {{#if flag.temporaryHpTimingTrigger}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.timing.trigger"}}</option>
+            <option value="activation" {{#if flag.temporaryHpTimingActivation}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.timing.activation"}}</option>
+            <option value="both" {{#if flag.temporaryHpTimingBoth}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.timing.both"}}</option>
+          </select>
+        </div>
+        <div class="bot-row">
           <label class="bot-label-sm">{{localize "BOT.ui.temporaryHp.targetMode.label"}}</label>
           <select name="temporaryHpTargetMode" class="bot-input-flex">
             <option value="triggerTarget" {{#if flag.temporaryHpTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.temporaryHp.targetMode.triggerTarget"}}</option>
