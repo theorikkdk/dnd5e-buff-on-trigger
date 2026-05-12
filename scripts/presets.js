@@ -103,4 +103,44 @@ export const BUFF_PRESETS = [
       consumeOnTrigger: false,
     },
   },
+  {
+    id: "fireShieldWarm",
+    label: "BOT.presets.fireShieldWarm.label",
+    description: "BOT.presets.fireShieldWarm.description",
+    flag: {
+      targetMode: "self",
+      type: "damaged",
+      receivedAttackType: "melee",
+      damage: {
+        formula: "2d8",
+        type: "fire",
+        targetMode: "attacker",
+      },
+      buffs: {
+        resistances: ["cold"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "fireShieldChill",
+    label: "BOT.presets.fireShieldChill.label",
+    description: "BOT.presets.fireShieldChill.description",
+    flag: {
+      targetMode: "self",
+      type: "damaged",
+      receivedAttackType: "melee",
+      damage: {
+        formula: "2d8",
+        type: "cold",
+        targetMode: "attacker",
+      },
+      buffs: {
+        resistances: ["fire"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
