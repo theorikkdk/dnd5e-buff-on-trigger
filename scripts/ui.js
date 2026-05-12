@@ -1,4 +1,4 @@
-import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
+import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
@@ -174,6 +174,15 @@ function getAbilityLabel(ability) {
   return ability ? game.i18n.localize(`BOT.abilities.${ability}`) : game.i18n.localize("BOT.ui.none");
 }
 
+function getAbilityLabels() {
+  return Object.fromEntries(ABILITY_IDS.map((id) => [id, getAbilityLabel(id)]));
+}
+
+function getAbilityOptions(selected = []) {
+  const selectedSet = new Set(selected ?? []);
+  return ABILITY_IDS.map((id) => ({ value: id, label: getAbilityLabel(id), selected: selectedSet.has(id) }));
+}
+
 function normalizeHealingTargetMode(targetMode) {
   return targetMode === "target" ? "triggerTarget" : (targetMode ?? "self");
 }
@@ -261,6 +270,10 @@ function hasMechanicalChanges(buffs = {}) {
     buffs.sensesSpecial,
     buffs.passivePerception,
   ].some(isFilled)
+    || (buffs.abilityCheckAdvantages ?? []).length > 0
+    || (buffs.abilityCheckDisadvantages ?? []).length > 0
+    || (buffs.savingThrowAdvantages ?? []).length > 0
+    || (buffs.savingThrowDisadvantages ?? []).length > 0
     || (buffs.skills ?? []).length > 0
     || (buffs.skillBonusSkills ?? []).length > 0
     || (buffs.resistances ?? []).length > 0
@@ -283,6 +296,10 @@ function buildMechanicalSummary(raw, labels) {
   if (isFilled(buffs.attackMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.attackMode}`)}`);
   if (isFilled(buffs.saveMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.saveMode}`)}`);
   if (isFilled(buffs.skillMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.abilityRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.skillMode}`)}`);
+  if ((buffs.abilityCheckAdvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.checkAdvantage")} : ${listSelectedLabels(buffs.abilityCheckAdvantages, labels.abilities)}`);
+  if ((buffs.abilityCheckDisadvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.checkDisadvantage")} : ${listSelectedLabels(buffs.abilityCheckDisadvantages, labels.abilities)}`);
+  if ((buffs.savingThrowAdvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.saveAdvantage")} : ${listSelectedLabels(buffs.savingThrowAdvantages, labels.abilities)}`);
+  if ((buffs.savingThrowDisadvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.saveDisadvantage")} : ${listSelectedLabels(buffs.savingThrowDisadvantages, labels.abilities)}`);
   if ((buffs.skills ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.skills.advantage")} : ${listSelectedLabels(buffs.skills, labels.skills)}`);
   if ((buffs.skillBonusSkills ?? []).length && isFilled(buffs.skillBonus)) {
     addEntry(`${game.i18n.localize("BOT.ui.skills.bonus")} : ${listSelectedLabels(buffs.skillBonusSkills, labels.skills)} (${buffs.skillBonus})`);
@@ -544,9 +561,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const statusOptions = getStatusOptions(raw.status?.id ?? null);
     const presets = getPresetOptions();
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
+    const abilityLabels = getAbilityLabels();
     const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
     const labels = {
       skills: skillLabels,
+      abilities: abilityLabels,
       damageTypes: damageLabels,
       weaponProfs: weaponProfLabels,
       armorProfs: armorProfLabels,
@@ -554,6 +573,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       conditions: Object.fromEntries(conditionImmunityOptions.map((option) => [option.value, option.label])),
       statuses: statusLabels,
     };
+    const abilityCheckAdvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckAdvantages ?? []);
+    const abilityCheckDisadvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckDisadvantages ?? []);
+    const savingThrowAdvantageOptions = getAbilityOptions(raw.buffs?.savingThrowAdvantages ?? []);
+    const savingThrowDisadvantageOptions = getAbilityOptions(raw.buffs?.savingThrowDisadvantages ?? []);
     const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
     const skillBonusOptions     = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skillBonusSkills ?? []).includes(id) }));
     const resistanceOptions     = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.resistances ?? []).includes(t) }));
@@ -630,6 +653,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       rollModifierTypeSave:      (raw.rollModifier?.rollTypes ?? []).includes("save"),
       rollModifierTypeAbility:   (raw.rollModifier?.rollTypes ?? []).includes("ability"),
       rollModifierTypeSkill:     (raw.rollModifier?.rollTypes ?? []).includes("skill"),
+      abilityCheckAdvantageOptions,
+      abilityCheckDisadvantageOptions,
+      savingThrowAdvantageOptions,
+      savingThrowDisadvantageOptions,
       skillAdvantageOptions,
       skillBonusOptions,
       resistanceOptions,
@@ -785,6 +812,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             attackMode: data.buffAttackMode !== "none" ? data.buffAttackMode : null,
             saveMode: data.buffSaveMode !== "none" ? data.buffSaveMode : null,
             skillMode: data.buffSkillMode !== "none" ? data.buffSkillMode : null,
+            abilityCheckAdvantages: toArray(data.buffAbilityCheckAdvantageList),
+            abilityCheckDisadvantages: toArray(data.buffAbilityCheckDisadvantageList),
+            savingThrowAdvantages: toArray(data.buffSavingThrowAdvantageList),
+            savingThrowDisadvantages: toArray(data.buffSavingThrowDisadvantageList),
             skills: toArray(data.buffSkillAdvantageList),
             skillBonusSkills: toArray(data.buffSkillBonusList),
             skillBonus: data.buffSkillBonus || null,
@@ -964,6 +995,10 @@ function buildBuffConfigFromForm(form) {
       attackMode: readFormValue(form, "buffAttackMode", "none") !== "none" ? readFormValue(form, "buffAttackMode") : null,
       saveMode: readFormValue(form, "buffSaveMode", "none") !== "none" ? readFormValue(form, "buffSaveMode") : null,
       skillMode: readFormValue(form, "buffSkillMode", "none") !== "none" ? readFormValue(form, "buffSkillMode") : null,
+      abilityCheckAdvantages: readCsvFormValue(form, "buffAbilityCheckAdvantageList"),
+      abilityCheckDisadvantages: readCsvFormValue(form, "buffAbilityCheckDisadvantageList"),
+      savingThrowAdvantages: readCsvFormValue(form, "buffSavingThrowAdvantageList"),
+      savingThrowDisadvantages: readCsvFormValue(form, "buffSavingThrowDisadvantageList"),
       skills: readCsvFormValue(form, "buffSkillAdvantageList"),
       skillBonusSkills: readCsvFormValue(form, "buffSkillBonusList"),
       skillBonus: readFormValue(form, "buffSkillBonus", "") || null,
@@ -1040,6 +1075,10 @@ function buildDefaultBuffConfig() {
       attackMode: null,
       saveMode: null,
       skillMode: null,
+      abilityCheckAdvantages: [],
+      abilityCheckDisadvantages: [],
+      savingThrowAdvantages: [],
+      savingThrowDisadvantages: [],
       skills: [],
       skillBonusSkills: [],
       skillBonus: null,
@@ -1137,7 +1176,7 @@ function formHasDraftConfiguration(form) {
     if (field.type === "checkbox") return field.checked;
     return String(field.value ?? "").trim() !== "";
   }) || [
-    "receivedDamageTypesList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
+    "receivedDamageTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
     "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
@@ -1245,6 +1284,10 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "buffSensesSpecial", flag.buffs?.sensesSpecial ?? "");
   setFormValue(form, "buffPassivePerception", flag.buffs?.passivePerception ?? "");
 
+  setTagList(form, "buffAbilityCheckAdvantageList", flag.buffs?.abilityCheckAdvantages ?? []);
+  setTagList(form, "buffAbilityCheckDisadvantageList", flag.buffs?.abilityCheckDisadvantages ?? []);
+  setTagList(form, "buffSavingThrowAdvantageList", flag.buffs?.savingThrowAdvantages ?? []);
+  setTagList(form, "buffSavingThrowDisadvantageList", flag.buffs?.savingThrowDisadvantages ?? []);
   setTagList(form, "buffSkillAdvantageList", flag.buffs?.skills ?? []);
   setTagList(form, "buffSkillBonusList", flag.buffs?.skillBonusSkills ?? []);
   setTagList(form, "buffResistancesList", flag.buffs?.resistances ?? []);
@@ -1772,4 +1815,3 @@ export function registerItemSheetButton() {
     }
   });
 }
-

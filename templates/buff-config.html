@@ -390,6 +390,58 @@
           </select>
         </div>
         <div class="bot-row">
+          <div class="form-group bot-picker-group bot-input-flex">
+            <label>{{localize "BOT.ui.abilities.checkAdvantage"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffAbilityCheckAdvantageList">
+                {{#each flag.abilityCheckAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffAbilityCheckAdvantageList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffAbilityCheckAdvantageList')">
+                {{#each flag.abilityCheckAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffAbilityCheckAdvantageList" id="hidden-buffAbilityCheckAdvantageList" value="{{#each flag.abilityCheckAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+            </div>
+          </div>
+          <div class="form-group bot-picker-group bot-input-flex">
+            <label>{{localize "BOT.ui.abilities.checkDisadvantage"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffAbilityCheckDisadvantageList">
+                {{#each flag.abilityCheckDisadvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffAbilityCheckDisadvantageList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffAbilityCheckDisadvantageList')">
+                {{#each flag.abilityCheckDisadvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffAbilityCheckDisadvantageList" id="hidden-buffAbilityCheckDisadvantageList" value="{{#each flag.abilityCheckDisadvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+            </div>
+          </div>
+        </div>
+        <div class="bot-row">
+          <div class="form-group bot-picker-group bot-input-flex">
+            <label>{{localize "BOT.ui.abilities.saveAdvantage"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffSavingThrowAdvantageList">
+                {{#each flag.savingThrowAdvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSavingThrowAdvantageList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffSavingThrowAdvantageList')">
+                {{#each flag.savingThrowAdvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffSavingThrowAdvantageList" id="hidden-buffSavingThrowAdvantageList" value="{{#each flag.savingThrowAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+            </div>
+          </div>
+          <div class="form-group bot-picker-group bot-input-flex">
+            <label>{{localize "BOT.ui.abilities.saveDisadvantage"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffSavingThrowDisadvantageList">
+                {{#each flag.savingThrowDisadvantageOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffSavingThrowDisadvantageList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffSavingThrowDisadvantageList')">
+                {{#each flag.savingThrowDisadvantageOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffSavingThrowDisadvantageList" id="hidden-buffSavingThrowDisadvantageList" value="{{#each flag.savingThrowDisadvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+            </div>
+          </div>
+        </div>
+        <div class="bot-row">
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
             <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" class="bot-input-xs" />
@@ -618,6 +670,3 @@
     <button type="submit">{{localize "BOT.ui.actions.save"}}</button>
   </footer>
 </div>
-
-
-

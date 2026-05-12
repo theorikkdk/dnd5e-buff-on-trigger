@@ -1,5 +1,7 @@
 export const MODULE_ID = "dnd5e-buff-on-trigger";
 
+export const ABILITY_IDS = ["str","dex","con","int","wis","cha"];
+
 export const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv","med","nat","prc","prf","per","rel","slt","ste","sur"];
 
 export const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];

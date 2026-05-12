@@ -1,4 +1,4 @@
-import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, SKILL_IDS, debugLog } from "./constants.js";
+import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, ABILITY_IDS, SKILL_IDS, debugLog } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
 
 const DAMAGE_LABEL_KEYS = {
@@ -1469,6 +1469,10 @@ export function buildMechanicalChanges(flag) {
     attackMode,
     saveMode,
     skillMode,
+    abilityCheckAdvantages,
+    abilityCheckDisadvantages,
+    savingThrowAdvantages,
+    savingThrowDisadvantages,
     skills,
     skillBonus,
     skillBonusSkills,
@@ -1503,6 +1507,18 @@ export function buildMechanicalChanges(flag) {
   if (skillMode) {
     const key = skillMode === "advantage" ? "flags.midi-qol.advantage.check.all" : "flags.midi-qol.disadvantage.check.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  for (const ability of abilityCheckAdvantages ?? []) {
+    if (ABILITY_IDS.includes(ability)) changes.push({ key: `system.abilities.${ability}.check.roll.mode`, mode: 2, value: "1", priority: 20 });
+  }
+  for (const ability of abilityCheckDisadvantages ?? []) {
+    if (ABILITY_IDS.includes(ability)) changes.push({ key: `system.abilities.${ability}.check.roll.mode`, mode: 2, value: "-1", priority: 20 });
+  }
+  for (const ability of savingThrowAdvantages ?? []) {
+    if (ABILITY_IDS.includes(ability)) changes.push({ key: `system.abilities.${ability}.save.roll.mode`, mode: 2, value: "1", priority: 20 });
+  }
+  for (const ability of savingThrowDisadvantages ?? []) {
+    if (ABILITY_IDS.includes(ability)) changes.push({ key: `system.abilities.${ability}.save.roll.mode`, mode: 2, value: "-1", priority: 20 });
   }
   // Avantage sur les compÃ©tences sÃ©lectionnÃ©es
   if (skills?.length) {
