@@ -1,4 +1,4 @@
-import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, debugLog } from "./constants.js";
+import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
@@ -299,7 +299,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
 
-  if (["mwak", "rwak", "msak", "rsak"].includes(raw.type)) {
+  if (ATTACK_TRIGGER_TYPES.includes(raw.type)) {
     summary.push({ label: game.i18n.localize("BOT.ui.summary.condition"), value: getConditionLabel(raw.condition) });
   }
 
@@ -540,6 +540,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       typeRwak:              raw.type === "rwak",
       typeMsak:              raw.type === "msak",
       typeRsak:              raw.type === "rsak",
+      typeAnyAttack:        raw.type === "anyAttack",
+      typeWeaponAttack:     raw.type === "weaponAttack",
+      typeSpellAttack:      raw.type === "spellAttack",
       typeDamaged:           raw.type === "damaged",
       typeHealed:            raw.type === "healed",
       typeTurnStart:         raw.type === "turnStart",
@@ -623,7 +626,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
       saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
       saveEffectFull:        raw.save?.effect === "full",
-      showAttackCondition:   ["mwak", "rwak", "msak", "rsak"].includes(raw.type),
+      showAttackCondition:   ATTACK_TRIGGER_TYPES.includes(raw.type),
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
       conditionAlways:       raw.condition === "always",
@@ -1109,7 +1112,7 @@ window.botUpdateTriggerUI = function(selectEl) {
   const passiveHelp = form?.querySelector?.("#bot-passive-help");
 
   if (conditionGroup) {
-    conditionGroup.style.display = ["mwak", "rwak", "msak", "rsak"].includes(selectEl.value) ? "" : "none";
+    conditionGroup.style.display = ATTACK_TRIGGER_TYPES.includes(selectEl.value) ? "" : "none";
   }
 
   if (receivedConditionsGroup) {
@@ -1234,7 +1237,7 @@ window.botUpdateRollModifierUI = function(form) {
 window.botUpdateTargetModeOptions = function(form, triggerType) {
   if (!form) return;
 
-  const attackTriggers = ["mwak", "rwak", "msak", "rsak"];
+  const attackTriggers = ATTACK_TRIGGER_TYPES;
   const turnTriggers = ["turnStart", "turnEnd", "targetTurnStart", "targetTurnEnd"];
 
   let allowedModes = ["triggerTarget", "self", "attacker", "storedTarget"];

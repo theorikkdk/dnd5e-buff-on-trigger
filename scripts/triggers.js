@@ -1,4 +1,4 @@
-import { MODULE_ID, ATTACK_ACTION_TYPES, debugLog } from "./constants.js";
+import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC } from "./effects.js";
 
@@ -112,6 +112,14 @@ function getReceivedAttackCategories(workflow, item) {
   return categories;
 }
 
+function doesAttackTriggerMatch(triggerType, actionType) {
+  if (triggerType === actionType) return true;
+  if (triggerType === "anyAttack") return ATTACK_ACTION_TYPES.includes(actionType);
+  if (triggerType === "weaponAttack") return ["mwak", "rwak"].includes(actionType);
+  if (triggerType === "spellAttack") return ["msak", "rsak"].includes(actionType);
+  return false;
+}
+
 function collectDamageTypes(value, types = new Set()) {
   if (!value) return types;
   if (Array.isArray(value)) {
@@ -175,7 +183,7 @@ function getStoredTargetCandidates(workflow, flag) {
     return attackerToken ? [attackerToken] : [];
   }
 
-  if (["mwak", "rwak", "msak", "rsak"].includes(flag.type)) {
+  if (ATTACK_TRIGGER_TYPES.includes(flag.type)) {
     const condition = flag.condition ?? "hit";
     if (condition === "hit") return [...(workflow.hitTargets ?? [])];
     if (condition === "miss") return getMissedAttackTargets(workflow);
@@ -577,7 +585,7 @@ export function registerTriggers() {
       if (!flag) return;
       if (flag.type === "passive") return;
 
-      if (flag.type === actionType) {
+      if (doesAttackTriggerMatch(flag.type, actionType)) {
         handleAttackTrigger(workflow, flag);
       }
     } catch (error) {

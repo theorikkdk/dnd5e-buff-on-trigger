@@ -76,7 +76,7 @@ export const BUFF_PRESETS = [
       targetMode: "self",
       rememberTargetOnActivation: true,
       requireStoredTargetMatch: true,
-      type: "mwak",
+      type: "anyAttack",
       condition: "hit",
       damage: {
         formula: "1d6",
@@ -94,7 +94,7 @@ export const BUFF_PRESETS = [
       targetMode: "self",
       rememberTargetOnActivation: true,
       requireStoredTargetMatch: true,
-      type: "mwak",
+      type: "weaponAttack",
       condition: "hit",
       damage: {
         formula: "1d6",

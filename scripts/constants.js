@@ -11,6 +11,8 @@ export const WEAPON_PROF_IDS = ["sim","mar","longsword","shortsword","dagger","h
 export const LANGUAGE_IDS = ["common","elvish","dwarvish","orcish","draconic","infernal","celestial","abyssal","undercommon","gnomish","halfling","goblin","sylvan","primordial","deep"];
 
 export const ATTACK_ACTION_TYPES = ["mwak","rwak","msak","rsak"];
+export const GROUPED_ATTACK_TRIGGER_TYPES = ["anyAttack","weaponAttack","spellAttack"];
+export const ATTACK_TRIGGER_TYPES = [...ATTACK_ACTION_TYPES, ...GROUPED_ATTACK_TRIGGER_TYPES];
 
 export const BUFF_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-active.svg";
 export const STORED_TARGET_ICON = "modules/dnd5e-buff-on-trigger/icons/buff-stored-target.svg";
