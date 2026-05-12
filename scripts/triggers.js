@@ -432,6 +432,192 @@ async function clearExistingBuffInstance(actor, activeBuff) {
   await refreshBuffIndicator(actor, itemName, [], activeBuff);
 }
 
+async function endActiveBuff(actor, activeBuff) {
+  if (!actor?.unsetFlag || !activeBuff) return;
+  const itemName = activeBuff.itemName;
+  await actor.unsetFlag(MODULE_ID, "activeBuff");
+  await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+  const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
+  for (const effect of mechEffects) await effect.delete();
+  const concentrationEffect = actor.effects?.find(
+    (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
+  );
+  if (concentrationEffect) await concentrationEffect.delete();
+  await refreshBuffIndicator(actor, itemName, [], activeBuff);
+}
+
+function shouldRollRepeatedSave(flag, timing) {
+  return !!flag?.save?.ability
+    && flag.save?.repeat?.enabled === true
+    && (flag.save.repeat?.timing ?? "endTurn") === timing;
+}
+
+function resolveActorUuid(uuid) {
+  if (!uuid) return null;
+  try {
+    if (typeof fromUuidSync === "function") return fromUuidSync(uuid);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function buildRepeatedSaveSupportBuffId(ownerActor, flag) {
+  return [
+    ownerActor?.uuid ?? null,
+    flag?.originActorUuid ?? null,
+    flag?.originItemUuid ?? flag?.itemUuid ?? null,
+    flag?.itemName ?? null,
+    flag?.status?.id ?? null,
+  ].filter(Boolean).join("|");
+}
+
+function activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag) {
+  if (!activeBuff || !linkedFlag?.buffId) return false;
+  return buildRepeatedSaveSupportBuffId(ownerActor, activeBuff) === linkedFlag.buffId;
+}
+
+function getLinkedStatusRepeatedSaveEffects(actor, timing) {
+  const effects = actor?.effects?.filter((effect) => {
+    const linkedFlag = effect.flags?.[MODULE_ID];
+    return linkedFlag?.linkedStatus === true
+      && linkedFlag.saveRepeat?.enabled === true
+      && (linkedFlag.saveRepeat?.timing ?? "endTurn") === timing
+      && !!linkedFlag.saveAbility;
+  }) ?? [];
+  debugLog(`[${MODULE_ID}] Sauvegardes répétées liées inspectées sur ${actor?.name ?? "inconnu"} : ${effects.length}`);
+  return effects;
+}
+
+function buildRepeatedSaveFlagFromLinkedStatus(linkedFlag) {
+  return {
+    itemUuid: linkedFlag.originItemUuid ?? null,
+    originItemUuid: linkedFlag.originItemUuid ?? null,
+    originActorUuid: linkedFlag.originActorUuid ?? null,
+    save: {
+      ability: linkedFlag.saveAbility,
+      dcSource: linkedFlag.saveDcSource ?? "fixed",
+      dc: linkedFlag.saveDc ?? null,
+      repeat: linkedFlag.saveRepeat ?? null,
+    },
+    status: {
+      id: linkedFlag.statusId ?? null,
+      removeWhenBuffEnds: true,
+    },
+  };
+}
+
+async function createRepeatedSaveMessage(actor, success, shouldEnd) {
+  const key = success
+    ? "BOT.chat.repeatSave.success"
+    : "BOT.chat.repeatSave.failure";
+  const content = game.i18n.format(key, {
+    actor: actor?.name ?? game.i18n.localize("BOT.fallback.effectName"),
+    result: shouldEnd ? "end" : "continue",
+  });
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content,
+  });
+}
+
+async function handleRepeatedSave(actor, flag, timing) {
+  if (!shouldRollRepeatedSave(flag, timing)) return false;
+
+  const workflow = {
+    actor,
+    item: null,
+    targets: new Set(),
+    hitTargets: new Set(),
+    missedTargets: new Set(),
+  };
+  const saveDc = await resolveSaveDC(workflow, flag);
+  if (saveDc === null) {
+    debugLog(`[${MODULE_ID}] Sauvegarde répétée ignorée : DD indisponible`);
+    return false;
+  }
+
+  const saveRolls = await actor.rollSavingThrow(
+    {
+      ability: flag.save.ability,
+      target: saveDc,
+      targetValue: saveDc,
+      dc: saveDc,
+    },
+    { configure: false },
+    { create: true }
+  );
+  const saveRoll = saveRolls?.[0] ?? null;
+  if (!saveRoll) {
+    debugLog(`[${MODULE_ID}] Sauvegarde répétée ignorée : jet indisponible`);
+    return false;
+  }
+
+  const success = saveRoll.total >= saveDc;
+  const endsOn = flag.save.repeat?.endsBuffOn ?? "success";
+  const shouldEnd = endsOn === "failure" ? !success : success;
+  debugLog(`[${MODULE_ID}] Sauvegarde répétée ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} — ${success ? "réussite" : "échec"} — buff ${shouldEnd ? "terminé" : "maintenu"}`);
+  await createRepeatedSaveMessage(actor, success, shouldEnd);
+  if (shouldEnd) await endActiveBuff(actor, flag);
+  return shouldEnd;
+}
+
+async function cleanupLinkedStatusSupportBuff(linkedFlag) {
+  const ownerActor = resolveActorUuid(linkedFlag?.ownerActorUuid);
+  if (!ownerActor?.getFlag) return;
+  const activeBuff = ownerActor.getFlag(MODULE_ID, "activeBuff");
+  if (!activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag)) return;
+  await endActiveBuff(ownerActor, activeBuff);
+}
+
+async function handleLinkedStatusRepeatedSaves(actor, timing) {
+  const effects = getLinkedStatusRepeatedSaveEffects(actor, timing);
+  for (const effect of effects) {
+    const linkedFlag = effect.flags?.[MODULE_ID];
+    const flag = buildRepeatedSaveFlagFromLinkedStatus(linkedFlag);
+    debugLog(`[${MODULE_ID}] JS répété lié au statut ${linkedFlag.statusId} lancé pour ${actor.name}`);
+
+    const workflow = {
+      actor,
+      item: null,
+      targets: new Set(),
+      hitTargets: new Set(),
+      missedTargets: new Set(),
+    };
+    const saveDc = await resolveSaveDC(workflow, flag);
+    if (saveDc === null) {
+      debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ignorée : DD indisponible`);
+      continue;
+    }
+
+    const saveRolls = await actor.rollSavingThrow(
+      {
+        ability: flag.save.ability,
+        target: saveDc,
+        targetValue: saveDc,
+        dc: saveDc,
+      },
+      { configure: false },
+      { create: true }
+    );
+    const saveRoll = saveRolls?.[0] ?? null;
+    if (!saveRoll) {
+      debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ignorée : jet indisponible`);
+      continue;
+    }
+
+    const success = saveRoll.total >= saveDc;
+    const endsOn = flag.save.repeat?.endsBuffOn ?? "success";
+    const shouldEnd = endsOn === "failure" ? !success : success;
+    debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} — ${success ? "réussite" : "échec"} — statut ${shouldEnd ? "retiré" : "conservé"}`);
+    await createRepeatedSaveMessage(actor, success, shouldEnd);
+    if (shouldEnd) {
+      await effect.delete();
+      await cleanupLinkedStatusSupportBuff(linkedFlag);
+    }
+  }
+}
+
 async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   if (!actor?.setFlag || !activeBuff?.rememberTargetOnActivation || !newTargetToken?.actor) return false;
   const previousFlag = foundry.utils.deepClone(activeBuff);
@@ -725,7 +911,10 @@ export function registerTriggers() {
       const currentActor = currentCombatant?.actor;
       if (currentActor) {
         const flag = currentActor.getFlag(MODULE_ID, "activeBuff");
-        if (flag?.type === "turnStart") {
+        const repeatedSaveHandled = shouldRollRepeatedSave(flag, "startTurn");
+        const endedByRepeatedSave = await handleRepeatedSave(currentActor, flag, "startTurn");
+        if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(currentActor, "startTurn");
+        if (!endedByRepeatedSave && flag?.type === "turnStart") {
           await handleTurnTrigger(currentActor, flag, "turnStart");
         }
       }
@@ -759,7 +948,10 @@ export function registerTriggers() {
 
       if (prevActor) {
         const flag = prevActor.getFlag(MODULE_ID, "activeBuff");
-        if (flag?.type === "turnEnd") {
+        const repeatedSaveHandled = shouldRollRepeatedSave(flag, "endTurn");
+        const endedByRepeatedSave = await handleRepeatedSave(prevActor, flag, "endTurn");
+        if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(prevActor, "endTurn");
+        if (!endedByRepeatedSave && flag?.type === "turnEnd") {
           await handleTurnTrigger(prevActor, flag, "turnEnd");
         }
       }

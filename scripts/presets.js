@@ -290,6 +290,11 @@ export const BUFF_PRESETS = [
         ability: "con",
         dcSource: "origin",
         effect: "full",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
       },
       status: {
         id: "blinded",
@@ -1017,6 +1022,11 @@ export const BUFF_PRESETS = [
         ability: "con",
         dcSource: "origin",
         activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
       },
       status: {
         id: "blinded",
@@ -1042,6 +1052,11 @@ export const BUFF_PRESETS = [
         ability: "con",
         dcSource: "origin",
         activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
       },
       status: {
         id: "deafened",
@@ -1067,6 +1082,11 @@ export const BUFF_PRESETS = [
         ability: "wis",
         dcSource: "origin",
         activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
       },
       status: {
         id: "paralyzed",

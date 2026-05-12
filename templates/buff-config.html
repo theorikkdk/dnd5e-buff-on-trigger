@@ -237,6 +237,25 @@
             <option value="success" {{#if flag.saveActivationApplyOnSuccess}}selected{{/if}}>{{localize "BOT.ui.activationApplyOn.success"}}</option>
           </select>
         </div>
+        <div class="bot-panel-soft" id="bot-save-repeat-section" {{#unless flag.saveAbility}}style="display:none"{{/unless}}>
+          <h4>{{localize "BOT.ui.saveRepeat.title"}}</h4>
+          <label class="bot-check-row">
+            <input type="checkbox" name="saveRepeatEnabled" {{#if flag.saveRepeatEnabled}}checked{{/if}}>
+            <span>{{localize "BOT.ui.saveRepeat.enabled"}}</span>
+          </label>
+          <div class="bot-row bot-save-row">
+            <label class="bot-label-sm">{{localize "BOT.ui.saveRepeat.timing.label"}}</label>
+            <select name="saveRepeatTiming" class="bot-input-flex">
+              <option value="endTurn" {{#if flag.saveRepeatTimingEndTurn}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.timing.endTurn"}}</option>
+              <option value="startTurn" {{#if flag.saveRepeatTimingStartTurn}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.timing.startTurn"}}</option>
+            </select>
+            <label class="bot-label-sm">{{localize "BOT.ui.saveRepeat.endsBuffOn.label"}}</label>
+            <select name="saveRepeatEndsBuffOn" class="bot-input-flex">
+              <option value="success" {{#if flag.saveRepeatEndsBuffOnSuccess}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.endsBuffOn.success"}}</option>
+              <option value="failure" {{#if flag.saveRepeatEndsBuffOnFailure}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.endsBuffOn.failure"}}</option>
+            </select>
+          </div>
+        </div>
       </div>
     </details>
 

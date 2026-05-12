@@ -179,6 +179,13 @@ function getSaveTimingLabel(timing) {
 function getActivationApplyOnLabel(value) {
   return game.i18n.localize(`BOT.ui.activationApplyOn.${value ?? "failure"}`);
 }
+function getSaveRepeatTimingLabel(timing) {
+  return game.i18n.localize(`BOT.ui.saveRepeat.timing.${timing ?? "endTurn"}`);
+}
+
+function getSaveRepeatEndsBuffOnLabel(value) {
+  return game.i18n.localize(`BOT.ui.saveRepeat.endsBuffOn.${value ?? "success"}`);
+}
 function getAbilityLabel(ability) {
   return ability ? game.i18n.localize(`BOT.abilities.${ability}`) : game.i18n.localize("BOT.ui.none");
 }
@@ -418,6 +425,15 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
       label: game.i18n.localize("BOT.ui.summary.save"),
       value: parts.join(" • ")
     });
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.saveRepeat"),
+      value: raw.save.repeat?.enabled
+        ? game.i18n.format("BOT.ui.summary.saveRepeatConfigured", {
+            timing: getSaveRepeatTimingLabel(raw.save.repeat.timing),
+            endsBuffOn: getSaveRepeatEndsBuffOnLabel(raw.save.repeat.endsBuffOn),
+          })
+        : game.i18n.localize("BOT.ui.summary.saveRepeatNone")
+    });
   } else {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
@@ -520,6 +536,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (saveDcSourceSelect) window.botUpdateSaveDcUI(saveDcSourceSelect);
     const saveTimingSelect = this.element.querySelector?.('[name="saveTiming"]');
     if (saveTimingSelect) window.botUpdateSaveTimingUI(saveTimingSelect);
+    const saveAbilitySelect = this.element.querySelector?.('[name="saveAbility"]');
+    if (saveAbilitySelect) saveAbilitySelect.addEventListener("change", () => window.botUpdateSaveRepeatUI(form));
+    if (form) window.botUpdateSaveRepeatUI(form);
     const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]') ?? [];
     for (const input of formulaInputs) {
       input.addEventListener("focus", () => {
@@ -712,6 +731,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveEffectNone:        (raw.save?.effect ?? "half") === "none",
       saveEffectHalf:        (raw.save?.effect ?? "half") === "half",
       saveEffectFull:        raw.save?.effect === "full",
+      saveRepeatEnabled:     raw.save?.repeat?.enabled === true,
+      saveRepeatTimingEndTurn: (raw.save?.repeat?.timing ?? "endTurn") === "endTurn",
+      saveRepeatTimingStartTurn: raw.save?.repeat?.timing === "startTurn",
+      saveRepeatEndsBuffOnSuccess: (raw.save?.repeat?.endsBuffOn ?? "success") === "success",
+      saveRepeatEndsBuffOnFailure: raw.save?.repeat?.endsBuffOn === "failure",
       showAttackCondition:   ATTACK_TRIGGER_TYPES.includes(raw.type),
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
@@ -820,7 +844,12 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             dcSource: data.saveDcSource ?? "fixed",
             timing: data.saveTiming ?? "trigger",
             activationApplyOn: data.saveActivationApplyOn ?? "failure",
-            effect: data.saveEffect
+            effect: data.saveEffect,
+            repeat: {
+              enabled: data.saveRepeatEnabled ?? false,
+              timing: data.saveRepeatTiming ?? "endTurn",
+              endsBuffOn: data.saveRepeatEndsBuffOn ?? "success",
+            }
           } : null,
           status: data.statusId ? {
             id: data.statusId,
@@ -995,6 +1024,11 @@ function buildBuffConfigFromForm(form) {
       timing: readFormValue(form, "saveTiming", "trigger"),
       activationApplyOn: readFormValue(form, "saveActivationApplyOn", "failure"),
       effect: readFormValue(form, "saveEffect", "half"),
+      repeat: {
+        enabled: !!readFormValue(form, "saveRepeatEnabled"),
+        timing: readFormValue(form, "saveRepeatTiming", "endTurn"),
+        endsBuffOn: readFormValue(form, "saveRepeatEndsBuffOn", "success"),
+      },
     } : null,
     status: statusId ? {
       id: statusId,
@@ -1195,7 +1229,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusRemoveWhenBuffEnds", "saveAbility", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "charges",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
   ];
@@ -1279,6 +1313,9 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveTiming", flag.save?.timing ?? "trigger");
   setFormValue(form, "saveActivationApplyOn", flag.save?.activationApplyOn ?? "failure");
   setFormValue(form, "saveEffect", flag.save?.effect ?? "half");
+  setFormValue(form, "saveRepeatEnabled", !!flag.save?.repeat?.enabled);
+  setFormValue(form, "saveRepeatTiming", flag.save?.repeat?.timing ?? "endTurn");
+  setFormValue(form, "saveRepeatEndsBuffOn", flag.save?.repeat?.endsBuffOn ?? "success");
 
   setFormValue(form, "statusId", flag.status?.id ?? "");
   setFormValue(form, "statusTiming", flag.status?.timing ?? "trigger");
@@ -1339,6 +1376,7 @@ function applyPresetFlagToForm(form, flag) {
   window.botUpdateTriggerUI(form.querySelector('[name="type"]'));
   window.botUpdateSaveDcUI(form.querySelector('[name="saveDcSource"]'));
   window.botUpdateSaveTimingUI(form.querySelector('[name="saveTiming"]'));
+  window.botUpdateSaveRepeatUI(form);
   window.botUpdateEffectSectionsUI(form);
   window.botUpdateRollModifierUI(form);
   updateSummaryFromFlag(form, flag);
@@ -1591,6 +1629,14 @@ window.botShowTab = function(btn, tabId) {
   if (app) app.resizeToContent();
 };
 
+window.botUpdateSaveRepeatUI = function(form) {
+  if (!form) return;
+  const repeatSection = form.querySelector('#bot-save-repeat-section');
+  const saveAbility = form.querySelector('[name="saveAbility"]');
+  if (repeatSection && saveAbility) {
+    repeatSection.style.display = saveAbility.value ? "" : "none";
+  }
+};
 window.botUpdateSaveTimingUI = function(selectEl) {
   const form = selectEl?.closest?.('form');
   if (!form) return;

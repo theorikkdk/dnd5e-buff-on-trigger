@@ -1135,8 +1135,13 @@ async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
     [`flags.${MODULE_ID}.originActorUuid`]: flag?.originActorUuid ?? null,
     [`flags.${MODULE_ID}.originItemUuid`]: originItemUuid,
     [`flags.${MODULE_ID}.ownerActorUuid`]: ownerActorUuid,
+    [`flags.${MODULE_ID}.statusBearerActorUuid`]: targetActor.uuid ?? null,
     [`flags.${MODULE_ID}.statusId`]: statusId,
     [`flags.${MODULE_ID}.buffId`]: buildLinkedStatusBuffId(ownerActor, flag),
+    [`flags.${MODULE_ID}.saveAbility`]: flag?.save?.ability ?? null,
+    [`flags.${MODULE_ID}.saveDcSource`]: flag?.save?.dcSource ?? "fixed",
+    [`flags.${MODULE_ID}.saveDc`]: flag?.save?.dc ?? null,
+    [`flags.${MODULE_ID}.saveRepeat`]: foundry.utils.deepClone(flag?.save?.repeat ?? null),
   });
   debugLog(`[${MODULE_ID}] Statut lie ${statusId} marque sur ${targetActor.name}`);
 }
@@ -1366,6 +1371,24 @@ function resolveTemporaryHpTargets(workflow, flag) {
   return new Set();
 }
 
+function shouldRetainBuffForRepeatedSave(flag) {
+  return flag?.save?.repeat?.enabled === true && !!flag?.status?.id;
+}
+
+function buildRepeatedSaveOnlyFlag(flag) {
+  const { chargesRemaining, ...rest } = flag ?? {};
+  return {
+    ...rest,
+    type: "passive",
+    damage: null,
+    healing: null,
+    temporaryHp: null,
+    rollModifier: null,
+    consumeOnTrigger: false,
+    charges: null,
+    save: flag?.save ? { ...flag.save, repeat: { ...(flag.save.repeat ?? {}), enabled: false } } : null,
+  };
+}
 async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) {
   try {
     if (flag.chargesRemaining !== null) {
@@ -1384,6 +1407,14 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       await createChargeConsumptionMessage(actor, currentFlag, newCharges);
       debugLog(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
       if (newCharges <= 0) {
+        if (shouldRetainBuffForRepeatedSave(currentFlag)) {
+          const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
+          await actor?.setFlag(MODULE_ID, "activeBuff", retainedFlag);
+          await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+          await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
+          debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
+          return;
+        }
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         debugLog(`[${MODULE_ID}] Buff �puis� � toutes les charges consomm�es`);
@@ -1411,6 +1442,14 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
       if (!isSameActiveBuff(currentFlag, flag)) {
         debugLog(`[${MODULE_ID}] Consommation ignor�e : buff actif d�j� modifi� ou supprim�`);
+        return;
+      }
+      if (shouldRetainBuffForRepeatedSave(currentFlag)) {
+        const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
+        await actor?.setFlag(MODULE_ID, "activeBuff", retainedFlag);
+        await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+        await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
+        debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
         return;
       }
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
