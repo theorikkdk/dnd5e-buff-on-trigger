@@ -1,4 +1,4 @@
-import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
+import { MODULE_ID, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
@@ -185,7 +185,7 @@ function getStatusOptions(currentStatusId = null) {
   const options = (CONFIG.statusEffects ?? [])
     .map((status) => {
       const id = status.id ?? status.statuses?.[0] ?? null;
-      if (!id || id === "bot-active") return null;
+      if (!id || id === "bot-active" || id === "bot-stored-target") return null;
       const rawLabel = status.name ?? status.label ?? id;
       const label = game.i18n.localize(rawLabel);
       return {
@@ -209,6 +209,21 @@ function getStatusOptions(currentStatusId = null) {
   return options;
 }
 
+function getConditionImmunityOptions(selected = []) {
+  const selectedSet = new Set(selected ?? []);
+  const byId = new Map();
+  for (const id of CONDITION_IDS) {
+    byId.set(id, { value: id, label: game.i18n.localize(`BOT.condition.${id}`), selected: selectedSet.has(id) });
+  }
+  for (const status of CONFIG.statusEffects ?? []) {
+    const id = status.id ?? status.statuses?.[0] ?? null;
+    if (!id || id === "bot-active" || id === "bot-stored-target") continue;
+    if (!CONDITION_IDS.includes(id)) continue;
+    const rawLabel = status.name ?? status.label ?? id;
+    byId.set(id, { value: id, label: game.i18n.localize(rawLabel), selected: selectedSet.has(id) });
+  }
+  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
 function formatItemDurationSummary(rounds, fallbackRounds = null) {
   const syncedRounds = rounds ?? fallbackRounds;
   if (syncedRounds === null || syncedRounds === undefined) {
@@ -246,6 +261,7 @@ function hasMechanicalChanges(buffs = {}) {
     || (buffs.resistances ?? []).length > 0
     || (buffs.vulnerabilities ?? []).length > 0
     || (buffs.immunities ?? []).length > 0
+    || (buffs.conditionImmunities ?? []).length > 0
     || (buffs.weaponProfs ?? []).length > 0
     || (buffs.armorProfs ?? []).length > 0
     || (buffs.languages ?? []).length > 0;
@@ -275,6 +291,7 @@ function buildMechanicalSummary(raw, labels) {
   if ((buffs.resistances ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.resistances")} : ${listSelectedLabels(buffs.resistances, labels.damageTypes)}`);
   if ((buffs.vulnerabilities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.vulnerabilities")} : ${listSelectedLabels(buffs.vulnerabilities, labels.damageTypes)}`);
   if ((buffs.immunities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.immunities")} : ${listSelectedLabels(buffs.immunities, labels.damageTypes)}`);
+  if ((buffs.conditionImmunities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.conditionImmunities")} : ${listSelectedLabels(buffs.conditionImmunities, labels.conditions)}`);
   if ((buffs.weaponProfs ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.weaponProficiencies")} : ${listSelectedLabels(buffs.weaponProfs, labels.weaponProfs)}`);
   if ((buffs.armorProfs ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.armorProficiencies")} : ${listSelectedLabels(buffs.armorProfs, labels.armorProfs)}`);
   if ((buffs.languages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.capacities.languages")} : ${listSelectedLabels(buffs.languages, labels.languages)}`);
@@ -521,12 +538,14 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const statusOptions = getStatusOptions(raw.status?.id ?? null);
     const presets = getPresetOptions();
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
+    const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
     const labels = {
       skills: skillLabels,
       damageTypes: damageLabels,
       weaponProfs: weaponProfLabels,
       armorProfs: armorProfLabels,
       languages: languageLabels,
+      conditions: Object.fromEntries(conditionImmunityOptions.map((option) => [option.value, option.label])),
       statuses: statusLabels,
     };
     const skillAdvantageOptions = SKILL_IDS.map(id => ({ value: id, label: skillLabels[id], selected: (raw.buffs?.skills ?? []).includes(id) }));
@@ -606,6 +625,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       resistanceOptions,
       vulnOptions,
       immunityOptions,
+      conditionImmunityOptions,
       weaponProfOptions,
       armorProfOptions,
       languageOptions,
@@ -772,6 +792,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             resistances: toArray(data.buffResistancesList),
             vulnerabilities: toArray(data.buffVulnsList),
             immunities: toArray(data.buffImmunitiesList),
+            conditionImmunities: toArray(data.buffConditionImmunitiesList),
           };
         })(),
       };
@@ -948,6 +969,7 @@ function buildBuffConfigFromForm(form) {
       resistances: readCsvFormValue(form, "buffResistancesList"),
       vulnerabilities: readCsvFormValue(form, "buffVulnsList"),
       immunities: readCsvFormValue(form, "buffImmunitiesList"),
+      conditionImmunities: readCsvFormValue(form, "buffConditionImmunitiesList"),
     },
   });
 }
@@ -1022,6 +1044,7 @@ function buildDefaultBuffConfig() {
       resistances: [],
       vulnerabilities: [],
       immunities: [],
+      conditionImmunities: [],
     },
   };
 }
@@ -1100,7 +1123,7 @@ function formHasDraftConfiguration(form) {
     return String(field.value ?? "").trim() !== "";
   }) || [
     "receivedDamageTypesList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
-    "buffVulnsList", "buffImmunitiesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
+    "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
 
@@ -1117,6 +1140,7 @@ function getSummaryLabels() {
     weaponProfs: getWeaponProfLabels(),
     armorProfs: getArmorProfLabels(),
     languages: getLanguageLabels(),
+    conditions: Object.fromEntries(getConditionImmunityOptions().map((option) => [option.value, option.label])),
     statuses: Object.fromEntries(statusOptions.map((option) => [option.value, option.label])),
   };
 }
@@ -1209,6 +1233,7 @@ function applyPresetFlagToForm(form, flag) {
   setTagList(form, "buffResistancesList", flag.buffs?.resistances ?? []);
   setTagList(form, "buffVulnsList", flag.buffs?.vulnerabilities ?? []);
   setTagList(form, "buffImmunitiesList", flag.buffs?.immunities ?? []);
+  setTagList(form, "buffConditionImmunitiesList", flag.buffs?.conditionImmunities ?? []);
   setTagList(form, "buffWeaponProfsList", flag.buffs?.weaponProfs ?? []);
   setTagList(form, "buffArmorProfsList", flag.buffs?.armorProfs ?? []);
   setTagList(form, "buffLanguagesList", flag.buffs?.languages ?? []);

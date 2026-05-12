@@ -423,6 +423,32 @@ function readProfBonus(actor) {
   );
 }
 
+function readSpellcastingModifier(actor) {
+  if (!actor) return 0;
+  const direct = normalizeFormulaNumber(
+    actor.system?.attributes?.spell?.mod
+    ?? actor.system?.attributes?.spellcasting?.mod
+    ?? actor.getRollData?.()?.attributes?.spell?.mod,
+    NaN
+  );
+  if (Number.isFinite(direct)) return direct;
+
+  const dc = readNumericSaveDCFromActor(actor);
+  if (dc !== null) return dc - 8 - readProfBonus(actor);
+
+  const abilitySource = actor.system?.attributes?.spellcasting
+    ?? actor.system?.details?.spellcasting
+    ?? actor.getRollData?.()?.attributes?.spellcasting
+    ?? null;
+  const ability = typeof abilitySource === "string"
+    ? abilitySource
+    : abilitySource?.ability ?? abilitySource?.value ?? null;
+  if (ability && actor.system?.abilities?.[ability]) return readAbilityModifier(actor, ability);
+
+  debugLog(`[${MODULE_ID}] Modificateur d'incantation indisponible pour ${actor.name ?? "acteur inconnu"}`);
+  return 0;
+}
+
 function readItemBaseSpellLevel(item) {
   if (!item) return null;
   const level = normalizeFormulaNumber(
@@ -442,7 +468,8 @@ function buildActorFormulaSource(actor) {
     con: { mod: readAbilityModifier(actor, "con") },
     int: { mod: readAbilityModifier(actor, "int") },
     wis: { mod: readAbilityModifier(actor, "wis") },
-    cha: { mod: readAbilityModifier(actor, "cha") }
+    cha: { mod: readAbilityModifier(actor, "cha") },
+    spell: { mod: readSpellcastingModifier(actor) }
   };
 }
 
@@ -456,6 +483,7 @@ function assignSafeRollModifierData(target, safeData) {
   target.data.int = safeData.int;
   target.data.wis = safeData.wis;
   target.data.cha = safeData.cha;
+  target.data.spell = safeData.spell;
   target.data.origin = safeData.origin;
   target.data.owner = safeData.owner;
   target.data.target = safeData.target;
@@ -484,6 +512,7 @@ function buildSafeRollModifierData(actor, flag) {
     int: { mod: originData.int.mod },
     wis: { mod: originData.wis.mod },
     cha: { mod: originData.cha.mod },
+    spell: { mod: originData.spell.mod },
     origin: originData,
     owner: ownerData,
     target: emptyData,
@@ -531,6 +560,7 @@ export async function buildFormulaRollData(workflow, flag) {
     int: { mod: originData.int.mod },
     wis: { mod: originData.wis.mod },
     cha: { mod: originData.cha.mod },
+    spell: { mod: originData.spell.mod },
     origin: originData,
     owner: ownerData,
     target: targetData,
@@ -1366,6 +1396,7 @@ export function buildMechanicalChanges(flag) {
     resistances,
     vulnerabilities,
     immunities,
+    conditionImmunities,
     weaponProfs,
     armorProfs,
     languages,
@@ -1422,6 +1453,9 @@ export function buildMechanicalChanges(flag) {
   }
   if (immunities?.length) {
     for (const type of immunities) changes.push({ key: "system.traits.di.value", mode: 2, value: type, priority: 20 });
+  }
+  if (conditionImmunities?.length) {
+    for (const condition of conditionImmunities) changes.push({ key: "system.traits.ci.value", mode: 2, value: condition, priority: 20 });
   }
   for (const id of weaponProfs ?? []) {
     changes.push({ key: "system.traits.weaponProf.value", mode: 0, value: id, priority: 20 });

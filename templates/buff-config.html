@@ -272,6 +272,7 @@
       <div class="bot-formula-help-insert-label">{{localize "BOT.ui.formulaHelp.insert"}}</div>
       <div class="bot-formula-variable-list">
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@spellLevel')">@spellLevel</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@spell.mod')">@spell.mod</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@prof')">@prof</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@str.mod')">@str.mod</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@dex.mod')">@dex.mod</button>
@@ -280,6 +281,7 @@
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@wis.mod')">@wis.mod</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@cha.mod')">@cha.mod</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@origin.prof')">@origin.prof</button>
+        <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@origin.spell.mod')">@origin.spell.mod</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@owner.prof')">@owner.prof</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@target.prof')">@target.prof</button>
         <button type="button" class="bot-formula-variable" onclick="botInsertFormulaVariable(this, '@attacker.prof')">@attacker.prof</button>
@@ -460,6 +462,18 @@
               {{#each flag.immunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
             </select>
             <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
+          </div>
+        </div>
+        <div class="form-group bot-picker-group">
+          <label>{{localize "BOT.ui.defense.conditionImmunities"}}</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffConditionImmunitiesList">
+              {{#each flag.conditionImmunityOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffConditionImmunitiesList')">✕</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffConditionImmunitiesList')">
+              {{#each flag.conditionImmunityOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffConditionImmunitiesList" id="hidden-buffConditionImmunitiesList" value="{{#each flag.conditionImmunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
       </div>

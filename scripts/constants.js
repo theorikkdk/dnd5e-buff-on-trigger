@@ -4,6 +4,8 @@ export const SKILL_IDS = ["acr","ani","arc","ath","dec","his","ins","itm","inv",
 
 export const DAMAGE_TYPES = ["acid","bludgeoning","cold","fire","force","lightning","necrotic","piercing","poison","psychic","radiant","slashing","thunder"];
 
+export const CONDITION_IDS = ["blinded","charmed","deafened","frightened","grappled","incapacitated","invisible","paralyzed","petrified","poisoned","prone","restrained","stunned","unconscious"];
+
 export const ARMOR_PROF_IDS = ["lgt","med","hvy","shl"];
 
 export const WEAPON_PROF_IDS = ["sim","mar","longsword","shortsword","dagger","handaxe","greataxe","battleaxe","mace","warhammer","spear","quarterstaff","bow","crossbow"];

@@ -143,4 +143,23 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "heroism",
+    label: "BOT.presets.heroism.label",
+    description: "BOT.presets.heroism.description",
+    flag: {
+      targetMode: "target",
+      type: "turnStart",
+      temporaryHp: {
+        formula: "@origin.spell.mod",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      buffs: {
+        conditionImmunities: ["frightened"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
