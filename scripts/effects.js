@@ -1610,6 +1610,8 @@ export function buildMechanicalChanges(flag) {
     abilityCheckDisadvantages,
     savingThrowAdvantages,
     savingThrowDisadvantages,
+    abilityCheckModifiers,
+    savingThrowModifiers,
     skills,
     skillBonus,
     skillBonusSkills,
@@ -1656,6 +1658,14 @@ export function buildMechanicalChanges(flag) {
   }
   for (const ability of savingThrowDisadvantages ?? []) {
     if (ABILITY_IDS.includes(ability)) changes.push({ key: `system.abilities.${ability}.save.roll.mode`, mode: 2, value: "-1", priority: 20 });
+  }
+  for (const ability of ABILITY_IDS) {
+    const modifier = abilityCheckModifiers?.[ability];
+    if (modifier) changes.push({ key: `system.abilities.${ability}.bonuses.check`, mode: 2, value: String(modifier), priority: 20 });
+  }
+  for (const ability of ABILITY_IDS) {
+    const modifier = savingThrowModifiers?.[ability];
+    if (modifier) changes.push({ key: `system.abilities.${ability}.bonuses.save`, mode: 2, value: String(modifier), priority: 20 });
   }
   // Avantage sur les compÃ©tences sÃ©lectionnÃ©es
   if (skills?.length) {

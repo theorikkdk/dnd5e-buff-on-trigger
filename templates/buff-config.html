@@ -485,7 +485,7 @@
         </div>
         </section>
         <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.fixedBonuses"}}</h4>
+          <h4>{{localize "BOT.ui.buffs.numericModifiers"}}</h4>
         <div class="bot-row bot-responsive-grid">
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
@@ -496,6 +496,32 @@
             <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" class="bot-input-xs" />
           </div>
         </div>
+        </section>
+        <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.buffs.abilityModifiers"}}</h4>
+          <div class="bot-ability-modifier-grid">
+            <div></div>
+            <div class="bot-ability-modifier-header">{{localize "BOT.ui.abilities.checkShort"}}</div>
+            <div class="bot-ability-modifier-header">{{localize "BOT.ui.abilities.saveShort"}}</div>
+            <label>{{localize "BOT.abilities.str"}}</label>
+            <input type="text" name="buffAbilityCheckModifierStr" value="{{flag.buffAbilityCheckModifierStr}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierStr" value="{{flag.buffSavingThrowModifierStr}}" placeholder="-2" />
+            <label>{{localize "BOT.abilities.dex"}}</label>
+            <input type="text" name="buffAbilityCheckModifierDex" value="{{flag.buffAbilityCheckModifierDex}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierDex" value="{{flag.buffSavingThrowModifierDex}}" placeholder="-2" />
+            <label>{{localize "BOT.abilities.con"}}</label>
+            <input type="text" name="buffAbilityCheckModifierCon" value="{{flag.buffAbilityCheckModifierCon}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierCon" value="{{flag.buffSavingThrowModifierCon}}" placeholder="-2" />
+            <label>{{localize "BOT.abilities.int"}}</label>
+            <input type="text" name="buffAbilityCheckModifierInt" value="{{flag.buffAbilityCheckModifierInt}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierInt" value="{{flag.buffSavingThrowModifierInt}}" placeholder="-2" />
+            <label>{{localize "BOT.abilities.wis"}}</label>
+            <input type="text" name="buffAbilityCheckModifierWis" value="{{flag.buffAbilityCheckModifierWis}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierWis" value="{{flag.buffSavingThrowModifierWis}}" placeholder="-2" />
+            <label>{{localize "BOT.abilities.cha"}}</label>
+            <input type="text" name="buffAbilityCheckModifierCha" value="{{flag.buffAbilityCheckModifierCha}}" placeholder="+2" />
+            <input type="text" name="buffSavingThrowModifierCha" value="{{flag.buffSavingThrowModifierCha}}" placeholder="-2" />
+          </div>
         </section>
       </div>
 

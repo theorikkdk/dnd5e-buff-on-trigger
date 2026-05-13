@@ -1160,6 +1160,17 @@ export const BUFF_PRESETS = [
         ability: "wis",
         dcSource: "origin",
         activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
+      },
+      buffs: {
+        ac: -2,
+        savingThrowModifiers: {
+          dex: "-2",
+        },
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",

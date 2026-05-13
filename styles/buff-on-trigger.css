@@ -135,6 +135,28 @@
   min-width: 0;
 }
 
+.bot-ability-modifier-grid {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) repeat(2, minmax(72px, 110px));
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.bot-ability-modifier-grid label {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.bot-ability-modifier-grid input {
+  width: 100%;
+}
+
+.bot-ability-modifier-header {
+  font-size: 0.85em;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
 .bot-skill-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
