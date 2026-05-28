@@ -594,7 +594,9 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
       label: game.i18n.localize("BOT.ui.summary.saveRepeat"),
       value: raw.save.repeat?.enabled
         ? game.i18n.format("BOT.ui.summary.saveRepeatConfigured", {
-            timing: getSaveRepeatTimingLabel(raw.save.repeat.timing),
+            timing: raw.save.repeat?.onDamaged
+              ? game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamage", { timing: getSaveRepeatTimingLabel(raw.save.repeat.timing) })
+              : getSaveRepeatTimingLabel(raw.save.repeat.timing),
             endsBuffOn: getSaveRepeatEndsBuffOnLabel(raw.save.repeat.endsBuffOn),
           })
         : game.i18n.localize("BOT.ui.summary.saveRepeatNone")
@@ -926,6 +928,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveRepeatTimingStartTurn: raw.save?.repeat?.timing === "startTurn",
       saveRepeatEndsBuffOnSuccess: (raw.save?.repeat?.endsBuffOn ?? "success") === "success",
       saveRepeatEndsBuffOnFailure: raw.save?.repeat?.endsBuffOn === "failure",
+      saveRepeatOnDamaged:    raw.save?.repeat?.onDamaged === true,
       showAttackCondition:   ATTACK_TRIGGER_TYPES.includes(raw.type),
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
@@ -1048,6 +1051,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
               enabled: data.saveRepeatEnabled ?? false,
               timing: data.saveRepeatTiming ?? "endTurn",
               endsBuffOn: data.saveRepeatEndsBuffOn ?? "success",
+              onDamaged: data.saveRepeatOnDamaged ?? false,
             }
           } : null,
           status: (() => {
@@ -1246,6 +1250,7 @@ function buildBuffConfigFromForm(form) {
         enabled: !!readFormValue(form, "saveRepeatEnabled"),
         timing: readFormValue(form, "saveRepeatTiming", "endTurn"),
         endsBuffOn: readFormValue(form, "saveRepeatEndsBuffOn", "success"),
+        onDamaged: !!readFormValue(form, "saveRepeatOnDamaged"),
       },
     } : null,
     status: statusId ? {
@@ -1455,7 +1460,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
@@ -1545,6 +1550,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveRepeatEnabled", !!flag.save?.repeat?.enabled);
   setFormValue(form, "saveRepeatTiming", flag.save?.repeat?.timing ?? "endTurn");
   setFormValue(form, "saveRepeatEndsBuffOn", flag.save?.repeat?.endsBuffOn ?? "success");
+  setFormValue(form, "saveRepeatOnDamaged", !!flag.save?.repeat?.onDamaged);
 
   const statusIds = getConfiguredStatusIds(flag.status);
   setFormValue(form, "statusId", statusIds[0] ?? "");

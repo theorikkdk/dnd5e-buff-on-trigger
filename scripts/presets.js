@@ -1200,6 +1200,7 @@ export const BUFF_PRESETS = [
           enabled: true,
           timing: "endTurn",
           endsBuffOn: "success",
+          onDamaged: true,
         },
       },
       status: {

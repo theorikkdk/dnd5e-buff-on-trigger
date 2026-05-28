@@ -3,6 +3,7 @@ import { buildItemDurationData } from "./duration.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
+const recentDamagedRepeatedSaves = new Map();
 
 function resolveRollHookActor(config) {
   return config?.subject?.getFlag
@@ -186,6 +187,43 @@ function workflowHasDamageDealt(workflow) {
       ?? getNumericDamageValue(entry?.damage);
     return entryDamage !== null && entryDamage > 0;
   });
+}
+
+function getDamageTakenAmount(damageItem, workflow) {
+  const directDamage = getNumericDamageValue(damageItem?.appliedDamage)
+    ?? getNumericDamageValue(damageItem?.hpDamage)
+    ?? getNumericDamageValue(damageItem?.totalDamage)
+    ?? getNumericDamageValue(damageItem?.damage)
+    ?? getNumericDamageValue(workflow?.damageTotal);
+  if (directDamage !== null) return directDamage;
+
+  const entries = Array.isArray(workflow?.damageList) ? workflow.damageList : [];
+  return entries.reduce((total, entry) => {
+    const entryDamage = getNumericDamageValue(entry?.appliedDamage)
+      ?? getNumericDamageValue(entry?.hpDamage)
+      ?? getNumericDamageValue(entry?.totalDamage)
+      ?? getNumericDamageValue(entry?.damage)
+      ?? 0;
+    return total + Math.max(0, entryDamage);
+  }, 0);
+}
+
+function shouldProcessDamagedRepeatedSave(actor, workflow, damageItem) {
+  const now = Date.now();
+  for (const [key, timestamp] of recentDamagedRepeatedSaves.entries()) {
+    if (now - timestamp > 1000) recentDamagedRepeatedSaves.delete(key);
+  }
+
+  const key = [
+    actor?.uuid ?? "actor",
+    workflow?.uuid ?? workflow?.id ?? workflow?._id ?? "workflow",
+    workflow?.item?.uuid ?? "item",
+    damageItem?.tokenId ?? damageItem?.tokenUuid ?? damageItem?.actorUuid ?? "damage",
+  ].join("|");
+  const previous = recentDamagedRepeatedSaves.get(key);
+  if (previous && now - previous <= 1000) return false;
+  recentDamagedRepeatedSaves.set(key, now);
+  return true;
 }
 
 function getAutomaticEndReasons(activeBuff, workflow, actionType) {
@@ -504,7 +542,11 @@ async function endActiveBuff(actor, activeBuff) {
 function shouldRollRepeatedSave(flag, timing) {
   return !!flag?.save?.ability
     && flag.save?.repeat?.enabled === true
-    && (flag.save.repeat?.timing ?? "endTurn") === timing;
+    && (
+      timing === "damaged"
+        ? flag.save.repeat?.onDamaged === true
+        : (flag.save.repeat?.timing ?? "endTurn") === timing
+    );
 }
 
 function resolveActorUuid(uuid) {
@@ -539,7 +581,11 @@ function getLinkedStatusRepeatedSaveEffects(actor, timing) {
     const linkedFlag = effect.flags?.[MODULE_ID];
     return linkedFlag?.linkedStatus === true
       && linkedFlag.saveRepeat?.enabled === true
-      && (linkedFlag.saveRepeat?.timing ?? "endTurn") === timing
+      && (
+        timing === "damaged"
+          ? linkedFlag.saveRepeat?.onDamaged === true
+          : (linkedFlag.saveRepeat?.timing ?? "endTurn") === timing
+      )
       && !!linkedFlag.saveAbility;
   }) ?? [];
   debugLog(`[${MODULE_ID}] Sauvegardes répétées liées inspectées sur ${actor?.name ?? "inconnu"} : ${effects.length}`);
@@ -1066,6 +1112,15 @@ export function registerTriggers() {
       const actor = token.actor;
       if (!actor) return;
       if (token.actor.id !== actor.id) return;
+      const damageTaken = getDamageTakenAmount(damageItem, workflow);
+      if (damageTaken > 0 && shouldProcessDamagedRepeatedSave(actor, workflow, damageItem)) {
+        const activeFlag = actor?.getFlag(MODULE_ID, "activeBuff");
+        const repeatedSaveHandled = shouldRollRepeatedSave(activeFlag, "damaged");
+        const endedByRepeatedSave = await handleRepeatedSave(actor, activeFlag, "damaged");
+        if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(actor, "damaged");
+        if (endedByRepeatedSave) return;
+      }
+
       const flag = actor?.getFlag(MODULE_ID, "activeBuff");
       if (!flag) {
         debugLog(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);

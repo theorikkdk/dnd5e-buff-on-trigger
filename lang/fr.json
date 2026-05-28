@@ -451,7 +451,7 @@
   "BOT.presets.faerieFire.label": "Lueurs féeriques / Faerie Fire",
   "BOT.presets.faerieFire.description": "La cible fait un JS de Dextérité. En cas d’échec, le buff sert de marqueur pour les lueurs féeriques. L’avantage aux attaques et la révélation de l’invisibilité peuvent devoir être gérés manuellement.",
   "BOT.presets.tashasHideousLaughter.label": "Fou rire de Tasha / Tasha’s Hideous Laughter",
-  "BOT.presets.tashasHideousLaughter.description": "La cible fait un JS de Sagesse. En cas d’échec, elle devient Incapable d’agir et À terre. Elle refait un JS à la fin de chacun de ses tours.",
+  "BOT.presets.tashasHideousLaughter.description": "La cible fait un JS de Sagesse. En cas d’échec, elle devient Incapable d’agir et À terre. Elle refait un JS à la fin de chacun de ses tours, et aussi lorsqu’elle subit des dégâts.",
   "BOT.presets.slow.label": "Lenteur / Slow",
   "BOT.presets.slow.description": "La cible fait un JS de Sagesse. En cas d’échec, elle subit -2 à la CA, -2 aux JS de Dextérité, et ses vitesses sont divisées par deux. Les limitations d’action/réaction et le retard des sorts doivent être gérés manuellement.",
   "BOT.presets.bestowCurseStr.label": "Malédiction — Force / Bestow Curse — Strength",
@@ -577,5 +577,7 @@
   "BOT.presets.invisibility.label": "Invisibilité / Invisibility",
   "BOT.presets.invisibility.description": "La cible devient Invisible. Le buff prend fin automatiquement si son porteur attaque ou lance un sort.",
   "BOT.presets.greaterInvisibility.label": "Invisibilité supérieure / Greater Invisibility",
-  "BOT.presets.greaterInvisibility.description": "La cible devient Invisible sans fin automatique sur attaque ou lancement de sort."
+  "BOT.presets.greaterInvisibility.description": "La cible devient Invisible sans fin automatique sur attaque ou lancement de sort.",
+  "BOT.ui.saveRepeat.onDamaged": "Relancer aussi le JS quand le porteur subit des dégâts",
+  "BOT.ui.summary.saveRepeatTimingWithDamage": "{timing} et dégâts subis"
 }

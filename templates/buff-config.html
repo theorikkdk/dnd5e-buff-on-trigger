@@ -255,6 +255,10 @@
               <option value="failure" {{#if flag.saveRepeatEndsBuffOnFailure}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.endsBuffOn.failure"}}</option>
             </select>
           </div>
+          <label class="bot-check-row">
+            <input type="checkbox" name="saveRepeatOnDamaged" {{#if flag.saveRepeatOnDamaged}}checked{{/if}}>
+            <span>{{localize "BOT.ui.saveRepeat.onDamaged"}}</span>
+          </label>
         </div>
       </div>
     </details>
