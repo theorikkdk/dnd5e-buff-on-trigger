@@ -451,7 +451,7 @@
   "BOT.presets.holdPerson.label": "Hold Person",
   "BOT.presets.holdPerson.description": "The humanoid target makes a Wisdom saving throw. On a failure, it becomes Paralyzed and can repeat the save at the end of its turns.",
   "BOT.presets.faerieFire.label": "Faerie Fire",
-  "BOT.presets.faerieFire.description": "The target makes a Dexterity saving throw. On a failure, the buff acts as a marker for Faerie Fire. Attack advantage and revealing invisibility may need to be handled manually.",
+  "BOT.presets.faerieFire.description": "The target makes a Dexterity saving throw. On a failure, attacks against it have advantage. Revealing invisibility may need to be handled manually.",
   "BOT.presets.tashasHideousLaughter.label": "Tasha’s Hideous Laughter",
   "BOT.presets.tashasHideousLaughter.description": "The target makes a Wisdom saving throw. On a failure, it becomes Incapacitated and Prone. It repeats the save at the end of each of its turns, and also when it takes damage.",
   "BOT.presets.slow.label": "Slow",
@@ -579,5 +579,10 @@
   "BOT.presets.greaterInvisibility.label": "Greater Invisibility",
   "BOT.presets.greaterInvisibility.description": "The target becomes Invisible without automatic ending on attack or spell cast.",
   "BOT.ui.saveRepeat.onDamaged": "Also repeat the save when the bearer takes damage",
-  "BOT.ui.summary.saveRepeatTimingWithDamage": "{timing} and when damaged"
+  "BOT.ui.summary.saveRepeatTimingWithDamage": "{timing} and when damaged",
+  "BOT.ui.defense.incomingAttackMode": "Attacks against bearer",
+  "BOT.presets.blur.label": "Blur",
+  "BOT.presets.blur.description": "Attacks against the bearer have disadvantage while the buff is active.",
+  "BOT.presets.protectionFromEvilAndGood.label": "Protection from Evil and Good",
+  "BOT.presets.protectionFromEvilAndGood.description": "The target gains partial protection: immunity to Charmed/Frightened and disadvantage on attacks against it. Creature-type filtering and possession must be handled manually."
 }

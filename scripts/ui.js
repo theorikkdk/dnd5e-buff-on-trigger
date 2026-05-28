@@ -430,6 +430,7 @@ function hasMechanicalChanges(buffs = {}) {
     buffs.ac,
     buffs.attackMode,
     buffs.saveMode,
+    buffs.incomingAttackMode,
     buffs.skillMode,
     buffs.skillBonus,
     buffs.skillBonusAll,
@@ -470,6 +471,7 @@ function buildMechanicalSummary(raw, labels) {
   if (isFilled(buffs.ac)) addEntry(`${game.i18n.localize("BOT.ui.combat.acBonus")} : ${formatModifierValue(buffs.ac)}`);
   if (isFilled(buffs.attackMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.attackMode}`)}`);
   if (isFilled(buffs.saveMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.saveMode}`)}`);
+  if (isFilled(buffs.incomingAttackMode)) addEntry(`${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${game.i18n.localize(`BOT.ui.common.${buffs.incomingAttackMode}`)}`);
   if (isFilled(buffs.skillMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.abilityRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.skillMode}`)}`);
   if ((buffs.abilityCheckAdvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.checkAdvantage")} : ${listSelectedLabels(buffs.abilityCheckAdvantages, labels.abilities)}`);
   if ((buffs.abilityCheckDisadvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.checkDisadvantage")} : ${listSelectedLabels(buffs.abilityCheckDisadvantages, labels.abilities)}`);
@@ -837,6 +839,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
+      buffIncomingAttackMode:    raw.buffs?.incomingAttackMode ?? "none",
       buffSkillMode:             raw.buffs?.skillMode ?? "none",
       buffSkillBonus:            raw.buffs?.skillBonus ?? "",
       buffSkillBonusAll:         raw.buffs?.skillBonusAll ?? "",
@@ -901,6 +904,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffSaveModeNone:          (raw.buffs?.saveMode ?? "none") === "none",
       buffSaveModeAdvantage:     raw.buffs?.saveMode === "advantage",
       buffSaveModeDisadvantage:  raw.buffs?.saveMode === "disadvantage",
+      buffIncomingAttackModeNone: (raw.buffs?.incomingAttackMode ?? "none") === "none",
+      buffIncomingAttackModeAdvantage: raw.buffs?.incomingAttackMode === "advantage",
+      buffIncomingAttackModeDisadvantage: raw.buffs?.incomingAttackMode === "disadvantage",
       buffSkillModeNone:         (raw.buffs?.skillMode ?? "none") === "none",
       buffSkillModeAdvantage:    raw.buffs?.skillMode === "advantage",
       buffSkillModeDisadvantage: raw.buffs?.skillMode === "disadvantage",
@@ -1077,6 +1083,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             ac: data.buffAC ? Number(data.buffAC) : null,
             attackMode: data.buffAttackMode !== "none" ? data.buffAttackMode : null,
             saveMode: data.buffSaveMode !== "none" ? data.buffSaveMode : null,
+            incomingAttackMode: data.buffIncomingAttackMode !== "none" ? data.buffIncomingAttackMode : null,
             skillMode: data.buffSkillMode !== "none" ? data.buffSkillMode : null,
             abilityCheckAdvantages: toArray(data.buffAbilityCheckAdvantageList),
             abilityCheckDisadvantages: toArray(data.buffAbilityCheckDisadvantageList),
@@ -1280,6 +1287,7 @@ function buildBuffConfigFromForm(form) {
       ac: readNumberFormValue(form, "buffAC"),
       attackMode: readFormValue(form, "buffAttackMode", "none") !== "none" ? readFormValue(form, "buffAttackMode") : null,
       saveMode: readFormValue(form, "buffSaveMode", "none") !== "none" ? readFormValue(form, "buffSaveMode") : null,
+      incomingAttackMode: readFormValue(form, "buffIncomingAttackMode", "none") !== "none" ? readFormValue(form, "buffIncomingAttackMode") : null,
       skillMode: readFormValue(form, "buffSkillMode", "none") !== "none" ? readFormValue(form, "buffSkillMode") : null,
       abilityCheckAdvantages: readCsvFormValue(form, "buffAbilityCheckAdvantageList"),
       abilityCheckDisadvantages: readCsvFormValue(form, "buffAbilityCheckDisadvantageList"),
@@ -1365,6 +1373,7 @@ function buildDefaultBuffConfig() {
       ac: null,
       attackMode: null,
       saveMode: null,
+      incomingAttackMode: null,
       skillMode: null,
       abilityCheckAdvantages: [],
       abilityCheckDisadvantages: [],
@@ -1462,6 +1471,7 @@ function formHasDraftConfiguration(form) {
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
+    "buffIncomingAttackMode",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
     ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("buffAbilityCheckModifier", ability), abilityFieldName("buffSavingThrowModifier", ability)]),
@@ -1578,6 +1588,7 @@ function applyPresetFlagToForm(form, flag) {
 
   setFormValue(form, "buffAttackMode", flag.buffs?.attackMode ?? "none");
   setFormValue(form, "buffSaveMode", flag.buffs?.saveMode ?? "none");
+  setFormValue(form, "buffIncomingAttackMode", flag.buffs?.incomingAttackMode ?? "none");
   setFormValue(form, "buffSkillMode", flag.buffs?.skillMode ?? "none");
   setFormValue(form, "buffAC", flag.buffs?.ac ?? "");
   setFormValue(form, "buffAttackBonus", flag.buffs?.attackBonus ?? "");

@@ -449,7 +449,7 @@
   "BOT.presets.holdPerson.label": "Immobilisation de personne / Hold Person",
   "BOT.presets.holdPerson.description": "La cible humanoïde fait un JS de Sagesse. En cas d’échec, elle devient Paralysée et peut refaire un JS à la fin de ses tours.",
   "BOT.presets.faerieFire.label": "Lueurs féeriques / Faerie Fire",
-  "BOT.presets.faerieFire.description": "La cible fait un JS de Dextérité. En cas d’échec, le buff sert de marqueur pour les lueurs féeriques. L’avantage aux attaques et la révélation de l’invisibilité peuvent devoir être gérés manuellement.",
+  "BOT.presets.faerieFire.description": "La cible fait un JS de Dextérité. En cas d’échec, les attaques contre elle ont avantage. La révélation de l’invisibilité peut devoir être gérée manuellement.",
   "BOT.presets.tashasHideousLaughter.label": "Fou rire de Tasha / Tasha’s Hideous Laughter",
   "BOT.presets.tashasHideousLaughter.description": "La cible fait un JS de Sagesse. En cas d’échec, elle devient Incapable d’agir et À terre. Elle refait un JS à la fin de chacun de ses tours, et aussi lorsqu’elle subit des dégâts.",
   "BOT.presets.slow.label": "Lenteur / Slow",
@@ -579,5 +579,10 @@
   "BOT.presets.greaterInvisibility.label": "Invisibilité supérieure / Greater Invisibility",
   "BOT.presets.greaterInvisibility.description": "La cible devient Invisible sans fin automatique sur attaque ou lancement de sort.",
   "BOT.ui.saveRepeat.onDamaged": "Relancer aussi le JS quand le porteur subit des dégâts",
-  "BOT.ui.summary.saveRepeatTimingWithDamage": "{timing} et dégâts subis"
+  "BOT.ui.summary.saveRepeatTimingWithDamage": "{timing} et dégâts subis",
+  "BOT.ui.defense.incomingAttackMode": "Attaques contre le porteur",
+  "BOT.presets.blur.label": "Flou / Blur",
+  "BOT.presets.blur.description": "Les attaques contre le porteur ont désavantage tant que le buff est actif.",
+  "BOT.presets.protectionFromEvilAndGood.label": "Protection contre le mal et le bien / Protection from Evil and Good",
+  "BOT.presets.protectionFromEvilAndGood.description": "La cible gagne une protection partielle : immunité Charmé/Effrayé et désavantage aux attaques contre elle. Le filtre par type de créature et la possession doivent être gérés manuellement."
 }

@@ -1769,6 +1769,7 @@ export function buildMechanicalChanges(flag, actor = null) {
     ac,
     attackMode,
     saveMode,
+    incomingAttackMode,
     skillMode,
     abilityCheckAdvantages,
     abilityCheckDisadvantages,
@@ -1806,6 +1807,10 @@ export function buildMechanicalChanges(flag, actor = null) {
   }
   if (saveMode) {
     const key = saveMode === "advantage" ? "flags.midi-qol.advantage.save.all" : "flags.midi-qol.disadvantage.save.all";
+    changes.push({ key, mode: 5, value: "1", priority: 20 });
+  }
+  if (incomingAttackMode) {
+    const key = incomingAttackMode === "advantage" ? "flags.midi-qol.grants.advantage.attack.all" : "flags.midi-qol.grants.disadvantage.attack.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });
   }
   if (skillMode) {

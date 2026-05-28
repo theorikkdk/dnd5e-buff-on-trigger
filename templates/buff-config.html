@@ -587,6 +587,17 @@
         </div>
         </section>
         <section class="bot-config-block">
+          <h4>{{localize "BOT.ui.defense.incomingAttackMode"}}</h4>
+          <div class="form-group">
+            <label>{{localize "BOT.ui.defense.incomingAttackMode"}}</label>
+            <select name="buffIncomingAttackMode">
+              <option value="none" {{#if flag.buffIncomingAttackModeNone}}selected{{/if}}>{{localize "BOT.ui.common.normal"}}</option>
+              <option value="advantage" {{#if flag.buffIncomingAttackModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.common.advantage"}}</option>
+              <option value="disadvantage" {{#if flag.buffIncomingAttackModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
+            </select>
+          </div>
+        </section>
+        <section class="bot-config-block">
           <h4>{{localize "BOT.ui.buffs.damageTraits"}}</h4>
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.resistances"}}</label>

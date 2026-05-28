@@ -1042,6 +1042,36 @@ export const BUFF_PRESETS = [
     },
   },
   {
+    id: "blur",
+    label: "BOT.presets.blur.label",
+    description: "BOT.presets.blur.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      buffs: {
+        incomingAttackMode: "disadvantage",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "protectionFromEvilAndGood",
+    label: "BOT.presets.protectionFromEvilAndGood.label",
+    description: "BOT.presets.protectionFromEvilAndGood.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        incomingAttackMode: "disadvantage",
+        conditionImmunities: ["charmed", "frightened"],
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
     id: "freedomOfMovement",
     label: "BOT.presets.freedomOfMovement.label",
     description: "BOT.presets.freedomOfMovement.description",
@@ -1178,6 +1208,9 @@ export const BUFF_PRESETS = [
         ability: "dex",
         dcSource: "origin",
         activationApplyOn: "failure",
+      },
+      buffs: {
+        incomingAttackMode: "advantage",
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
