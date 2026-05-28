@@ -147,6 +147,26 @@ function getActorCreatureTypeValues(actor) {
     .filter(Boolean);
 }
 
+function getTargetFilterCreatureTypes(flag) {
+  return normalizeIncomingAttackCreatureTypes(flag?.targetFilters?.creatureTypes ?? []);
+}
+
+function actorMatchesCreatureTypeFilter(actor, creatureTypes = []) {
+  const expectedTypes = normalizeIncomingAttackCreatureTypes(creatureTypes);
+  if (!expectedTypes.length) return true;
+
+  const detectedTypes = getActorCreatureTypeValues(actor);
+  const match = detectedTypes.some((type) => expectedTypes.includes(type));
+  debugLog(`[${MODULE_ID}] Filtre cible activation : actor=${actor?.name ?? "inconnu"}, detected=${JSON.stringify(detectedTypes)}, expected=${JSON.stringify(expectedTypes)}, match=${match}`);
+  return match;
+}
+
+function activationTargetMatchesFilters(flag, targetToken) {
+  const creatureTypes = getTargetFilterCreatureTypes(flag);
+  if (!creatureTypes.length) return true;
+  return actorMatchesCreatureTypeFilter(targetToken?.actor, creatureTypes);
+}
+
 function addIncomingAttackTarget(targets, token) {
   const resolved = token?.object ?? token;
   if (!resolved?.actor) return;
@@ -1204,6 +1224,13 @@ export function registerTriggers() {
         }
 
         const selfToken = workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? { actor: workflow.actor };
+        const activationFilterTarget = effectiveTargetMode === "target" ? selectedTargetToken : selfToken;
+        if (!activationTargetMatchesFilters(activeFlag, activationFilterTarget)) {
+          ui.notifications.warn(game.i18n.localize("BOT.notifications.targetRestrictionsMismatch"));
+          debugLog(`[${MODULE_ID}] Activation annulée : cible hors restrictions`);
+          return;
+        }
+
         const activationSaveTarget = effectiveTargetMode === "target" ? selectedTargetToken : (shouldFallbackToSelf ? selfToken : null);
         const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
         if (!activationSave.shouldApply) {

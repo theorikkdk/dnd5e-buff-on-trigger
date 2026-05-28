@@ -64,6 +64,21 @@
         <input type="checkbox" name="requireStoredTargetMatch" {{#if flag.requireStoredTargetMatch}}checked{{/if}} />
       </div>
     </section>
+    <section class="bot-inline-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.targetFilters.title"}}</h3>
+      <div class="form-group bot-picker-group">
+        <label>{{localize "BOT.ui.targetFilters.creatureTypes"}}</label>
+        <div class="bot-tag-picker">
+          <div class="bot-tags" id="tags-targetFilterCreatureTypesList">
+            {{#each flag.targetFilterCreatureTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'targetFilterCreatureTypesList')">&times;</span></span>{{/if}}{{/each}}
+          </div>
+          <select class="bot-tag-select" onchange="botAddTag(this,'targetFilterCreatureTypesList')">
+            {{#each flag.targetFilterCreatureTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+          </select>
+          <input type="hidden" name="targetFilterCreatureTypesList" id="hidden-targetFilterCreatureTypesList" value="{{flag.targetFilterCreatureTypesList}}" />
+        </div>
+      </div>
+    </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.trigger.label"}}</label>
       <select name="type" onchange="botUpdateTriggerUI(this)">

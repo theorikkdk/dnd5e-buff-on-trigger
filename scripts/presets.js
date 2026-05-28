@@ -1171,6 +1171,9 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.holdPerson.description",
     flag: {
       targetMode: "target",
+      targetFilters: {
+        creatureTypes: ["humanoid"],
+      },
       type: "passive",
       save: {
         enabled: true,
@@ -1187,6 +1190,69 @@ export const BUFF_PRESETS = [
       status: {
         id: "paralyzed",
         ids: ["paralyzed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "charmPerson",
+    label: "BOT.presets.charmPerson.label",
+    description: "BOT.presets.charmPerson.description",
+    flag: {
+      targetMode: "target",
+      targetFilters: {
+        creatureTypes: ["humanoid"],
+      },
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+      },
+      status: {
+        id: "charmed",
+        ids: ["charmed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "dominateBeast",
+    label: "BOT.presets.dominateBeast.label",
+    description: "BOT.presets.dominateBeast.description",
+    flag: {
+      targetMode: "target",
+      targetFilters: {
+        creatureTypes: ["beast"],
+      },
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
+      },
+      status: {
+        id: "charmed",
+        ids: ["charmed"],
         timing: "activation",
         targetMode: "self",
         applyCondition: "saveFailure",
