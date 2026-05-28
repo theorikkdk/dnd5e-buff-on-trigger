@@ -962,7 +962,7 @@ function collectSavingThrowTargets(workflow, flag) {
   };
 
   if (flag.damage) {
-    addTargets(resolveBonusDamageTargets(workflow, flag));
+    addTargets(filterBonusDamageTargetsByCreatureType(resolveBonusDamageTargets(workflow, flag), flag));
   }
 
   if (flag.status && (flag.status?.applyCondition ?? "always") !== "always") {
@@ -1339,6 +1339,50 @@ function resolveTargets(workflow, flag) {
     return new Set();
   }
   return getWorkflowConditionTargets(workflow, condition);
+}
+
+function normalizeCreatureTypeFilter(types = []) {
+  return [...new Set((types ?? [])
+    .map((type) => String(type ?? "").trim().toLowerCase())
+    .filter((type) => CREATURE_TYPES.includes(type)))];
+}
+
+function flattenCreatureTypeValues(value) {
+  if (!value) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap((entry) => flattenCreatureTypeValues(entry));
+  if (typeof value === "object") return Object.values(value).flatMap((entry) => flattenCreatureTypeValues(entry));
+  return [String(value)];
+}
+
+function getActorCreatureTypeValues(actor) {
+  const midiTypeOrRace = globalThis.MidiQOL?.typeOrRace?.(actor);
+  const midiRaceOrType = globalThis.MidiQOL?.raceOrType?.(actor);
+  return [
+    midiTypeOrRace,
+    midiRaceOrType,
+    actor?.system?.details?.type?.value,
+    actor?.system?.details?.type?.subtype,
+    actor?.system?.details?.race,
+    actor?.raceOrType,
+  ]
+    .flatMap((value) => flattenCreatureTypeValues(value))
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function filterBonusDamageTargetsByCreatureType(targets, flag) {
+  const expectedTypes = normalizeCreatureTypeFilter(flag.damage?.targetCreatureTypes);
+  if (!expectedTypes.length) return targets;
+
+  const filtered = new Set();
+  for (const token of targets ?? []) {
+    const detectedTypes = getActorCreatureTypeValues(token?.actor);
+    const match = detectedTypes.some((type) => expectedTypes.includes(type));
+    debugLog("[" + MODULE_ID + "] Filtre types cible degats bonus : cible=" + (token?.name ?? token?.actor?.name ?? "inconnue") + ", detected=" + JSON.stringify(detectedTypes) + ", expected=" + JSON.stringify(expectedTypes) + ", match=" + match);
+    if (match) filtered.add(token);
+  }
+  return filtered;
 }
 
 function normalizeDamageTargetMode(value) {
@@ -1765,9 +1809,7 @@ function buildMovementChanges(buffs, actor = null) {
 }
 
 function normalizeIncomingAttackCreatureTypes(types = []) {
-  return [...new Set((types ?? [])
-    .map((type) => String(type ?? "").trim().toLowerCase())
-    .filter((type) => CREATURE_TYPES.includes(type)))];
+  return normalizeCreatureTypeFilter(types);
 }
 
 export function buildMechanicalChanges(flag, actor = null) {
@@ -1937,10 +1979,15 @@ export async function applyBonusDamage(workflow, flag) {
     const rawDamageTargetMode = flag.damage?.targetMode;
     const damageTargetMode = normalizeDamageTargetMode(rawDamageTargetMode);
     debugLog(`[${MODULE_ID}] Cible dégâts bonus : raw=${rawDamageTargetMode ?? "absent"}, normalized=${damageTargetMode}`);
-    const targets = resolveBonusDamageTargets(workflow, flag);
+    const resolvedTargets = resolveBonusDamageTargets(workflow, flag);
+    const targets = filterBonusDamageTargetsByCreatureType(resolvedTargets, flag);
 
-    if (!targets?.size) {
+    if (!resolvedTargets?.size) {
       console.warn(`[${MODULE_ID}] applyBonusDamage : aucune cible valide (mode "${damageTargetMode}", condition "${flag.condition ?? "hit"}")`);
+      return;
+    }
+    if (!targets?.size) {
+      debugLog("[" + MODULE_ID + "] Degats bonus ignores : aucune cible ne correspond aux types configures " + JSON.stringify(flag.damage?.targetCreatureTypes ?? []));
       return;
     }
 

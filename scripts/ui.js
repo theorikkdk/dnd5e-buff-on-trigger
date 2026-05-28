@@ -566,9 +566,13 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   }
 
   if (raw.damage) {
+    const damageTargetCreatureTypes = raw.damage.targetCreatureTypes ?? [];
+    const damageTargetCreatureFilter = damageTargetCreatureTypes.length
+      ? ", " + game.i18n.localize("BOT.ui.damage.targetCreatureTypesSummary") + " : " + listSelectedLabels(damageTargetCreatureTypes, labels.creatureTypes)
+      : "";
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.damage"),
-      value: `${raw.damage.formula ?? game.i18n.localize("BOT.ui.summary.notConfigured")} ${raw.damage.type ? `(${labels.damageTypes[raw.damage.type] ?? raw.damage.type})` : ""}`.trim()
+      value: (String(raw.damage.formula ?? game.i18n.localize("BOT.ui.summary.notConfigured")) + " " + (raw.damage.type ? "(" + (labels.damageTypes[raw.damage.type] ?? raw.damage.type) + ")" : "") + damageTargetCreatureFilter).trim()
     });
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.damageTarget"),
@@ -805,6 +809,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
     const creatureTypeLabels = getCreatureTypeLabels();
     const incomingAttackCreatureTypeOptions = getCreatureTypeOptions(raw.buffs?.incomingAttackCreatureTypes ?? []);
+    const damageTargetCreatureTypeOptions = getCreatureTypeOptions(raw.damage?.targetCreatureTypes ?? []);
     const labels = {
       skills: skillLabels,
       abilities: abilityLabels,
@@ -868,6 +873,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffIncomingAttackMode:    raw.buffs?.incomingAttackMode ?? "none",
       buffIncomingAttackCreatureTypesList: (raw.buffs?.incomingAttackCreatureTypes ?? []).join(","),
       incomingAttackCreatureTypeOptions,
+      damageTargetCreatureTypesList: (raw.damage?.targetCreatureTypes ?? []).join(","),
+      damageTargetCreatureTypeOptions,
       buffSkillMode:             raw.buffs?.skillMode ?? "none",
       buffSkillBonus:            raw.buffs?.skillBonus ?? "",
       buffSkillBonusAll:         raw.buffs?.skillBonusAll ?? "",
@@ -1052,7 +1059,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         damage: data.damageFormula ? {
           formula: data.damageFormula,
           type: data.damageType || null,
-          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {})
+          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {}),
+          targetCreatureTypes: String(data.damageTargetCreatureTypesList ?? "").split(",").filter(Boolean)
         } : null,
         healing: data.healingEnabled && data.healingFormula ? {
           formula: data.healingFormula,
@@ -1274,6 +1282,7 @@ function buildBuffConfigFromForm(form) {
       formula: damageFormula,
       type: readFormValue(form, "damageType", "") || null,
       targetMode: normalizeDamageTargetMode(readFormValue(form, "damageTargetMode", "triggerTarget")),
+      targetCreatureTypes: readCsvFormValue(form, "damageTargetCreatureTypesList"),
     } : null,
     save: saveAbility ? {
       ability: saveAbility,
@@ -1499,7 +1508,7 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffIncomingAttackMode",
@@ -1514,7 +1523,7 @@ function formHasDraftConfiguration(form) {
     if (field.type === "checkbox") return field.checked;
     return String(field.value ?? "").trim() !== "";
   }) || [
-    "receivedDamageTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
+    "receivedDamageTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
     "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
@@ -1583,6 +1592,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "damageFormula", flag.damage?.formula ?? "");
   setFormValue(form, "damageType", flag.damage?.type ?? "");
   setFormValue(form, "damageTargetMode", normalizeDamageTargetMode(flag.damage?.targetMode));
+  setTagList(form, "damageTargetCreatureTypesList", flag.damage?.targetCreatureTypes ?? []);
 
   setFormValue(form, "saveAbility", flag.save?.ability ?? "");
   setFormValue(form, "saveDC", flag.save?.dc ?? 15);

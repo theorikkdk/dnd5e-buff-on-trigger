@@ -99,6 +99,8 @@
   "BOT.ui.damage.targetMode.self": "Porteur du buff",
   "BOT.ui.damage.targetMode.attacker": "Attaquant",
   "BOT.ui.damage.targetMode.storedTarget": "Cible mémorisée",
+  "BOT.ui.damage.targetCreatureTypes": "Types de créatures ciblées",
+  "BOT.ui.damage.targetCreatureTypesSummary": "cibles",
   "BOT.ui.damage.criticalMode.label": "Critique des dégâts bonus",
   "BOT.ui.damage.criticalMode.system": "Suivre les réglages du système",
   "BOT.ui.damage.criticalMode.doubleDice": "Toujours doubler les dés sur critique",

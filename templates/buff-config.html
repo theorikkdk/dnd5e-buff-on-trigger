@@ -187,6 +187,18 @@
             <option value="storedTarget" {{#if flag.damageTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.damage.targetMode.storedTarget"}}</option>
           </select>
         </div>
+        <div class="form-group bot-picker-group">
+          <label>{{localize "BOT.ui.damage.targetCreatureTypes"}}</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-damageTargetCreatureTypesList">
+              {{#each flag.damageTargetCreatureTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'damageTargetCreatureTypesList')">&times;</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'damageTargetCreatureTypesList')">
+              {{#each flag.damageTargetCreatureTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="damageTargetCreatureTypesList" id="hidden-damageTargetCreatureTypesList" value="{{flag.damageTargetCreatureTypesList}}" />
+          </div>
+        </div>
       </div>
     </details>
 
