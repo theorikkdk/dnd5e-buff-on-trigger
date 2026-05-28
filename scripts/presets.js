@@ -1065,6 +1065,7 @@ export const BUFF_PRESETS = [
       type: "passive",
       buffs: {
         incomingAttackMode: "disadvantage",
+        incomingAttackCreatureTypes: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
         conditionImmunities: ["charmed", "frightened"],
       },
       consumeOnTrigger: false,

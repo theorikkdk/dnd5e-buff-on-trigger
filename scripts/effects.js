@@ -18,6 +18,7 @@ const DAMAGE_LABEL_KEYS = {
 };
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
+const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const allowedLinkedStatusDeletions = new Set();
 let linkedStatusProtectionRegistered = false;
 
@@ -1763,6 +1764,12 @@ function buildMovementChanges(buffs, actor = null) {
   }));
 }
 
+function normalizeIncomingAttackCreatureTypes(types = []) {
+  return [...new Set((types ?? [])
+    .map((type) => String(type ?? "").trim().toLowerCase())
+    .filter((type) => CREATURE_TYPES.includes(type)))];
+}
+
 export function buildMechanicalChanges(flag, actor = null) {
   if (!flag.buffs) return [];
   const {
@@ -1770,6 +1777,7 @@ export function buildMechanicalChanges(flag, actor = null) {
     attackMode,
     saveMode,
     incomingAttackMode,
+    incomingAttackCreatureTypes,
     skillMode,
     abilityCheckAdvantages,
     abilityCheckDisadvantages,
@@ -1810,8 +1818,11 @@ export function buildMechanicalChanges(flag, actor = null) {
     changes.push({ key, mode: 5, value: "1", priority: 20 });
   }
   if (incomingAttackMode) {
-    const key = incomingAttackMode === "advantage" ? "flags.midi-qol.grants.advantage.attack.all" : "flags.midi-qol.grants.disadvantage.attack.all";
-    changes.push({ key, mode: 5, value: "1", priority: 20 });
+    const creatureTypes = normalizeIncomingAttackCreatureTypes(incomingAttackCreatureTypes);
+    if (!creatureTypes.length) {
+      const key = incomingAttackMode === "advantage" ? "flags.midi-qol.grants.advantage.attack.all" : "flags.midi-qol.grants.disadvantage.attack.all";
+      changes.push({ key, mode: 5, value: "1", priority: 20 });
+    }
   }
   if (skillMode) {
     const key = skillMode === "advantage" ? "flags.midi-qol.advantage.check.all" : "flags.midi-qol.disadvantage.check.all";

@@ -584,5 +584,21 @@
   "BOT.presets.blur.label": "Blur",
   "BOT.presets.blur.description": "Attacks against the bearer have disadvantage while the buff is active.",
   "BOT.presets.protectionFromEvilAndGood.label": "Protection from Evil and Good",
-  "BOT.presets.protectionFromEvilAndGood.description": "The target gains partial protection: immunity to Charmed/Frightened and disadvantage on attacks against it. Creature-type filtering and possession must be handled manually."
+  "BOT.presets.protectionFromEvilAndGood.description": "The target gains protection against certain creature types: immunity to Charmed/Frightened and disadvantage on attacks from those creatures. Possession must still be handled manually.",
+  "BOT.ui.defense.incomingAttackCreatureTypes": "Affected attacker types",
+  "BOT.ui.defense.incomingAttackCreatureTypesSummary": "attackers",
+  "BOT.creatureTypes.aberration": "Aberration",
+  "BOT.creatureTypes.celestial": "Celestial",
+  "BOT.creatureTypes.elemental": "Elemental",
+  "BOT.creatureTypes.fey": "Fey",
+  "BOT.creatureTypes.fiend": "Fiend",
+  "BOT.creatureTypes.undead": "Undead",
+  "BOT.creatureTypes.beast": "Beast",
+  "BOT.creatureTypes.dragon": "Dragon",
+  "BOT.creatureTypes.giant": "Giant",
+  "BOT.creatureTypes.humanoid": "Humanoid",
+  "BOT.creatureTypes.monstrosity": "Monstrosity",
+  "BOT.creatureTypes.ooze": "Ooze",
+  "BOT.creatureTypes.plant": "Plant",
+  "BOT.creatureTypes.construct": "Construct"
 }

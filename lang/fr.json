@@ -584,5 +584,21 @@
   "BOT.presets.blur.label": "Flou / Blur",
   "BOT.presets.blur.description": "Les attaques contre le porteur ont désavantage tant que le buff est actif.",
   "BOT.presets.protectionFromEvilAndGood.label": "Protection contre le mal et le bien / Protection from Evil and Good",
-  "BOT.presets.protectionFromEvilAndGood.description": "La cible gagne une protection partielle : immunité Charmé/Effrayé et désavantage aux attaques contre elle. Le filtre par type de créature et la possession doivent être gérés manuellement."
+  "BOT.presets.protectionFromEvilAndGood.description": "La cible gagne une protection contre certains types de créatures : immunité Charmé/Effrayé et désavantage aux attaques de ces créatures. La possession reste à gérer manuellement.",
+  "BOT.ui.defense.incomingAttackCreatureTypes": "Types d’attaquants concernés",
+  "BOT.ui.defense.incomingAttackCreatureTypesSummary": "attaquants",
+  "BOT.creatureTypes.aberration": "Aberration",
+  "BOT.creatureTypes.celestial": "Céleste",
+  "BOT.creatureTypes.elemental": "Élémentaire",
+  "BOT.creatureTypes.fey": "Fée",
+  "BOT.creatureTypes.fiend": "Fiélon",
+  "BOT.creatureTypes.undead": "Mort-vivant",
+  "BOT.creatureTypes.beast": "Bête",
+  "BOT.creatureTypes.dragon": "Dragon",
+  "BOT.creatureTypes.giant": "Géant",
+  "BOT.creatureTypes.humanoid": "Humanoïde",
+  "BOT.creatureTypes.monstrosity": "Monstruosité",
+  "BOT.creatureTypes.ooze": "Vase",
+  "BOT.creatureTypes.plant": "Plante",
+  "BOT.creatureTypes.construct": "Artificiel"
 }
