@@ -17,12 +17,18 @@ const DAMAGE_LABEL_KEYS = {
   thunder: "BOT.damageTypes.thunder"
 };
 
+const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
+
 function localize(key) {
   return game.i18n.localize(key);
 }
 
 function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
+}
+
+function activeEffectMode(name, fallback) {
+  return globalThis.CONST?.ACTIVE_EFFECT_MODES?.[name] ?? fallback;
 }
 
 function hasConfiguredCharges(flag) {
@@ -1052,13 +1058,19 @@ function getLinkedStatusOriginItemUuid(flag) {
   return flag?.originItemUuid ?? flag?.itemUuid ?? null;
 }
 
-function buildLinkedStatusBuffId(ownerActor, flag) {
+function getConfiguredStatusIds(flag) {
+  const ids = Array.isArray(flag?.status?.ids) ? flag.status.ids.filter(Boolean) : [];
+  if (ids.length) return [...new Set(ids)];
+  return flag?.status?.id ? [flag.status.id] : [];
+}
+
+function buildLinkedStatusBuffId(ownerActor, flag, statusId = null) {
   return [
     ownerActor?.uuid ?? null,
     flag?.originActorUuid ?? null,
     getLinkedStatusOriginItemUuid(flag),
     flag?.itemName ?? null,
-    flag?.status?.id ?? null,
+    statusId,
   ].filter(Boolean).join("|");
 }
 
@@ -1092,29 +1104,33 @@ function collectActorsForLinkedStatusCleanup() {
 function linkedStatusMatchesBuff(effect, ownerActor, flag) {
   const effectFlag = effect?.flags?.[MODULE_ID];
   if (effectFlag?.linkedStatus !== true) return false;
-  if (effectFlag.statusId !== flag?.status?.id) return false;
+  const statusIds = getConfiguredStatusIds(flag);
+  if (!statusIds.includes(effectFlag.statusId)) return false;
 
   const expectedOriginActorUuid = flag?.originActorUuid ?? null;
   const expectedOriginItemUuid = getLinkedStatusOriginItemUuid(flag);
   const expectedOwnerActorUuid = ownerActor?.uuid ?? null;
   const expectedBuffId = buildLinkedStatusBuffId(ownerActor, flag);
+  const legacyBuffId = buildLinkedStatusBuffId(ownerActor, flag, effectFlag.statusId);
 
   if (expectedOriginActorUuid && effectFlag.originActorUuid !== expectedOriginActorUuid) return false;
   if (expectedOriginItemUuid && effectFlag.originItemUuid !== expectedOriginItemUuid) return false;
   if (expectedOwnerActorUuid && effectFlag.ownerActorUuid !== expectedOwnerActorUuid) return false;
-  if (expectedBuffId && effectFlag.buffId !== expectedBuffId) return false;
+  if (expectedBuffId && effectFlag.buffId !== expectedBuffId && effectFlag.buffId !== legacyBuffId) return false;
 
   return true;
 }
 
 async function cleanupLinkedStatusEffects(ownerActor, flag) {
-  if (!flag?.status?.removeWhenBuffEnds || !flag?.status?.id) return;
+  const statusIds = getConfiguredStatusIds(flag);
+  if (!flag?.status?.removeWhenBuffEnds || !statusIds.length) return;
 
   for (const actor of collectActorsForLinkedStatusCleanup()) {
     const linkedEffects = actor.effects?.filter((effect) => linkedStatusMatchesBuff(effect, ownerActor, flag)) ?? [];
     for (const effect of linkedEffects) {
-      await deleteDocumentIfExists(effect, `statut lie ${flag.status.id}`);
-      debugLog(`[${MODULE_ID}] Statut lie ${flag.status.id} retire de ${actor.name}`);
+      const statusId = effect.flags?.[MODULE_ID]?.statusId ?? "unknown";
+      await deleteDocumentIfExists(effect, `statut lie ${statusId}`);
+      debugLog(`[${MODULE_ID}] Statut lie ${statusId} retire de ${actor.name}`);
     }
   }
 }
@@ -1599,7 +1615,64 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
     return false;
   }
 }
-export function buildMechanicalChanges(flag) {
+function normalizeMovementTypes(types) {
+  const rawTypes = Array.isArray(types) ? types.filter(Boolean) : [types].filter(Boolean);
+  if (rawTypes.includes("all")) return ["all"];
+  const configuredTypes = rawTypes.filter((type) => MOVEMENT_TYPES.includes(type));
+  return [...new Set(configuredTypes.length ? configuredTypes : ["walk"])];
+}
+
+function getConfiguredMovement(buffs) {
+  const movement = buffs?.movement;
+  const movementValue = String(movement?.value ?? "").trim();
+  if (movement?.enabled && movementValue) {
+    return {
+      mode: movement.mode === "multiply" ? "multiply" : "add",
+      value: movementValue,
+      types: normalizeMovementTypes(movement.types),
+    };
+  }
+
+  if (buffs?.speed?.value) {
+    return {
+      mode: "add",
+      value: String(buffs.speed.value).trim(),
+      types: normalizeMovementTypes([buffs.speed.type ?? "walk"]),
+    };
+  }
+
+  return null;
+}
+
+function getMovementChangeTypes(config, actor = null) {
+  if (!config?.types?.includes("all")) return config?.types ?? [];
+  if (!actor) return MOVEMENT_TYPES;
+
+  const movement = actor.system?.attributes?.movement ?? {};
+  const existingTypes = MOVEMENT_TYPES.filter((type) => Number(movement[type] ?? 0) > 0);
+  return existingTypes.length ? existingTypes : ["walk"];
+}
+
+function buildMovementChanges(buffs, actor = null) {
+  const movement = getConfiguredMovement(buffs);
+  if (!movement) return [];
+
+  const value = Number(movement.value);
+  if (!Number.isFinite(value)) return [];
+
+  const mode = movement.mode === "multiply"
+    ? activeEffectMode("MULTIPLY", 1)
+    : activeEffectMode("ADD", 2);
+
+  return getMovementChangeTypes(movement, actor).map((type) => ({
+    key: "system.attributes.movement." + type,
+    mode,
+    value: String(value),
+    priority: 20,
+  }));
+}
+
+export function buildMechanicalChanges(flag, actor = null) {
   if (!flag.buffs) return [];
   const {
     ac,
@@ -1618,6 +1691,7 @@ export function buildMechanicalChanges(flag) {
     skillBonusAll,
     saveBonus,
     attackBonus,
+    movement,
     speed,
     resistances,
     vulnerabilities,
@@ -1690,7 +1764,7 @@ export function buildMechanicalChanges(flag) {
     changes.push({ key: "system.bonuses.mwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
     changes.push({ key: "system.bonuses.rwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
   }
-  if (speed?.value) changes.push({ key: `system.attributes.movement.${speed.type ?? "walk"}`, mode: 2, value: String(speed.value), priority: 20 });
+  changes.push(...buildMovementChanges({ movement, speed }, actor));
   if (resistances?.length) {
     for (const type of resistances) changes.push({ key: "system.traits.dr.value", mode: 2, value: type, priority: 20 });
   }
@@ -1735,7 +1809,7 @@ export function buildMechanicalChanges(flag) {
 
 export async function applyMechanicalBuffs(actor, flag, durationRounds) {
   try {
-    const changes = buildMechanicalChanges(flag);
+    const changes = buildMechanicalChanges(flag, actor);
     if (!changes.length) return;
     const resolvedDurationRounds = getFlagDurationInRounds(flag) ?? durationRounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
@@ -1937,18 +2011,19 @@ export async function applyBonusDamage(workflow, flag) {
 export async function applyStatusEffect(workflow, flag, options = {}) {
   try {
     let targets = resolveStatusTargets(workflow, flag);
+    const statusIds = getConfiguredStatusIds(flag);
 
     if (!targets?.size) {
       console.warn(`[${MODULE_ID}] applyStatusEffect : aucune cible valide (mode "${flag.status?.targetMode ?? flag.targetMode ?? "self"}", condition "${flag.condition ?? "hit"}")`);
       return;
     }
+    if (!statusIds.length) return;
 
-    const statusId = flag.status.id;
     const applyCondition = flag.status?.applyCondition ?? "always";
     if (applyCondition !== "always") {
       const saveResults = workflow._botSaveResults;
       if (!saveResults || saveResults.resolvedCount <= 0) {
-        debugLog(`[${MODULE_ID}] Statut ignor� : aucun r�sultat de sauvegarde disponible`);
+        debugLog(`[${MODULE_ID}] Statut ignore : aucun resultat de sauvegarde disponible`);
         return;
       }
 
@@ -1969,15 +2044,17 @@ export async function applyStatusEffect(workflow, flag, options = {}) {
       const targetActor = token.actor;
       if (!targetActor) continue;
 
-      const hadStatusBefore = actorHasActiveStatus(targetActor, statusId);
-      await targetActor.toggleStatusEffect(statusId, { active: true });
-      debugLog(`[${MODULE_ID}] Statut ${statusId} appliquÃ© sur ${targetActor.name}`);
+      for (const statusId of statusIds) {
+        const hadStatusBefore = actorHasActiveStatus(targetActor, statusId);
+        await targetActor.toggleStatusEffect(statusId, { active: true });
+        debugLog(`[${MODULE_ID}] Statut ${statusId} applique sur ${targetActor.name}`);
 
-      if (flag.status?.removeWhenBuffEnds === true) {
-        if (hadStatusBefore) {
-          debugLog(`[${MODULE_ID}] Statut ${statusId} deja present sur ${targetActor.name}, non lie au buff`);
-        } else {
-          await markLinkedStatusEffect(targetActor, statusId, workflow.actor, flag);
+        if (flag.status?.removeWhenBuffEnds === true) {
+          if (hadStatusBefore) {
+            debugLog(`[${MODULE_ID}] Statut ${statusId} deja present sur ${targetActor.name}, non lie au buff`);
+          } else {
+            await markLinkedStatusEffect(targetActor, statusId, workflow.actor, flag);
+          }
         }
       }
     }

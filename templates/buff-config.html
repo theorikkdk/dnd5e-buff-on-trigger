@@ -259,19 +259,23 @@
       </div>
     </details>
 
-    <details class="bot-collapsible-panel bot-effect-panel" id="bot-status-panel" {{#if flag.status.id}}open{{/if}}>
-      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.status.id}} — {{flag.status.id}}{{/if}}</summary>
+    <details class="bot-collapsible-panel bot-effect-panel" id="bot-status-panel" {{#if flag.hasStatus}}open{{/if}}>
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.hasStatus}} � {{flag.statusSummary}}{{/if}}</summary>
       <div class="bot-collapsible-body">
-        <div class="bot-row">
-          <label class="bot-label-sm">{{localize "BOT.ui.status.label"}}</label>
-          <select name="statusId" class="bot-input-flex">
-            <option value="">{{localize "BOT.ui.status.none"}}</option>
-            {{#each flag.statusOptions}}
-              <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
-            {{/each}}
-          </select>
+        <div class="form-group bot-picker-group">
+          <label>{{localize "BOT.ui.status.label"}}</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-statusIdsList">
+              {{#each flag.statusOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'statusIdsList')">&times;</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'statusIdsList')">
+              {{#each flag.statusOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="statusIdsList" id="hidden-statusIdsList" value="{{flag.statusIdsList}}" />
+            <input type="hidden" name="statusId" value="{{flag.statusLegacyId}}" />
+          </div>
         </div>
-        <div class="bot-row" id="bot-status-target-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+        <div class="bot-row" id="bot-status-target-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
           <label class="bot-label-sm">{{localize "BOT.ui.status.targetMode.label"}}</label>
           <select name="statusTargetMode" class="bot-input-flex">
             <option value="triggerTarget" {{#if flag.statusTargetModeTriggerTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.triggerTarget"}}</option>
@@ -280,7 +284,7 @@
             <option value="storedTarget" {{#if flag.statusTargetModeStoredTarget}}selected{{/if}}>{{localize "BOT.ui.status.targetMode.storedTarget"}}</option>
           </select>
         </div>
-        <div class="bot-row" id="bot-status-timing-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+        <div class="bot-row" id="bot-status-timing-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
           <label class="bot-label-sm">{{localize "BOT.ui.status.timing.label"}}</label>
           <select name="statusTiming" class="bot-input-flex">
             <option value="trigger" {{#if flag.statusTimingTrigger}}selected{{/if}}>{{localize "BOT.ui.status.timing.trigger"}}</option>
@@ -288,7 +292,7 @@
             <option value="both" {{#if flag.statusTimingBoth}}selected{{/if}}>{{localize "BOT.ui.status.timing.both"}}</option>
           </select>
         </div>
-        <div class="bot-row" id="bot-status-apply-condition-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+        <div class="bot-row" id="bot-status-apply-condition-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
           <label class="bot-label-sm">{{localize "BOT.ui.status.applyCondition.label"}}</label>
           <select name="statusApplyCondition" class="bot-input-flex">
             <option value="always" {{#if flag.statusApplyConditionAlways}}selected{{/if}}>{{localize "BOT.ui.status.applyCondition.always"}}</option>
@@ -296,13 +300,12 @@
             <option value="saveSuccess" {{#if flag.statusApplyConditionSaveSuccess}}selected{{/if}}>{{localize "BOT.ui.status.applyCondition.saveSuccess"}}</option>
           </select>
         </div>
-        <label class="bot-check-row" id="bot-status-remove-when-buff-ends-row" {{#unless flag.status.id}}style="display:none"{{/unless}}>
+        <label class="bot-check-row" id="bot-status-remove-when-buff-ends-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
           <input type="checkbox" name="statusRemoveWhenBuffEnds" {{#if flag.statusRemoveWhenBuffEnds}}checked{{/if}}>
           <span>{{localize "BOT.ui.status.removeWhenBuffEnds"}}</span>
         </label>
       </div>
     </details>
-
     <details class="bot-collapsible-panel bot-formula-help-panel">
       <summary class="bot-collapsible-summary">{{localize "BOT.ui.formulaHelp.summary"}}</summary>
       <div class="bot-collapsible-body bot-formula-help">
@@ -636,18 +639,37 @@
       </div>
 
       <div id="bot-subtab-capacities" class="bot-subtab-panel" style="display:none">
-        <div class="bot-capacity-row">
-          <label class="bot-capacity-label">{{localize "BOT.ui.capacities.speed"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffSpeed" value="{{flag.buffSpeed}}" placeholder="±" />
-          <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
-          <select class="bot-capacity-text" name="buffSpeedType">
-            <option value="walk"   {{#if (eq flag.buffSpeedType "walk")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.walk"}}</option>
-            <option value="fly"    {{#if (eq flag.buffSpeedType "fly")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.fly"}}</option>
-            <option value="swim"   {{#if (eq flag.buffSpeedType "swim")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.swim"}}</option>
-            <option value="climb"  {{#if (eq flag.buffSpeedType "climb")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.climb"}}</option>
-            <option value="burrow" {{#if (eq flag.buffSpeedType "burrow")}}selected{{/if}}>{{localize "BOT.ui.capacities.speedTypes.burrow"}}</option>
-          </select>
+        <p class="bot-section-label">{{localize "BOT.ui.movement.title"}}</p>
+        <label class="bot-check-row">
+          <input type="checkbox" name="buffMovementEnabled" {{#if flag.buffMovementEnabled}}checked{{/if}}>
+          <span>{{localize "BOT.ui.movement.enabled"}}</span>
+        </label>
+        <div class="bot-responsive-grid">
+          <div class="form-group bot-picker-group">
+            <label>{{localize "BOT.ui.movement.typeLabel"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffMovementTypesList">
+                {{#each flag.movementTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffMovementTypesList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffMovementTypesList')">
+                {{#each flag.movementTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffMovementTypesList" id="hidden-buffMovementTypesList" value="{{flag.buffMovementTypesList}}" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>{{localize "BOT.ui.movement.mode.label"}}</label>
+            <select name="buffMovementMode">
+              <option value="add" {{#if flag.buffMovementModeAdd}}selected{{/if}}>{{localize "BOT.ui.movement.mode.add"}}</option>
+              <option value="multiply" {{#if flag.buffMovementModeMultiply}}selected{{/if}}>{{localize "BOT.ui.movement.mode.multiply"}}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>{{localize "BOT.ui.movement.value"}}</label>
+            <input type="text" name="buffMovementValue" value="{{flag.buffMovementValue}}" placeholder="+10" />
+          </div>
         </div>
+        <p class="hint">{{localize "BOT.ui.movement.help"}}</p>
 
         <p class="bot-section-label">{{localize "BOT.ui.capacities.senses.title"}}</p>
         <div class="bot-capacity-row">

@@ -462,19 +462,21 @@ function resolveActorUuid(uuid) {
   return null;
 }
 
-function buildRepeatedSaveSupportBuffId(ownerActor, flag) {
+function buildRepeatedSaveSupportBuffId(ownerActor, flag, statusId = null) {
   return [
     ownerActor?.uuid ?? null,
     flag?.originActorUuid ?? null,
     flag?.originItemUuid ?? flag?.itemUuid ?? null,
     flag?.itemName ?? null,
-    flag?.status?.id ?? null,
+    statusId,
   ].filter(Boolean).join("|");
 }
 
 function activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag) {
   if (!activeBuff || !linkedFlag?.buffId) return false;
-  return buildRepeatedSaveSupportBuffId(ownerActor, activeBuff) === linkedFlag.buffId;
+  const groupedBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff);
+  const legacyBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff, linkedFlag.statusId ?? null);
+  return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId;
 }
 
 function getLinkedStatusRepeatedSaveEffects(actor, timing) {
@@ -489,7 +491,11 @@ function getLinkedStatusRepeatedSaveEffects(actor, timing) {
   return effects;
 }
 
-function buildRepeatedSaveFlagFromLinkedStatus(linkedFlag) {
+function buildRepeatedSaveFlagFromLinkedStatus(linkedFlag, linkedEffects = []) {
+  const statusIds = linkedEffects
+    .map((effect) => effect.flags?.[MODULE_ID]?.statusId)
+    .filter(Boolean);
+  const uniqueStatusIds = [...new Set(statusIds.length ? statusIds : [linkedFlag.statusId].filter(Boolean))];
   return {
     itemUuid: linkedFlag.originItemUuid ?? null,
     originItemUuid: linkedFlag.originItemUuid ?? null,
@@ -501,7 +507,8 @@ function buildRepeatedSaveFlagFromLinkedStatus(linkedFlag) {
       repeat: linkedFlag.saveRepeat ?? null,
     },
     status: {
-      id: linkedFlag.statusId ?? null,
+      id: uniqueStatusIds[0] ?? null,
+      ids: uniqueStatusIds,
       removeWhenBuffEnds: true,
     },
   };
@@ -572,10 +579,26 @@ async function cleanupLinkedStatusSupportBuff(linkedFlag) {
 
 async function handleLinkedStatusRepeatedSaves(actor, timing) {
   const effects = getLinkedStatusRepeatedSaveEffects(actor, timing);
+  const groups = new Map();
   for (const effect of effects) {
     const linkedFlag = effect.flags?.[MODULE_ID];
-    const flag = buildRepeatedSaveFlagFromLinkedStatus(linkedFlag);
-    debugLog(`[${MODULE_ID}] JS répété lié au statut ${linkedFlag.statusId} lancé pour ${actor.name}`);
+    const key = [
+      linkedFlag?.buffId ?? effect.id,
+      linkedFlag?.saveAbility ?? "",
+      linkedFlag?.saveDcSource ?? "fixed",
+      linkedFlag?.saveDc ?? "",
+      linkedFlag?.saveRepeat?.endsBuffOn ?? "success",
+    ].join("|");
+    const group = groups.get(key) ?? { linkedFlag, effects: [] };
+    group.effects.push(effect);
+    groups.set(key, group);
+  }
+
+  for (const group of groups.values()) {
+    const linkedFlag = group.linkedFlag;
+    const flag = buildRepeatedSaveFlagFromLinkedStatus(linkedFlag, group.effects);
+    const statusList = group.effects.map((effect) => effect.flags?.[MODULE_ID]?.statusId).filter(Boolean).join(", ");
+    debugLog(`[${MODULE_ID}] JS repete lie aux statuts ${statusList || "inconnus"} lance pour ${actor.name}`);
 
     const workflow = {
       actor,
@@ -586,7 +609,7 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
     };
     const saveDc = await resolveSaveDC(workflow, flag);
     if (saveDc === null) {
-      debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ignorée : DD indisponible`);
+      debugLog(`[${MODULE_ID}] Sauvegarde repetee liee ignoree : DD indisponible`);
       continue;
     }
 
@@ -602,22 +625,21 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
     );
     const saveRoll = saveRolls?.[0] ?? null;
     if (!saveRoll) {
-      debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ignorée : jet indisponible`);
+      debugLog(`[${MODULE_ID}] Sauvegarde repetee liee ignoree : jet indisponible`);
       continue;
     }
 
     const success = saveRoll.total >= saveDc;
     const endsOn = flag.save.repeat?.endsBuffOn ?? "success";
     const shouldEnd = endsOn === "failure" ? !success : success;
-    debugLog(`[${MODULE_ID}] Sauvegarde répétée liée ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} — ${success ? "réussite" : "échec"} — statut ${shouldEnd ? "retiré" : "conservé"}`);
+    debugLog(`[${MODULE_ID}] Sauvegarde repetee liee ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} - ${success ? "reussite" : "echec"} - statuts ${shouldEnd ? "retires" : "conserves"}`);
     await createRepeatedSaveMessage(actor, success, shouldEnd);
     if (shouldEnd) {
-      await effect.delete();
+      for (const effect of group.effects) await effect.delete();
       await cleanupLinkedStatusSupportBuff(linkedFlag);
     }
   }
 }
-
 async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   if (!actor?.setFlag || !activeBuff?.rememberTargetOnActivation || !newTargetToken?.actor) return false;
   const previousFlag = foundry.utils.deepClone(activeBuff);
@@ -846,7 +868,7 @@ export function registerTriggers() {
           await selectedTargetToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
           debugLog(`[${MODULE_ID}] Buff activé sur ${selectedTargetToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
           if (hasMechBuffs) {
-            const changes = buildMechanicalChanges(activeFlag);
+            const changes = buildMechanicalChanges(activeFlag, selectedTargetToken.actor);
             await refreshBuffIndicator(selectedTargetToken.actor, null, changes);
           } else {
             await refreshBuffIndicator(selectedTargetToken.actor);
@@ -866,7 +888,7 @@ export function registerTriggers() {
           await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
           debugLog(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
           if (hasMechBuffs) {
-            const changes = buildMechanicalChanges(activeFlag);
+            const changes = buildMechanicalChanges(activeFlag, workflow.actor);
             await refreshBuffIndicator(workflow.actor, null, changes);
           } else {
             await refreshBuffIndicator(workflow.actor);

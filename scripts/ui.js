@@ -3,6 +3,8 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
 
+const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
+
 const getSkillLabels = () => ({
   acr: game.i18n.localize("BOT.skills.acr"),
   ani: game.i18n.localize("BOT.skills.ani"),
@@ -119,6 +121,117 @@ function formatModifierValue(value) {
   return Number.isFinite(Number(text)) && Number(text) > 0 ? `+${text}` : text;
 }
 
+
+function normalizeMovementTypes(types) {
+  const rawTypes = Array.isArray(types) ? types.filter(Boolean) : [types].filter(Boolean);
+  if (rawTypes.includes("all")) return ["all"];
+  const configuredTypes = rawTypes.filter((type) => MOVEMENT_TYPES.includes(type));
+  return [...new Set(configuredTypes.length ? configuredTypes : ["walk"])];
+}
+
+function getConfiguredMovement(buffs = {}) {
+  const movement = buffs?.movement;
+  const movementValue = String(movement?.value ?? "").trim();
+  if (movement?.enabled && movementValue) {
+    return {
+      enabled: true,
+      mode: movement.mode === "multiply" ? "multiply" : "add",
+      value: movementValue,
+      types: normalizeMovementTypes(movement.types),
+    };
+  }
+
+  if (buffs?.speed?.value) {
+    return {
+      enabled: true,
+      mode: "add",
+      value: String(buffs.speed.value).trim(),
+      types: normalizeMovementTypes([buffs.speed.type ?? "walk"]),
+    };
+  }
+
+  return { enabled: false, mode: "add", value: "", types: ["walk"] };
+}
+
+function getMovementTypeOptions(selectedTypes = []) {
+  const selectedSet = new Set(normalizeMovementTypes(selectedTypes));
+  return [
+    { value: "all", label: game.i18n.localize("BOT.ui.movement.types.all"), selected: selectedSet.has("all") },
+    ...MOVEMENT_TYPES.map((type) => ({
+      value: type,
+      label: game.i18n.localize("BOT.ui.capacities.speedTypes." + type),
+      selected: selectedSet.has(type),
+    })),
+  ];
+}
+
+function formatMovementSummary(movement, labels) {
+  if (!movement?.enabled || !isFilled(movement.value)) return null;
+  const typeLabel = movement.types?.includes("all")
+    ? game.i18n.localize("BOT.ui.movement.types.all").toLowerCase()
+    : listSelectedLabels(movement.types, labels.movementTypes);
+  const value = movement.mode === "multiply" ? String.fromCharCode(215) + movement.value : formatModifierValue(movement.value);
+  return game.i18n.localize("BOT.ui.movement.title") + " : " + typeLabel + " " + value;
+}
+
+function getMovementUnit(actor = null) {
+  const actorUnit = actor?.system?.attributes?.movement?.units;
+  if (actorUnit) return actorUnit;
+
+  try {
+    const defaultUnit = globalThis.dnd5e?.utils?.defaultUnits?.("length");
+    if (defaultUnit) return defaultUnit;
+  } catch (error) {
+    debugLog(`[${MODULE_ID}] Unable to read dnd5e default length unit: ${error.message}`);
+  }
+
+  try {
+    return game.settings.get("dnd5e", "metricLengthUnits") ? "m" : "ft";
+  } catch (error) {
+    debugLog(`[${MODULE_ID}] Unable to read dnd5e metric length setting: ${error.message}`);
+  }
+
+  return canvas?.scene?.grid?.units ?? "ft";
+}
+
+function getMovementUnitType(unit) {
+  const normalized = String(unit ?? "").trim().toLowerCase();
+  const configuredType = globalThis.CONFIG?.DND5E?.movementUnits?.[normalized]?.type;
+  if (configuredType === "metric" || configuredType === "imperial") return configuredType;
+  if (["m", "meter", "meters", "metre", "metres"].includes(normalized)) return "metric";
+  if (["ft", "foot", "feet"].includes(normalized)) return "imperial";
+  return null;
+}
+
+function distanceFeetToCurrentUnit(feet, actor = null) {
+  if (!Number.isFinite(Number(feet))) return feet;
+  const unit = getMovementUnit(actor);
+  const unitType = getMovementUnitType(unit);
+  if (unitType === "imperial") return feet;
+  if (unitType === "metric") {
+    const converted = globalThis.dnd5e?.utils?.convertLength?.(feet, "ft", "m", { strict: false });
+    return Number.isFinite(converted) ? Math.round(converted) : Math.round(feet * 0.3);
+  }
+
+  debugLog(`[${MODULE_ID}] Unknown movement unit "${unit}", keeping ${feet} ft preset value`);
+  return feet;
+}
+
+function formatSignedMovementValue(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return String(value ?? "");
+  return number > 0 ? `+${number}` : String(number);
+}
+
+function convertPresetMovementDistances(flag, actor = null) {
+  const clone = foundry.utils.deepClone(flag);
+  const movement = clone.buffs?.movement;
+  if (!movement || movement.mode === "multiply" || movement.valueFeet === undefined || movement.valueFeet === null) return clone;
+
+  const converted = distanceFeetToCurrentUnit(Number(movement.valueFeet), actor);
+  movement.value = formatSignedMovementValue(converted);
+  return clone;
+}
 function getTriggerLabel(type) {
   if (!type) return game.i18n.localize("BOT.ui.summary.notConfigured");
   return game.i18n.localize(`BOT.ui.trigger.${type}`);
@@ -237,7 +350,14 @@ function getReceivedAttackTypeLabel(type) {
   return game.i18n.localize(`BOT.ui.receivedAttackType.${type ?? "any"}`);
 }
 
-function getStatusOptions(currentStatusId = null) {
+function getConfiguredStatusIds(status = null) {
+  const ids = Array.isArray(status?.ids) ? status.ids.filter(Boolean) : [];
+  if (ids.length) return [...new Set(ids)];
+  return status?.id ? [status.id] : [];
+}
+
+function getStatusOptions(currentStatusIds = []) {
+  const selectedSet = new Set(Array.isArray(currentStatusIds) ? currentStatusIds : [currentStatusIds].filter(Boolean));
   const options = (CONFIG.statusEffects ?? [])
     .map((status) => {
       const id = status.id ?? status.statuses?.[0] ?? null;
@@ -248,18 +368,20 @@ function getStatusOptions(currentStatusId = null) {
         value: id,
         label,
         icon: status.img ?? status.icon ?? null,
-        selected: id === currentStatusId,
+        selected: selectedSet.has(id),
       };
     })
     .filter(Boolean);
 
-  if (currentStatusId && !options.some((option) => option.value === currentStatusId)) {
-    options.unshift({
-      value: currentStatusId,
-      label: game.i18n.format("BOT.ui.status.unknown", { id: currentStatusId }),
-      icon: null,
-      selected: true,
-    });
+  for (const currentStatusId of selectedSet) {
+    if (!options.some((option) => option.value === currentStatusId)) {
+      options.unshift({
+        value: currentStatusId,
+        label: game.i18n.format("BOT.ui.status.unknown", { id: currentStatusId }),
+        icon: null,
+        selected: true,
+      });
+    }
   }
 
   return options;
@@ -304,7 +426,7 @@ function hasMechanicalChanges(buffs = {}) {
     buffs.skillBonusAll,
     buffs.saveBonus,
     buffs.attackBonus,
-    buffs.speed?.value,
+    getConfiguredMovement(buffs).enabled ? getConfiguredMovement(buffs).value : null,
     buffs.darkvision,
     buffs.blindsight,
     buffs.tremorsense,
@@ -359,9 +481,7 @@ function buildMechanicalSummary(raw, labels) {
   if (isFilled(buffs.skillBonusAll)) addEntry(`${game.i18n.localize("BOT.ui.skills.bonusAll")} : ${formatModifierValue(buffs.skillBonusAll)}`);
   if (isFilled(buffs.attackBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackBonus")} : ${formatModifierValue(buffs.attackBonus)}`);
   if (isFilled(buffs.saveBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveBonus")} : ${formatModifierValue(buffs.saveBonus)}`);
-  if (isFilled(buffs.speed?.value)) {
-    addEntry(`${game.i18n.localize("BOT.ui.capacities.speed")} : ${buffs.speed.value} ${game.i18n.localize("BOT.ui.units.feet")} (${game.i18n.localize(`BOT.ui.capacities.speedTypes.${buffs.speed.type ?? "walk"}`)})`);
-  }
+  addEntry(formatMovementSummary(getConfiguredMovement(buffs), labels));
   if ((buffs.resistances ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.resistances")} : ${listSelectedLabels(buffs.resistances, labels.damageTypes)}`);
   if ((buffs.vulnerabilities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.vulnerabilities")} : ${listSelectedLabels(buffs.vulnerabilities, labels.damageTypes)}`);
   if ((buffs.immunities ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.immunities")} : ${listSelectedLabels(buffs.immunities, labels.damageTypes)}`);
@@ -477,10 +597,12 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     });
   }
 
-  if (raw.status?.id) {
+  const configuredStatusIds = getConfiguredStatusIds(raw.status);
+  if (configuredStatusIds.length) {
+    const statusNames = configuredStatusIds.map((id) => labels.statuses?.[id] ?? id).join(", ");
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.status"),
-      value: `${labels.statuses?.[raw.status.id] ?? raw.status.id}, ${getStatusTimingLabel(raw.status.timing)}`
+      value: `${statusNames}, ${getStatusTimingLabel(raw.status.timing)}, ${getStatusApplyConditionLabel(raw.status.applyCondition)}`
     });
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.statusTarget"),
@@ -590,8 +712,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (temporaryHpEnabled) temporaryHpEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const rollModifierEnabled = this.element.querySelector?.('[name="rollModifierEnabled"]');
     if (rollModifierEnabled) rollModifierEnabled.addEventListener("change", () => window.botUpdateRollModifierUI(form));
-    const statusSelect = this.element.querySelector?.('[name="statusId"]');
-    if (statusSelect) statusSelect.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
+    const statusInput = this.element.querySelector?.('[name="statusIdsList"]');
+    if (statusInput) statusInput.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const targetModeSelect = this.element.querySelector?.('[name="targetMode"]');
     if (targetModeSelect) window.botUpdateStoredTargetUI(targetModeSelect);
     const presetSelect = this.element.querySelector?.('[name="presetId"]');
@@ -629,7 +751,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const weaponProfLabels = getWeaponProfLabels();
     const armorProfLabels = getArmorProfLabels();
     const languageLabels = getLanguageLabels();
-    const statusOptions = getStatusOptions(raw.status?.id ?? null);
+    const configuredStatusIds = getConfiguredStatusIds(raw.status);
+    const configuredMovement = getConfiguredMovement(raw.buffs ?? {});
+    const movementTypeOptions = getMovementTypeOptions(configuredMovement.types);
+    const statusOptions = getStatusOptions(configuredStatusIds);
     const presets = getPresetOptions();
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const abilityLabels = getAbilityLabels();
@@ -643,6 +768,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       languages: languageLabels,
       conditions: Object.fromEntries(conditionImmunityOptions.map((option) => [option.value, option.label])),
       statuses: statusLabels,
+      movementTypes: Object.fromEntries(movementTypeOptions.map((option) => [option.value, option.label.toLowerCase()])),
     };
     const abilityCheckAdvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckAdvantages ?? []);
     const abilityCheckDisadvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckDisadvantages ?? []);
@@ -695,6 +821,13 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffSaveBonus:             raw.buffs?.saveBonus ?? "",
       buffAttackBonus:           raw.buffs?.attackBonus ?? "",
       ...getAbilityModifierFlagFields(raw),
+      buffMovementEnabled:       configuredMovement.enabled,
+      buffMovementMode:          configuredMovement.mode,
+      buffMovementModeAdd:       configuredMovement.mode === "add",
+      buffMovementModeMultiply:  configuredMovement.mode === "multiply",
+      buffMovementValue:         configuredMovement.value,
+      buffMovementTypesList:     configuredMovement.types.join(","),
+      movementTypeOptions,
       buffSpeed:                 raw.buffs?.speed?.value ?? "",
       buffSpeedType:             raw.buffs?.speed?.type ?? "walk",
       buffDarkvision:            raw.buffs?.darkvision ?? "",
@@ -782,6 +915,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTargetModeAttacker: normalizeDamageTargetMode(raw.damage?.targetMode) === "attacker",
       damageTargetModeStoredTarget: normalizeDamageTargetMode(raw.damage?.targetMode) === "storedTarget",
       statusOptions,
+      statusIdsList: configuredStatusIds.join(","),
+      statusLegacyId: configuredStatusIds[0] ?? "",
+      hasStatus: configuredStatusIds.length > 0,
+      statusSummary: configuredStatusIds.map((id) => statusLabels[id] ?? id).join(", "),
       statusTimingTrigger:      (raw.status?.timing ?? "trigger") === "trigger",
       statusTimingActivation:   raw.status?.timing === "activation",
       statusTimingBoth:         raw.status?.timing === "both",
@@ -888,13 +1025,17 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
               endsBuffOn: data.saveRepeatEndsBuffOn ?? "success",
             }
           } : null,
-          status: data.statusId ? {
-            id: data.statusId,
+          status: (() => {
+            const statusIds = String(data.statusIdsList ?? data.statusId ?? "").split(",").filter(Boolean);
+            return statusIds.length ? {
+            id: statusIds[0],
+            ids: statusIds,
             timing: data.statusTiming ?? "trigger",
             ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {}),
             applyCondition: data.statusApplyCondition ?? "always",
             removeWhenBuffEnds: data.statusRemoveWhenBuffEnds ?? false
-          } : null,
+          } : null;
+          })(),
         charges: data.charges ? Number(data.charges) : null,
         buffs: (() => {
           const toArray = v => v ? v.split(',').filter(Boolean) : [];
@@ -920,7 +1061,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
             skillBonusAll: data.buffSkillBonusAll || null,
             saveBonus: data.buffSaveBonus || null,
             attackBonus: data.buffAttackBonus || null,
-            speed: data.buffSpeed ? { value: Number(data.buffSpeed), type: data.buffSpeedType ?? "walk" } : null,
+            movement: data.buffMovementEnabled && String(data.buffMovementValue ?? "").trim() ? { enabled: true, mode: data.buffMovementMode === "multiply" ? "multiply" : "add", value: String(data.buffMovementValue).trim(), types: toArray(data.buffMovementTypesList).length ? toArray(data.buffMovementTypesList) : ["walk"] } : null,
+            speed: null,
             weaponProfs: toArray(data.buffWeaponProfsList),
             armorProfs: toArray(data.buffArmorProfsList),
             languages: toArray(data.buffLanguagesList),
@@ -1040,8 +1182,10 @@ function buildBuffConfigFromForm(form) {
   const temporaryHpFormula = String(readFormValue(form, "temporaryHpFormula", "")).trim();
   const rollModifierFormula = String(readFormValue(form, "rollModifierFormula", "")).trim();
   const saveAbility = String(readFormValue(form, "saveAbility", "")).trim();
-  const statusId = String(readFormValue(form, "statusId", "")).trim();
-  const speedValue = readNumberFormValue(form, "buffSpeed");
+  const statusIds = readCsvFormValue(form, "statusIdsList");
+  const statusId = statusIds[0] ?? String(readFormValue(form, "statusId", "")).trim();
+  const movementValue = String(readFormValue(form, "buffMovementValue", "")).trim();
+  const movementTypes = readCsvFormValue(form, "buffMovementTypesList");
 
   return mergeBuffConfig(buildDefaultBuffConfig(), {
     targetMode: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")),
@@ -1076,6 +1220,7 @@ function buildBuffConfigFromForm(form) {
     } : null,
     status: statusId ? {
       id: statusId,
+      ids: statusIds.length ? statusIds : [statusId],
       timing: readFormValue(form, "statusTiming", "trigger"),
       targetMode: readFormValue(form, "statusTargetMode", "triggerTarget"),
       applyCondition: readFormValue(form, "statusApplyCondition", "always"),
@@ -1113,7 +1258,8 @@ function buildBuffConfigFromForm(form) {
       skillBonusAll: readFormValue(form, "buffSkillBonusAll", "") || null,
       saveBonus: readFormValue(form, "buffSaveBonus", "") || null,
       attackBonus: readFormValue(form, "buffAttackBonus", "") || null,
-      speed: speedValue ? { value: speedValue, type: readFormValue(form, "buffSpeedType", "walk") } : null,
+      movement: readFormValue(form, "buffMovementEnabled") && movementValue ? { enabled: true, mode: readFormValue(form, "buffMovementMode", "add") === "multiply" ? "multiply" : "add", value: movementValue, types: movementTypes.length ? movementTypes : ["walk"] } : null,
+      speed: null,
       weaponProfs: readCsvFormValue(form, "buffWeaponProfsList"),
       armorProfs: readCsvFormValue(form, "buffArmorProfsList"),
       languages: readCsvFormValue(form, "buffLanguagesList"),
@@ -1196,6 +1342,7 @@ function buildDefaultBuffConfig() {
       skillBonusAll: null,
       saveBonus: null,
       attackBonus: null,
+      movement: null,
       speed: null,
       weaponProfs: [],
       armorProfs: [],
@@ -1277,8 +1424,8 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "charges",
-    "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffSpeed",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "charges",
+    "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
     ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("buffAbilityCheckModifier", ability), abilityFieldName("buffSavingThrowModifier", ability)]),
   ];
@@ -1299,7 +1446,7 @@ function setPanelOpen(form, id, open) {
 }
 
 function getSummaryLabels() {
-  const statusOptions = getStatusOptions(null);
+  const statusOptions = getStatusOptions([]);
   return {
     skills: getSkillLabels(),
     damageTypes: getDamageLabels(),
@@ -1308,6 +1455,7 @@ function getSummaryLabels() {
     languages: getLanguageLabels(),
     conditions: Object.fromEntries(getConditionImmunityOptions().map((option) => [option.value, option.label])),
     statuses: Object.fromEntries(statusOptions.map((option) => [option.value, option.label])),
+    movementTypes: Object.fromEntries(getMovementTypeOptions(["all"]).map((option) => [option.value, option.label.toLowerCase()])),
   };
 }
 
@@ -1366,7 +1514,9 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveRepeatTiming", flag.save?.repeat?.timing ?? "endTurn");
   setFormValue(form, "saveRepeatEndsBuffOn", flag.save?.repeat?.endsBuffOn ?? "success");
 
-  setFormValue(form, "statusId", flag.status?.id ?? "");
+  const statusIds = getConfiguredStatusIds(flag.status);
+  setFormValue(form, "statusId", statusIds[0] ?? "");
+  setTagList(form, "statusIdsList", statusIds);
   setFormValue(form, "statusTiming", flag.status?.timing ?? "trigger");
   setFormValue(form, "statusTargetMode", flag.status?.targetMode ?? "triggerTarget");
   setFormValue(form, "statusApplyCondition", flag.status?.applyCondition ?? "always");
@@ -1397,8 +1547,14 @@ function applyPresetFlagToForm(form, flag) {
   }
   setFormValue(form, "buffSkillBonus", flag.buffs?.skillBonus ?? "");
   setFormValue(form, "buffSkillBonusAll", flag.buffs?.skillBonusAll ?? "");
-  setFormValue(form, "buffSpeed", flag.buffs?.speed?.value ?? "");
-  setFormValue(form, "buffSpeedType", flag.buffs?.speed?.type ?? "walk");
+  const resolvedFlag = convertPresetMovementDistances(flag, form?.__botApp?.item?.parent ?? null);
+  const movement = getConfiguredMovement(resolvedFlag.buffs ?? {});
+  setFormValue(form, "buffMovementEnabled", movement.enabled);
+  setFormValue(form, "buffMovementMode", movement.mode);
+  setFormValue(form, "buffMovementValue", movement.value);
+  setTagList(form, "buffMovementTypesList", movement.types);
+  setFormValue(form, "buffSpeed", resolvedFlag.buffs?.speed?.value ?? "");
+  setFormValue(form, "buffSpeedType", resolvedFlag.buffs?.speed?.type ?? "walk");
   setFormValue(form, "buffDarkvision", flag.buffs?.darkvision ?? "");
   setFormValue(form, "buffBlindSight", flag.buffs?.blindsight ?? "");
   setFormValue(form, "buffTremorSense", flag.buffs?.tremorsense ?? "");
@@ -1798,7 +1954,13 @@ window.botRemoveTag = function(removeEl, targetId) {
 window.botUpdateHidden = function(targetId) {
   const tagsDiv = document.getElementById('tags-' + targetId);
   const hiddenInput = document.getElementById('hidden-' + targetId);
-  hiddenInput.value = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value).join(',');
+  const values = [...tagsDiv.querySelectorAll('.bot-tag')].map(t => t.dataset.value);
+  hiddenInput.value = values.join(',');
+  if (targetId === 'statusIdsList') {
+    const legacyStatusInput = hiddenInput.form?.querySelector?.('[name="statusId"]');
+    if (legacyStatusInput) legacyStatusInput.value = values[0] ?? '';
+  }
+  hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
 window.botUpdateEffectSectionsUI = function(form) {
@@ -1820,7 +1982,7 @@ window.botUpdateEffectSectionsUI = function(form) {
   const statusTargetRow = form.querySelector('#bot-status-target-row');
   const statusApplyConditionRow = form.querySelector('#bot-status-apply-condition-row');
   const statusRemoveWhenBuffEndsRow = form.querySelector('#bot-status-remove-when-buff-ends-row');
-  const statusSelect = form.querySelector('[name="statusId"]');
+  const statusSelect = form.querySelector('[name="statusIdsList"]');
   if (statusTimingRow && statusSelect) {
     statusTimingRow.style.display = statusSelect.value ? "" : "none";
   }

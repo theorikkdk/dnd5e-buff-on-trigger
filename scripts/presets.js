@@ -229,6 +229,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "frightened",
+        ids: ["frightened"],
         targetMode: "triggerTarget",
         applyCondition: "saveFailure",
         removeWhenBuffEnds: true,
@@ -298,6 +299,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "blinded",
+        ids: ["blinded"],
         targetMode: "triggerTarget",
         applyCondition: "saveFailure",
         removeWhenBuffEnds: true,
@@ -329,6 +331,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "prone",
+        ids: ["prone"],
         targetMode: "triggerTarget",
         applyCondition: "saveFailure",
       },
@@ -506,6 +509,22 @@ export const BUFF_PRESETS = [
       buffs: {
         ac: 2,
         savingThrowAdvantages: ["dex"],
+        movement: { enabled: true, mode: "multiply", value: "2", types: ["all"] },
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "longstrider",
+    label: "BOT.presets.longstrider.label",
+    description: "BOT.presets.longstrider.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        movement: { enabled: true, mode: "add", value: "+10", valueFeet: 10, types: ["walk"] },
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
@@ -1030,6 +1049,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "blinded",
+        ids: ["blinded"],
         timing: "activation",
         targetMode: "self",
         applyCondition: "saveFailure",
@@ -1060,6 +1080,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "deafened",
+        ids: ["deafened"],
         timing: "activation",
         targetMode: "self",
         applyCondition: "saveFailure",
@@ -1090,6 +1111,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "paralyzed",
+        ids: ["paralyzed"],
         timing: "activation",
         targetMode: "self",
         applyCondition: "saveFailure",
@@ -1138,6 +1160,7 @@ export const BUFF_PRESETS = [
       },
       status: {
         id: "incapacitated",
+        ids: ["incapacitated", "prone"],
         timing: "activation",
         targetMode: "self",
         applyCondition: "saveFailure",
@@ -1171,6 +1194,7 @@ export const BUFF_PRESETS = [
         savingThrowModifiers: {
           dex: "-2",
         },
+        movement: { enabled: true, mode: "multiply", value: "0.5", types: ["all"] },
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
