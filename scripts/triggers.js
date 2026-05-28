@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect } from "./effects.js";
+import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection } from "./effects.js";
 
 const recentConcentrationRolls = new Map();
 
@@ -137,7 +137,7 @@ function getWorkflowAttackActionType(workflow) {
     ?? null;
 }
 
-function resolveAttackBuffCarrier(workflow) {
+function resolveWorkflowBuffCarrier(workflow) {
   const candidates = [];
   const addCandidate = (actor, token = null, source = "unknown") => {
     if (!actor?.getFlag) return;
@@ -153,6 +153,61 @@ function resolveAttackBuffCarrier(workflow) {
   addCandidate(workflow?.item?.actor, workflow?.token ?? null, "workflow.item.actor");
 
   return candidates.find(({ actor }) => actor.getFlag(MODULE_ID, "activeBuff")) ?? null;
+}
+
+function resolveAttackBuffCarrier(workflow) {
+  return resolveWorkflowBuffCarrier(workflow);
+}
+
+function isSpellCastWorkflow(workflow) {
+  return workflow?.item?.type === "spell";
+}
+
+function getNumericDamageValue(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function workflowHasDamageDealt(workflow) {
+  const hasDamageTarget = (workflow?.damageList?.length ?? 0) > 0
+    || (workflow?.hitTargets?.size ?? 0) > 0
+    || (workflow?.targets?.size ?? 0) > 0;
+  const directDamage = getNumericDamageValue(workflow?.damageTotal)
+    ?? getNumericDamageValue(workflow?.damageItem?.totalDamage)
+    ?? getNumericDamageValue(workflow?.damageItem?.appliedDamage)
+    ?? getNumericDamageValue(workflow?.damageItem?.hpDamage);
+  if (directDamage !== null) return hasDamageTarget && directDamage > 0;
+
+  const damageEntries = Array.isArray(workflow?.damageList) ? workflow.damageList : [];
+  return damageEntries.some((entry) => {
+    const entryDamage = getNumericDamageValue(entry?.appliedDamage)
+      ?? getNumericDamageValue(entry?.hpDamage)
+      ?? getNumericDamageValue(entry?.totalDamage)
+      ?? getNumericDamageValue(entry?.damage);
+    return entryDamage !== null && entryDamage > 0;
+  });
+}
+
+function getAutomaticEndReasons(activeBuff, workflow, actionType) {
+  const conditions = activeBuff?.endConditions;
+  if (!conditions) return [];
+
+  const reasons = [];
+  if (conditions.onAttack && ATTACK_ACTION_TYPES.includes(actionType)) reasons.push("attack");
+  if (conditions.onSpellCast && isSpellCastWorkflow(workflow)) reasons.push("spellCast");
+  if (conditions.onDamageDealt && workflowHasDamageDealt(workflow)) reasons.push("damageDealt");
+  return reasons;
+}
+
+async function maybeEndActiveBuffForWorkflowAction(workflow, actionType) {
+  const carrier = resolveWorkflowBuffCarrier(workflow);
+  const activeBuff = carrier?.actor?.getFlag(MODULE_ID, "activeBuff") ?? null;
+  const reasons = getAutomaticEndReasons(activeBuff, workflow, actionType);
+  if (!reasons.length) return false;
+
+  await endActiveBuff(carrier.actor, activeBuff);
+  debugLog(`[${MODULE_ID}] Buff ended automatically on ${carrier.actor.name}: ${reasons.join(", ")}`);
+  return true;
 }
 
 function collectDamageTypes(value, types = new Set()) {
@@ -635,7 +690,7 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
     debugLog(`[${MODULE_ID}] Sauvegarde repetee liee ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} - ${success ? "reussite" : "echec"} - statuts ${shouldEnd ? "retires" : "conserves"}`);
     await createRepeatedSaveMessage(actor, success, shouldEnd);
     if (shouldEnd) {
-      for (const effect of group.effects) await effect.delete();
+      for (const effect of group.effects) await effect.delete({ [MODULE_ID]: { allowLinkedStatusDeletion: true } });
       await cleanupLinkedStatusSupportBuff(linkedFlag);
     }
   }
@@ -796,6 +851,7 @@ async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetTo
 }
 
 export function registerTriggers() {
+  registerLinkedStatusProtection();
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
 
   Hooks.on("midi-qol.RollComplete", async (workflow) => {
@@ -804,6 +860,7 @@ export function registerTriggers() {
       if (!workflow.activity && !workflow.item) return;
 
       const actionType = getWorkflowAttackActionType(workflow);
+      await maybeEndActiveBuffForWorkflowAction(workflow, actionType);
 
       // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
       const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
@@ -907,6 +964,7 @@ export function registerTriggers() {
       const flag = carrier?.actor?.getFlag(MODULE_ID, "activeBuff") ?? null;
       debugLog(`[${MODULE_ID}] Trigger attaque inspecté : attaquant=${workflow.actor?.name ?? "inconnu"}, porteur=${carrier?.actor?.name ?? "aucun"}, source=${carrier?.source ?? "aucune"}, activeBuff=${Boolean(flag)}, trigger=${flag?.type ?? "aucun"}, actionType=${actionType ?? "aucun"}, match=${flag ? doesAttackTriggerMatch(flag.type, actionType) : false}, hitTargets=${workflow.hitTargets?.size ?? 0}, damageTargetMode=${flag?.damage?.targetMode ?? "aucun"}`);
       if (!flag) return;
+      await ensureLinkedStatusesForActiveBuff(carrier.actor, flag);
       if (flag.type === "passive") return;
 
       if (doesAttackTriggerMatch(flag.type, actionType)) {

@@ -760,6 +760,21 @@
       <label>{{localize "BOT.ui.settings.charges"}}</label>
       <input type="number" name="charges" value="{{flag.charges}}" placeholder="{{localize "BOT.ui.settings.chargesPlaceholder"}}" min="1" />
     </div>
+    <section class="bot-inline-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.endConditions.title"}}</h3>
+      <label class="bot-check-row">
+        <input type="checkbox" name="endConditionOnAttack" {{#if flag.endConditionOnAttack}}checked{{/if}} />
+        <span>{{localize "BOT.ui.endConditions.onAttack"}}</span>
+      </label>
+      <label class="bot-check-row">
+        <input type="checkbox" name="endConditionOnSpellCast" {{#if flag.endConditionOnSpellCast}}checked{{/if}} />
+        <span>{{localize "BOT.ui.endConditions.onSpellCast"}}</span>
+      </label>
+      <label class="bot-check-row">
+        <input type="checkbox" name="endConditionOnDamageDealt" {{#if flag.endConditionOnDamageDealt}}checked{{/if}} />
+        <span>{{localize "BOT.ui.endConditions.onDamageDealt"}}</span>
+      </label>
+    </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.settings.durationRounds"}}</label>
       <p class="bot-duration-info">{{flag.itemDurationLabel}}</p>

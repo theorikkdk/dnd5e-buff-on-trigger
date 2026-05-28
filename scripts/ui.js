@@ -286,6 +286,15 @@ function getChargesSummary(charges) {
   return game.i18n.format(count === 1 ? "BOT.ui.chargeSummary.one" : "BOT.ui.chargeSummary.many", { count });
 }
 
+function getEndConditionSummaryLabels(endConditions) {
+  if (!endConditions) return [];
+  return [
+    endConditions.onAttack ? game.i18n.localize("BOT.ui.endConditions.summary.attack") : null,
+    endConditions.onSpellCast ? game.i18n.localize("BOT.ui.endConditions.summary.spellCast") : null,
+    endConditions.onDamageDealt ? game.i18n.localize("BOT.ui.endConditions.summary.damageDealt") : null,
+  ].filter(Boolean);
+}
+
 function normalizeDamageTargetMode(targetMode) {
   if (targetMode === "target") return "triggerTarget";
   return ["triggerTarget", "self", "attacker", "storedTarget"].includes(targetMode) ? targetMode : "triggerTarget";
@@ -628,6 +637,14 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     });
   }
 
+  const endConditionLabels = getEndConditionSummaryLabels(raw.endConditions);
+  if (endConditionLabels.length) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.endConditions"),
+      value: endConditionLabels.join(", ")
+    });
+  }
+
   summary.push({
     label: game.i18n.localize("BOT.ui.summary.consumeOnTrigger"),
     value: game.i18n.localize(raw.consumeOnTrigger ?? true ? "BOT.ui.common.yes" : "BOT.ui.common.no")
@@ -812,6 +829,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       triggerFrequencyNone:  (raw.triggerFrequency ?? "none") === "none",
       triggerFrequencyTurn:  raw.triggerFrequency === "turn",
       triggerFrequencyRound: raw.triggerFrequency === "round",
+      endConditionOnAttack:      !!raw.endConditions?.onAttack,
+      endConditionOnSpellCast:  !!raw.endConditions?.onSpellCast,
+      endConditionOnDamageDealt: !!raw.endConditions?.onDamageDealt,
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
@@ -987,6 +1007,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         })(),
         consumeOnTrigger: data.consumeOnTrigger ?? true,
         triggerFrequency: data.triggerFrequency ?? "none",
+        endConditions: (data.endConditionOnAttack || data.endConditionOnSpellCast || data.endConditionOnDamageDealt) ? {
+          onAttack: data.endConditionOnAttack ?? false,
+          onSpellCast: data.endConditionOnSpellCast ?? false,
+          onDamageDealt: data.endConditionOnDamageDealt ?? false,
+        } : null,
         damage: data.damageFormula ? {
           formula: data.damageFormula,
           type: data.damageType || null,
@@ -1199,6 +1224,11 @@ function buildBuffConfigFromForm(form) {
     receivedDamageTypes: readCsvFormValue(form, "receivedDamageTypesList"),
     consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
     triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
+    endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt")) ? {
+      onAttack: !!readFormValue(form, "endConditionOnAttack"),
+      onSpellCast: !!readFormValue(form, "endConditionOnSpellCast"),
+      onDamageDealt: !!readFormValue(form, "endConditionOnDamageDealt"),
+    } : null,
     charges: readNumberFormValue(form, "charges"),
     damage: damageFormula ? {
       formula: damageFormula,
@@ -1318,6 +1348,7 @@ function buildDefaultBuffConfig() {
     receivedDamageTypes: [],
     consumeOnTrigger: true,
     triggerFrequency: "none",
+    endConditions: null,
     charges: null,
     damage: null,
     save: null,
@@ -1425,6 +1456,7 @@ function formHasDraftConfiguration(form) {
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "damageFormula", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "charges",
+    "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
     ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("buffAbilityCheckModifier", ability), abilityFieldName("buffSavingThrowModifier", ability)]),
@@ -1533,6 +1565,9 @@ function applyPresetFlagToForm(form, flag) {
 
   setFormValue(form, "consumeOnTrigger", flag.consumeOnTrigger ?? true);
   setFormValue(form, "triggerFrequency", flag.triggerFrequency ?? "none");
+  setFormValue(form, "endConditionOnAttack", !!flag.endConditions?.onAttack);
+  setFormValue(form, "endConditionOnSpellCast", !!flag.endConditions?.onSpellCast);
+  setFormValue(form, "endConditionOnDamageDealt", !!flag.endConditions?.onDamageDealt);
   setFormValue(form, "charges", flag.charges ?? "");
 
   setFormValue(form, "buffAttackMode", flag.buffs?.attackMode ?? "none");

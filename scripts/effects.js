@@ -18,6 +18,8 @@ const DAMAGE_LABEL_KEYS = {
 };
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
+const allowedLinkedStatusDeletions = new Set();
+let linkedStatusProtectionRegistered = false;
 
 function localize(key) {
   return game.i18n.localize(key);
@@ -55,6 +57,24 @@ function pruneRecentRollModifierConsumptions(now = Date.now()) {
 
 function getBuffItemUuid(flag) {
   return flag?.originItemUuid ?? flag?.itemUuid ?? null;
+}
+
+function getDocumentDeletionKey(document) {
+  return document?.uuid ?? document?.id ?? null;
+}
+
+function allowLinkedStatusDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key) return;
+  allowedLinkedStatusDeletions.add(key);
+  setTimeout(() => allowedLinkedStatusDeletions.delete(key), 5000);
+}
+
+function consumeAllowedLinkedStatusDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key || !allowedLinkedStatusDeletions.has(key)) return false;
+  allowedLinkedStatusDeletions.delete(key);
+  return true;
 }
 
 function isSameActiveBuff(currentFlag, expectedFlag) {
@@ -99,7 +119,8 @@ function reserveRollModifierConsumption(actor, flag, metadata) {
 async function deleteDocumentIfExists(document, context = "document") {
   if (!document || document.deleted) return false;
   try {
-    await document.delete();
+    if (document.flags?.[MODULE_ID]?.linkedStatus === true) allowLinkedStatusDeletion(document);
+    await document.delete({ [MODULE_ID]: { allowLinkedStatusDeletion: true } });
     return true;
   } catch (error) {
     const message = String(error?.message ?? error ?? "");
@@ -1101,6 +1122,44 @@ function collectActorsForLinkedStatusCleanup() {
   return [...actors.values()];
 }
 
+function resolveLinkedStatusOwnerActor(linkedFlag, fallbackActor = null) {
+  const ownerUuid = linkedFlag?.ownerActorUuid ?? null;
+  if (ownerUuid) {
+    try {
+      const resolved = globalThis.fromUuidSync?.(ownerUuid) ?? null;
+      if (resolved?.getFlag) return resolved;
+      if (resolved?.actor?.getFlag) return resolved.actor;
+    } catch (error) {
+      debugLog(`[${MODULE_ID}] Proprietaire du statut lie introuvable : ${ownerUuid}`, error);
+    }
+  }
+  return fallbackActor?.getFlag ? fallbackActor : null;
+}
+
+function shouldBlockLinkedStatusDeletion(effect, options = {}) {
+  const linkedFlag = effect?.flags?.[MODULE_ID];
+  if (linkedFlag?.linkedStatus !== true || !linkedFlag.statusId) return false;
+  if (options?.[MODULE_ID]?.allowLinkedStatusDeletion === true || options?.botAllowLinkedStatusDeletion === true) return false;
+  if (consumeAllowedLinkedStatusDeletion(effect)) return false;
+
+  const ownerActor = resolveLinkedStatusOwnerActor(linkedFlag, effect.parent);
+  const activeBuff = ownerActor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
+  if (!activeBuff?.status?.removeWhenBuffEnds) return false;
+  if (!linkedStatusMatchesBuff(effect, ownerActor, activeBuff)) return false;
+  return true;
+}
+
+export function registerLinkedStatusProtection() {
+  if (linkedStatusProtectionRegistered) return;
+  linkedStatusProtectionRegistered = true;
+  Hooks.on("preDeleteActiveEffect", (effect, options) => {
+    if (!shouldBlockLinkedStatusDeletion(effect, options)) return true;
+    const statusId = effect.flags?.[MODULE_ID]?.statusId ?? "unknown";
+    debugLog(`[${MODULE_ID}] Suppression externe du statut li\u00e9 bloqu\u00e9e : ${statusId}`);
+    return false;
+  });
+}
+
 function linkedStatusMatchesBuff(effect, ownerActor, flag) {
   const effectFlag = effect?.flags?.[MODULE_ID];
   if (effectFlag?.linkedStatus !== true) return false;
@@ -1161,6 +1220,38 @@ async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
   });
   debugLog(`[${MODULE_ID}] Statut lie ${statusId} marque sur ${targetActor.name}`);
 }
+export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = null) {
+  try {
+    const actor = actorOrToken?.actor ?? actorOrToken;
+    if (!actor?.getFlag || !actor?.toggleStatusEffect) return;
+
+    const currentActiveBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    const activeBuff = flag ?? currentActiveBuff;
+    if (!currentActiveBuff || !activeBuff) return;
+    if (flag) {
+      const currentOriginItemUuid = getLinkedStatusOriginItemUuid(currentActiveBuff);
+      const activeOriginItemUuid = getLinkedStatusOriginItemUuid(activeBuff);
+      if (currentOriginItemUuid && activeOriginItemUuid && currentOriginItemUuid !== activeOriginItemUuid) return;
+    }
+    if (activeBuff.status?.removeWhenBuffEnds !== true) return;
+
+    const statusIds = getConfiguredStatusIds(activeBuff);
+    if (!statusIds.length) return;
+
+    for (const statusId of statusIds) {
+      const linkedEffect = actor.effects?.find((effect) => linkedStatusMatchesBuff(effect, actor, activeBuff) && effect.flags?.[MODULE_ID]?.statusId === statusId && !effect.disabled) ?? null;
+      if (linkedEffect) continue;
+      if (actorHasActiveStatus(actor, statusId)) continue;
+
+      await actor.toggleStatusEffect(statusId, { active: true });
+      await markLinkedStatusEffect(actor, statusId, actor, activeBuff);
+      debugLog(`[${MODULE_ID}] Statut li\u00e9 manquant r\u00e9appliqu\u00e9 : ${statusId}`);
+    }
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans ensureLinkedStatusesForActiveBuff :`, error);
+  }
+}
+
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = [], previousFlag = null) {
   try {
     const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));

@@ -565,6 +565,17 @@
   "BOT.languages.goblin": "Goblin",
   "BOT.languages.sylvan": "Sylvan",
   "BOT.languages.primordial": "Primordial",
-  "BOT.languages.deep": "Deep Speech"
+  "BOT.languages.deep": "Deep Speech",
+  "BOT.ui.summary.endConditions": "Automatic ending",
+  "BOT.ui.endConditions.title": "Automatic buff ending",
+  "BOT.ui.endConditions.onAttack": "End when bearer attacks",
+  "BOT.ui.endConditions.onSpellCast": "End when bearer casts a spell",
+  "BOT.ui.endConditions.onDamageDealt": "End when bearer deals damage",
+  "BOT.ui.endConditions.summary.attack": "attack",
+  "BOT.ui.endConditions.summary.spellCast": "spell cast",
+  "BOT.ui.endConditions.summary.damageDealt": "damage dealt",
+  "BOT.presets.invisibility.label": "Invisibility",
+  "BOT.presets.invisibility.description": "The target becomes Invisible. The buff ends automatically if its bearer attacks or casts a spell.",
+  "BOT.presets.greaterInvisibility.label": "Greater Invisibility",
+  "BOT.presets.greaterInvisibility.description": "The target becomes Invisible without automatic ending on attack or spell cast."
 }
-

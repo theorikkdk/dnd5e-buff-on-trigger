@@ -565,6 +565,17 @@
   "BOT.languages.goblin": "Gobelin",
   "BOT.languages.sylvan": "Sylvestre",
   "BOT.languages.primordial": "Primordial",
-  "BOT.languages.deep": "Profond"
+  "BOT.languages.deep": "Profond",
+  "BOT.ui.summary.endConditions": "Fin automatique",
+  "BOT.ui.endConditions.title": "Fin automatique du buff",
+  "BOT.ui.endConditions.onAttack": "Fin quand le porteur attaque",
+  "BOT.ui.endConditions.onSpellCast": "Fin quand le porteur lance un sort",
+  "BOT.ui.endConditions.onDamageDealt": "Fin quand le porteur inflige des dégâts",
+  "BOT.ui.endConditions.summary.attack": "attaque",
+  "BOT.ui.endConditions.summary.spellCast": "lancement de sort",
+  "BOT.ui.endConditions.summary.damageDealt": "dégâts infligés",
+  "BOT.presets.invisibility.label": "Invisibilité / Invisibility",
+  "BOT.presets.invisibility.description": "La cible devient Invisible. Le buff prend fin automatiquement si son porteur attaque ou lance un sort.",
+  "BOT.presets.greaterInvisibility.label": "Invisibilité supérieure / Greater Invisibility",
+  "BOT.presets.greaterInvisibility.description": "La cible devient Invisible sans fin automatique sur attaque ou lancement de sort."
 }
-
