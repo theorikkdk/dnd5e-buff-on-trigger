@@ -7,6 +7,12 @@ export const BUFF_PRESETS = [
       targetMode: "target",
       allowMultipleTargets: true,
       fallbackToSelfIfNoTarget: true,
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 3,
+        baseSpellLevel: 1,
+        targetsPerLevelAbove: 1,
+      },
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -23,6 +29,12 @@ export const BUFF_PRESETS = [
     flag: {
       targetMode: "target",
       allowMultipleTargets: true,
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 3,
+        baseSpellLevel: 1,
+        targetsPerLevelAbove: 1,
+      },
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -1112,6 +1124,12 @@ export const BUFF_PRESETS = [
     flag: {
       targetMode: "target",
       allowMultipleTargets: true,
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 1,
+        baseSpellLevel: 2,
+        targetsPerLevelAbove: 1,
+      },
       type: "passive",
       save: {
         enabled: true,
@@ -1144,6 +1162,12 @@ export const BUFF_PRESETS = [
     flag: {
       targetMode: "target",
       allowMultipleTargets: true,
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 1,
+        baseSpellLevel: 2,
+        targetsPerLevelAbove: 1,
+      },
       type: "passive",
       save: {
         enabled: true,
@@ -1175,8 +1199,15 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.holdPerson.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       targetFilters: {
         creatureTypes: ["humanoid"],
+      },
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 1,
+        baseSpellLevel: 2,
+        targetsPerLevelAbove: 1,
       },
       type: "passive",
       save: {
@@ -1209,8 +1240,15 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.holdMonster.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       targetFilters: {
         excludedCreatureTypes: ["undead"],
+      },
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 1,
+        baseSpellLevel: 5,
+        targetsPerLevelAbove: 1,
       },
       type: "passive",
       save: {
@@ -1458,6 +1496,12 @@ export const BUFF_PRESETS = [
     flag: {
       targetMode: "target",
       allowMultipleTargets: true,
+      multiTargetLimit: {
+        enabled: true,
+        baseTargets: 6,
+        baseSpellLevel: 3,
+        targetsPerLevelAbove: 0,
+      },
       type: "passive",
       save: {
         enabled: true,

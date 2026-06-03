@@ -636,5 +636,14 @@
   "BOT.creatureTypes.plant": "Plante",
   "BOT.creatureTypes.construct": "Artificiel",
   "BOT.ui.allowMultipleTargets": "Autoriser plusieurs cibles",
-  "BOT.ui.summary.allowMultipleTargets": "Cibles multiples"
+  "BOT.ui.summary.allowMultipleTargets": "Cibles multiples",
+  "BOT.notifications.tooManyTargetsSelected": "Trop de cibles s?lectionn?es : maximum {max} cible(s) pour ce niveau d?emplacement.",
+  "BOT.ui.multiTargetLimit.title": "Limite de cibles",
+  "BOT.ui.multiTargetLimit.enabled": "Activer une limite de cibles",
+  "BOT.ui.multiTargetLimit.baseTargets": "Nombre de cibles de base",
+  "BOT.ui.multiTargetLimit.baseSpellLevel": "Niveau d?emplacement de base",
+  "BOT.ui.multiTargetLimit.targetsPerLevelAbove": "Cibles suppl?mentaires par niveau sup?rieur",
+  "BOT.ui.multiTargetLimit.summaryFixed": "{base}",
+  "BOT.ui.multiTargetLimit.summaryScaling": "{base} + {per} par niveau au-dessus du {level}",
+  "BOT.ui.summary.multiTargetLimit": "Cibles max"
 }

@@ -53,8 +53,25 @@
     </div>
     <div class="form-group" id="bot-allow-multiple-targets-group" {{#unless flag.showAllowMultipleTargets}}style="display:none"{{/unless}}>
       <label>{{localize "BOT.ui.allowMultipleTargets"}}</label>
-      <input type="checkbox" name="allowMultipleTargets" {{#if flag.allowMultipleTargets}}checked{{/if}} />
+      <input type="checkbox" name="allowMultipleTargets" onchange="botUpdateMultiTargetLimitUI(this)" {{#if flag.allowMultipleTargets}}checked{{/if}} />
     </div>
+    <section class="bot-inline-panel" id="bot-multi-target-limit-group" {{#unless flag.showMultiTargetLimit}}style="display:none"{{/unless}}>
+      <h3 class="bot-summary-title">{{localize "BOT.ui.multiTargetLimit.title"}}</h3>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.multiTargetLimit.enabled"}}</label>
+        <input type="checkbox" name="multiTargetLimitEnabled" {{#if flag.multiTargetLimitEnabled}}checked{{/if}} />
+      </div>
+      <div class="bot-row">
+        <label class="bot-label-sm">{{localize "BOT.ui.multiTargetLimit.baseTargets"}}</label>
+        <input type="number" name="multiTargetLimitBaseTargets" value="{{flag.multiTargetLimitBaseTargets}}" min="1" class="bot-input-xs" />
+        <label class="bot-label-sm">{{localize "BOT.ui.multiTargetLimit.baseSpellLevel"}}</label>
+        <input type="number" name="multiTargetLimitBaseSpellLevel" value="{{flag.multiTargetLimitBaseSpellLevel}}" min="0" class="bot-input-xs" />
+      </div>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.multiTargetLimit.targetsPerLevelAbove"}}</label>
+        <input type="number" name="multiTargetLimitTargetsPerLevelAbove" value="{{flag.multiTargetLimitTargetsPerLevelAbove}}" min="0" />
+      </div>
+    </section>
     <section class="bot-inline-panel" id="bot-stored-target-group" {{#unless flag.showStoredTargetSection}}style="display:none"{{/unless}}>
       <h3 class="bot-summary-title">{{localize "BOT.ui.storedTarget.title"}}</h3>
       <p class="hint">{{localize "BOT.ui.storedTarget.help"}}</p>
@@ -317,7 +334,7 @@
     </details>
 
     <details class="bot-collapsible-panel bot-effect-panel" id="bot-status-panel" {{#if flag.hasStatus}}open{{/if}}>
-      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.hasStatus}} — {{flag.statusSummary}}{{/if}}</summary>
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.hasStatus}} ï¿½ {{flag.statusSummary}}{{/if}}</summary>
       <div class="bot-collapsible-body">
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.status.label"}}</label>

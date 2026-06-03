@@ -142,6 +142,31 @@ function buildTargetFilters(creatureTypes = [], excludedCreatureTypes = [], abil
   return Object.keys(filters).length ? filters : null;
 }
 
+function normalizeMultiTargetLimit(raw = {}) {
+  if (raw?.enabled !== true) return null;
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const baseTargets = Math.max(1, Math.floor(toNumber(raw.baseTargets, 1)));
+  const baseSpellLevel = Math.max(0, Math.floor(toNumber(raw.baseSpellLevel, 1)));
+  const targetsPerLevelAbove = Math.max(0, Math.floor(toNumber(raw.targetsPerLevelAbove, 0)));
+  return { enabled: true, baseTargets, baseSpellLevel, targetsPerLevelAbove };
+}
+
+function formatMultiTargetLimitSummary(limit) {
+  const normalized = normalizeMultiTargetLimit(limit);
+  if (!normalized) return null;
+  if (normalized.targetsPerLevelAbove > 0) {
+    return game.i18n.format("BOT.ui.multiTargetLimit.summaryScaling", {
+      base: normalized.baseTargets,
+      per: normalized.targetsPerLevelAbove,
+      level: normalized.baseSpellLevel,
+    });
+  }
+  return game.i18n.format("BOT.ui.multiTargetLimit.summaryFixed", { base: normalized.baseTargets });
+}
+
 function readTargetFilterAbilityScoresFromData(data = {}) {
   return Object.fromEntries(ABILITY_IDS.map((ability) => [ability, {
     min: data[abilityFieldName("targetFilterAbilityMin", ability)] ?? "",
@@ -620,6 +645,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
   ...(raw.fallbackToSelfIfNoTarget ? [{ label: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTarget"), value: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTargetValue") }] : []),
   ...(raw.allowMultipleTargets ? [{ label: game.i18n.localize("BOT.ui.summary.allowMultipleTargets"), value: game.i18n.localize("BOT.ui.common.yes") }] : []),
+  ...(raw.allowMultipleTargets && raw.multiTargetLimit?.enabled ? [{ label: game.i18n.localize("BOT.ui.summary.multiTargetLimit"), value: formatMultiTargetLimitSummary(raw.multiTargetLimit) }] : []),
     { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
@@ -941,6 +967,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       showFallbackToSelfIfNoTarget: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation,
       showAllowMultipleTargets: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation,
       allowMultipleTargets: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation && !!raw.allowMultipleTargets,
+      showMultiTargetLimit: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation && !!raw.allowMultipleTargets,
+      multiTargetLimitEnabled: raw.multiTargetLimit?.enabled === true,
+      multiTargetLimitBaseTargets: raw.multiTargetLimit?.baseTargets ?? 1,
+      multiTargetLimitBaseSpellLevel: raw.multiTargetLimit?.baseSpellLevel ?? 1,
+      multiTargetLimitTargetsPerLevelAbove: raw.multiTargetLimit?.targetsPerLevelAbove ?? 0,
       fallbackToSelfIfNoTarget: !!raw.fallbackToSelfIfNoTarget,
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
@@ -1245,6 +1276,14 @@ function buildBuffConfigFromForm(form) {
     rememberTargetOnActivation: !!readFormValue(form, "rememberTargetOnActivation"),
     fallbackToSelfIfNoTarget: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "fallbackToSelfIfNoTarget"),
     allowMultipleTargets: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "allowMultipleTargets"),
+    multiTargetLimit: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "allowMultipleTargets")
+      ? normalizeMultiTargetLimit({
+        enabled: !!readFormValue(form, "multiTargetLimitEnabled"),
+        baseTargets: readFormValue(form, "multiTargetLimitBaseTargets", 1),
+        baseSpellLevel: readFormValue(form, "multiTargetLimitBaseSpellLevel", 1),
+        targetsPerLevelAbove: readFormValue(form, "multiTargetLimitTargetsPerLevelAbove", 0),
+      })
+      : null,
     requireStoredTargetMatch: !!readFormValue(form, "requireStoredTargetMatch"),
     requireBearerTemporaryHp: !!readFormValue(form, "requireBearerTemporaryHp"),
     type: readFormValue(form, "type", "passive"),
@@ -1379,6 +1418,7 @@ function buildDefaultBuffConfig() {
     rememberTargetOnActivation: false,
     fallbackToSelfIfNoTarget: false,
     allowMultipleTargets: false,
+    multiTargetLimit: null,
     requireStoredTargetMatch: false,
     requireBearerTemporaryHp: false,
     type: "passive",
@@ -1496,7 +1536,7 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffIncomingAttackMode",
@@ -1570,6 +1610,10 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
   setFormValue(form, "fallbackToSelfIfNoTarget", !!flag.fallbackToSelfIfNoTarget);
   setFormValue(form, "allowMultipleTargets", !!flag.allowMultipleTargets && normalizeGlobalTargetMode(flag.targetMode) === "target" && !flag.rememberTargetOnActivation);
+  setFormValue(form, "multiTargetLimitEnabled", flag.multiTargetLimit?.enabled === true);
+  setFormValue(form, "multiTargetLimitBaseTargets", flag.multiTargetLimit?.baseTargets ?? 1);
+  setFormValue(form, "multiTargetLimitBaseSpellLevel", flag.multiTargetLimit?.baseSpellLevel ?? 1);
+  setFormValue(form, "multiTargetLimitTargetsPerLevelAbove", flag.multiTargetLimit?.targetsPerLevelAbove ?? 0);
   setFormValue(form, "requireStoredTargetMatch", !!flag.requireStoredTargetMatch);
   setFormValue(form, "requireBearerTemporaryHp", !!flag.requireBearerTemporaryHp);
   setFormValue(form, "type", flag.type ?? "passive");
@@ -1676,6 +1720,7 @@ function applyPresetFlagToForm(form, flag) {
   setPanelOpen(form, "bot-status-panel", statusIds.length > 0);
 
   window.botUpdateStoredTargetUI(form.querySelector('[name="targetMode"]'));
+  window.botUpdateMultiTargetLimitUI(form.querySelector('[name="allowMultipleTargets"]'));
   window.botUpdateTriggerUI(form.querySelector('[name="type"]'));
   window.botUpdateSaveDcUI(form.querySelector('[name="saveDcSource"]'));
   window.botUpdateSaveTimingUI(form.querySelector('[name="saveTiming"]'));
@@ -1993,6 +2038,7 @@ window.botUpdateStoredTargetUI = function(selectEl) {
   const fallbackGroup = form?.querySelector?.('#bot-fallback-self-group');
   const multiTargetGroup = form?.querySelector?.('#bot-allow-multiple-targets-group');
   const multiTargetInput = form?.querySelector?.('[name="allowMultipleTargets"]');
+  const limitGroup = form?.querySelector?.('#bot-multi-target-limit-group');
   const rememberTargetInput = form?.querySelector?.('[name="rememberTargetOnActivation"]');
   const showTargetOptions = selectEl.value === "target" && !rememberTargetInput?.checked;
   if (fallbackGroup) {
@@ -2002,6 +2048,19 @@ window.botUpdateStoredTargetUI = function(selectEl) {
     multiTargetGroup.style.display = showTargetOptions ? "" : "none";
   }
   if (!showTargetOptions && multiTargetInput) multiTargetInput.checked = false;
+  if (limitGroup) limitGroup.style.display = showTargetOptions && multiTargetInput?.checked ? "" : "none";
+  const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
+    ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
+  if (app) app.resizeToContent();
+};
+
+window.botUpdateMultiTargetLimitUI = function(inputEl) {
+  const form = inputEl?.closest?.('form');
+  const limitGroup = form?.querySelector?.('#bot-multi-target-limit-group');
+  const targetMode = form?.querySelector?.('[name="targetMode"]')?.value;
+  const rememberTargetInput = form?.querySelector?.('[name="rememberTargetOnActivation"]');
+  const visible = targetMode === "target" && !rememberTargetInput?.checked && !!inputEl?.checked;
+  if (limitGroup) limitGroup.style.display = visible ? "" : "none";
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.resizeToContent();

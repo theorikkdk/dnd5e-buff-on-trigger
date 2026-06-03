@@ -636,5 +636,14 @@
   "BOT.creatureTypes.plant": "Plant",
   "BOT.creatureTypes.construct": "Construct",
   "BOT.ui.allowMultipleTargets": "Allow multiple targets",
-  "BOT.ui.summary.allowMultipleTargets": "Multiple targets"
+  "BOT.ui.summary.allowMultipleTargets": "Multiple targets",
+  "BOT.notifications.tooManyTargetsSelected": "Too many targets selected: maximum {max} target(s) for this spell slot level.",
+  "BOT.ui.multiTargetLimit.title": "Target limit",
+  "BOT.ui.multiTargetLimit.enabled": "Enable target limit",
+  "BOT.ui.multiTargetLimit.baseTargets": "Base target count",
+  "BOT.ui.multiTargetLimit.baseSpellLevel": "Base spell level",
+  "BOT.ui.multiTargetLimit.targetsPerLevelAbove": "Additional targets per higher level",
+  "BOT.ui.multiTargetLimit.summaryFixed": "{base}",
+  "BOT.ui.multiTargetLimit.summaryScaling": "{base} + {per} per level above {level}",
+  "BOT.ui.summary.multiTargetLimit": "Max targets"
 }

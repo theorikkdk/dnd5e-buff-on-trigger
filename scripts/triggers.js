@@ -1373,6 +1373,45 @@ async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetTo
   return { shouldApply, saveResults };
 }
 
+function normalizeMultiTargetLimit(flag) {
+  const limit = flag?.multiTargetLimit;
+  if (flag?.allowMultipleTargets !== true || limit?.enabled !== true) return null;
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  return {
+    baseTargets: Math.max(1, Math.floor(toNumber(limit.baseTargets, 1))),
+    baseSpellLevel: Math.max(0, Math.floor(toNumber(limit.baseSpellLevel, 1))),
+    targetsPerLevelAbove: Math.max(0, Math.floor(toNumber(limit.targetsPerLevelAbove, 0))),
+  };
+}
+
+function resolveActivationSpellLevel(workflow, flag, limit) {
+  const candidates = [
+    workflow?.castData?.castLevel,
+    workflow?.castData?.level,
+    workflow?.castLevel,
+    workflow?.activity?.castLevel,
+    workflow?.activity?.spellLevel,
+    flag?.originSpellLevel,
+    workflow?.item?.system?.level,
+    limit?.baseSpellLevel,
+  ];
+  for (const candidate of candidates) {
+    const parsed = Number(candidate);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return limit?.baseSpellLevel ?? 0;
+}
+
+function getMultiTargetMaximum(workflow, flag) {
+  const limit = normalizeMultiTargetLimit(flag);
+  if (!limit) return null;
+  const spellLevel = resolveActivationSpellLevel(workflow, flag, limit);
+  return limit.baseTargets + Math.max(0, spellLevel - limit.baseSpellLevel) * limit.targetsPerLevelAbove;
+}
+
 function buildActivationTargetFlag(baseFlag, targetToken) {
   const flag = foundry.utils.deepClone(baseFlag);
   flag.targetTokenId = targetToken?.id ?? null;
@@ -1454,6 +1493,13 @@ export function registerTriggers() {
         if (allowMultipleTargets && selectedTargets.length === 0 && !shouldFallbackToSelf) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.noTargetSelected"));
           debugLog(`[${MODULE_ID}] Activation annulee - aucune cible pour activation multi-cible`);
+          return;
+        }
+
+        const multiTargetMaximum = allowMultipleTargets ? getMultiTargetMaximum(workflow, activeFlag) : null;
+        if (multiTargetMaximum !== null && selectedTargets.length > multiTargetMaximum) {
+          ui.notifications.warn(game.i18n.format("BOT.notifications.tooManyTargetsSelected", { max: multiTargetMaximum }));
+          debugLog(`[${MODULE_ID}] Activation annulee - trop de cibles (${selectedTargets.length}/${multiTargetMaximum})`);
           return;
         }
 
