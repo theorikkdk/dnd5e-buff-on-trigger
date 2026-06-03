@@ -645,5 +645,17 @@
   "BOT.ui.multiTargetLimit.targetsPerLevelAbove": "Additional targets per higher level",
   "BOT.ui.multiTargetLimit.summaryFixed": "{base}",
   "BOT.ui.multiTargetLimit.summaryScaling": "{base} + {per} per level above {level}",
-  "BOT.ui.summary.multiTargetLimit": "Max targets"
+  "BOT.ui.summary.multiTargetLimit": "Max targets",
+  "BOT.chat.multiTargetActivation.summary": "{item}: {details}.",
+  "BOT.chat.multiTargetActivation.noneAffected": "no target affected",
+  "BOT.chat.multiTargetActivation.invalidList": "Ignored targets: {targets}.",
+  "BOT.chat.multiTargetActivation.failedList": "Technical failures: {targets}.",
+  "BOT.chat.multiTargetActivation.affected.one": "{count} target affected",
+  "BOT.chat.multiTargetActivation.affected.many": "{count} targets affected",
+  "BOT.chat.multiTargetActivation.resisted.one": "{count} target resisted",
+  "BOT.chat.multiTargetActivation.resisted.many": "{count} targets resisted",
+  "BOT.chat.multiTargetActivation.invalid.one": "{count} target ignored",
+  "BOT.chat.multiTargetActivation.invalid.many": "{count} targets ignored",
+  "BOT.chat.multiTargetActivation.failed.one": "{count} target failed",
+  "BOT.chat.multiTargetActivation.failed.many": "{count} targets failed"
 }

@@ -1412,6 +1412,59 @@ function getMultiTargetMaximum(workflow, flag) {
   return limit.baseTargets + Math.max(0, spellLevel - limit.baseSpellLevel) * limit.targetsPerLevelAbove;
 }
 
+function getActivationTargetName(tokenOrActor) {
+  return tokenOrActor?.name ?? tokenOrActor?.actor?.name ?? game.i18n.localize("BOT.ui.summary.notConfigured");
+}
+
+function countActivationResults(results, status) {
+  return results.filter((result) => result.status === status).length;
+}
+
+function formatMultiTargetActivationCount(status, count) {
+  const pluralKey = count === 1 ? "one" : "many";
+  return game.i18n.format(`BOT.chat.multiTargetActivation.${status}.${pluralKey}`, { count });
+}
+
+function buildMultiTargetActivationSummaryText(itemName, counts) {
+  const parts = [];
+  if (counts.affected > 0) parts.push(formatMultiTargetActivationCount("affected", counts.affected));
+  if (counts.resisted > 0) parts.push(formatMultiTargetActivationCount("resisted", counts.resisted));
+  if (counts.invalid > 0) parts.push(formatMultiTargetActivationCount("invalid", counts.invalid));
+  if (counts.failed > 0) parts.push(formatMultiTargetActivationCount("failed", counts.failed));
+  if (!counts.affected && parts.length) parts.unshift(game.i18n.localize("BOT.chat.multiTargetActivation.noneAffected"));
+  return game.i18n.format("BOT.chat.multiTargetActivation.summary", { item: itemName, details: parts.join(", ") });
+}
+
+async function reportMultiTargetActivation(workflow, activeFlag, results) {
+  if (!activeFlag?.allowMultipleTargets || results.length <= 1) return;
+  const itemName = activeFlag.itemName ?? workflow.item?.name ?? game.i18n.localize("BOT.fallback.effectName");
+  const counts = {
+    affected: countActivationResults(results, "affected"),
+    resisted: countActivationResults(results, "resisted"),
+    invalid: countActivationResults(results, "invalid"),
+    failed: countActivationResults(results, "failed"),
+  };
+  const hasOnlyAffected = counts.affected === results.length;
+  const summary = buildMultiTargetActivationSummaryText(itemName, counts);
+  if (hasOnlyAffected) {
+    ui.notifications.info(summary);
+    return;
+  }
+
+  const invalidNames = results.filter((result) => result.status === "invalid").map((result) => result.name).filter(Boolean);
+  const failedNames = results.filter((result) => result.status === "failed").map((result) => result.name).filter(Boolean);
+  const details = [
+    invalidNames.length ? game.i18n.format("BOT.chat.multiTargetActivation.invalidList", { targets: invalidNames.join(", ") }) : null,
+    failedNames.length ? game.i18n.format("BOT.chat.multiTargetActivation.failedList", { targets: failedNames.join(", ") }) : null,
+  ].filter(Boolean);
+
+  const detailHtml = details.length ? "<br>" + details.join("<br>") : "";
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
+    content: `<div class="dnd5e-buff-on-trigger-summary">${summary}${detailHtml}</div>`,
+  });
+}
+
 function buildActivationTargetFlag(baseFlag, targetToken) {
   const flag = foundry.utils.deepClone(baseFlag);
   flag.targetTokenId = targetToken?.id ?? null;
@@ -1508,12 +1561,14 @@ export function registerTriggers() {
           ? (allowMultipleTargets ? selectedTargets : [selectedTargetToken].filter(Boolean))
           : [selfToken].filter(Boolean);
         const pendingApplications = [];
+        const activationResults = [];
 
         for (const targetToken of targetsToApply) {
           const targetFilterResult = evaluateTargetFilters(activeFlag, targetToken);
           debugLog(`[${MODULE_ID}] Restriction cible : ${JSON.stringify(targetFilterResult)}`);
           if (!targetFilterResult.ok) {
             ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
+            activationResults.push({ status: "invalid", name: getActivationTargetName(targetToken), reason: targetFilterResult.reason });
             debugLog(`[${MODULE_ID}] Cible ignoree : hors restrictions`);
             continue;
           }
@@ -1521,6 +1576,7 @@ export function registerTriggers() {
           const activationSaveTarget = effectiveTargetMode === "target" ? targetToken : (shouldFallbackToSelf ? selfToken : null);
           const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
           if (!activationSave.shouldApply) {
+            activationResults.push({ status: "resisted", name: getActivationTargetName(targetToken) });
             debugLog(`[${MODULE_ID}] Cible ignoree - JS d'activation non satisfait : ${targetToken?.actor?.name ?? "inconnue"}`);
             continue;
           }
@@ -1545,6 +1601,7 @@ export function registerTriggers() {
         }
 
         if (!pendingApplications.length) {
+          await reportMultiTargetActivation(workflow, activeFlag, activationResults);
           debugLog(`[${MODULE_ID}] Activation annulee - aucune cible n'a recu le buff`);
           return;
         }
@@ -1558,16 +1615,24 @@ export function registerTriggers() {
         }
 
         for (const application of pendingApplications) {
-          await applyActivatedBuffInstance(
-            application.targetActor,
-            application.carrierToken,
-            application.targetFlag,
-            workflow,
-            application.activationSave,
-            hasMechBuffs,
-            sourceActorName
-          );
+          try {
+            const applied = await applyActivatedBuffInstance(
+              application.targetActor,
+              application.carrierToken,
+              application.targetFlag,
+              workflow,
+              application.activationSave,
+              hasMechBuffs,
+              sourceActorName
+            );
+            activationResults.push({ status: applied ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
+          } catch (error) {
+            activationResults.push({ status: "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
+            console.error(`[${MODULE_ID}] Erreur application multi-cible :`, error);
+          }
         }
+
+        await reportMultiTargetActivation(workflow, activeFlag, activationResults);
 
         if (effectiveTargetMode !== "target" && !hasMechBuffs) {
           for (const token of game.user.targets) {
