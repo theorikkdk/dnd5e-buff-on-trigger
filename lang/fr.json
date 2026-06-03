@@ -634,5 +634,7 @@
   "BOT.creatureTypes.monstrosity": "Monstruosité",
   "BOT.creatureTypes.ooze": "Vase",
   "BOT.creatureTypes.plant": "Plante",
-  "BOT.creatureTypes.construct": "Artificiel"
+  "BOT.creatureTypes.construct": "Artificiel",
+  "BOT.ui.allowMultipleTargets": "Autoriser plusieurs cibles",
+  "BOT.ui.summary.allowMultipleTargets": "Cibles multiples"
 }

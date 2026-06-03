@@ -5,6 +5,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.bless.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       fallbackToSelfIfNoTarget: true,
       type: "passive",
       rollModifier: {
@@ -21,6 +22,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.bane.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       type: "passive",
       rollModifier: {
         enabled: true,
@@ -1109,6 +1111,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.blindness.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       type: "passive",
       save: {
         enabled: true,
@@ -1140,6 +1143,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.deafness.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       type: "passive",
       save: {
         enabled: true,
@@ -1394,6 +1398,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.faerieFire.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       type: "passive",
       save: {
         enabled: true,
@@ -1452,6 +1457,7 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.slow.description",
     flag: {
       targetMode: "target",
+      allowMultipleTargets: true,
       type: "passive",
       save: {
         enabled: true,

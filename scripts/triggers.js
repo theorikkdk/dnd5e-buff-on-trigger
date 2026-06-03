@@ -1373,6 +1373,29 @@ async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetTo
   return { shouldApply, saveResults };
 }
 
+function buildActivationTargetFlag(baseFlag, targetToken) {
+  const flag = foundry.utils.deepClone(baseFlag);
+  flag.targetTokenId = targetToken?.id ?? null;
+  flag.storedTargetTokenUuid = targetToken?.document?.uuid ?? targetToken?.uuid ?? null;
+  flag.storedTargetActorUuid = targetToken?.actor?.uuid ?? null;
+  return flag;
+}
+
+async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, workflow, activationSave, hasMechBuffs, sourceActorName) {
+  if (!targetActor?.setFlag) return false;
+  await targetActor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+  debugLog(`[${MODULE_ID}] Buff active sur ${targetActor.name} via ${workflow.item?.name ?? activeFlag.itemName}, origine : ${sourceActorName}`);
+  if (hasMechBuffs) {
+    const changes = buildMechanicalChanges(activeFlag, targetActor);
+    await refreshBuffIndicator(targetActor, null, changes);
+  } else {
+    await refreshBuffIndicator(targetActor);
+  }
+  await applyActivationTemporaryHp(targetActor, targetToken, activeFlag, workflow);
+  await applyActivationStatus(targetActor, targetToken, activeFlag, workflow, activationSave?.saveResults ?? null);
+  return true;
+}
+
 export function registerTriggers() {
   registerLinkedStatusProtection();
   game.actors.forEach((actor) => refreshBuffIndicator(actor));
@@ -1410,7 +1433,10 @@ export function registerTriggers() {
         };
         const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
         const sourceActorName = workflow.actor.name;
-        const selectedTargets = [...(game.user?.targets ?? [])];
+        const selectedTargets = [...(game.user?.targets ?? [])].filter((token) => token?.actor);
+        const allowMultipleTargets = targetMode === "target"
+          && activeFlag.allowMultipleTargets === true
+          && activeFlag.rememberTargetOnActivation !== true;
         const selectedTargetToken = selectedTargets.length === 1 ? selectedTargets[0] ?? null : null;
         const canFallbackToSelf = targetMode === "target"
           && activeFlag.fallbackToSelfIfNoTarget === true
@@ -1418,75 +1444,89 @@ export function registerTriggers() {
         const shouldRequireTarget = targetMode === "target" || activeFlag.rememberTargetOnActivation === true;
         const shouldFallbackToSelf = canFallbackToSelf && selectedTargets.length === 0;
         const effectiveTargetMode = shouldFallbackToSelf ? "self" : targetMode;
-        const existingBuffs = findExistingBuffInstances(activeFlag);
 
-        if (shouldRequireTarget && !shouldFallbackToSelf && !selectedTargetToken?.actor) {
+        if (shouldRequireTarget && !shouldFallbackToSelf && !allowMultipleTargets && !selectedTargetToken?.actor) {
           ui.notifications.warn(game.i18n.localize("BOT.notifications.selectExactlyOneTarget"));
-          debugLog(`[${MODULE_ID}] Activation annulée — il faut exactement une cible mémorisée`);
+          debugLog(`[${MODULE_ID}] Activation annulee - il faut exactement une cible`);
+          return;
+        }
+
+        if (allowMultipleTargets && selectedTargets.length === 0 && !shouldFallbackToSelf) {
+          ui.notifications.warn(game.i18n.localize("BOT.notifications.noTargetSelected"));
+          debugLog(`[${MODULE_ID}] Activation annulee - aucune cible pour activation multi-cible`);
           return;
         }
 
         const selfToken = workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? { actor: workflow.actor };
-        const activationFilterTarget = effectiveTargetMode === "target" ? selectedTargetToken : selfToken;
-        const targetFilterResult = evaluateTargetFilters(activeFlag, activationFilterTarget);
-        debugLog(`[${MODULE_ID}] Restriction cible : ${JSON.stringify(targetFilterResult)}`);
-        if (!targetFilterResult.ok) {
-          ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
-          debugLog(`[${MODULE_ID}] Activation annulée : cible hors restrictions`);
+        const targetsToApply = effectiveTargetMode === "target"
+          ? (allowMultipleTargets ? selectedTargets : [selectedTargetToken].filter(Boolean))
+          : [selfToken].filter(Boolean);
+        const pendingApplications = [];
+
+        for (const targetToken of targetsToApply) {
+          const targetFilterResult = evaluateTargetFilters(activeFlag, targetToken);
+          debugLog(`[${MODULE_ID}] Restriction cible : ${JSON.stringify(targetFilterResult)}`);
+          if (!targetFilterResult.ok) {
+            ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
+            debugLog(`[${MODULE_ID}] Cible ignoree : hors restrictions`);
+            continue;
+          }
+
+          const activationSaveTarget = effectiveTargetMode === "target" ? targetToken : (shouldFallbackToSelf ? selfToken : null);
+          const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
+          if (!activationSave.shouldApply) {
+            debugLog(`[${MODULE_ID}] Cible ignoree - JS d'activation non satisfait : ${targetToken?.actor?.name ?? "inconnue"}`);
+            continue;
+          }
+
+          const targetFlag = effectiveTargetMode === "target"
+            ? buildActivationTargetFlag(activeFlag, targetToken)
+            : foundry.utils.deepClone(activeFlag);
+          if (effectiveTargetMode !== "target") {
+            if (selectedTargetToken?.actor) {
+              targetFlag.targetTokenId = selectedTargetToken.id;
+              targetFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
+              targetFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
+            } else if (shouldFallbackToSelf) {
+              targetFlag.targetTokenId = null;
+              targetFlag.storedTargetTokenUuid = null;
+              targetFlag.storedTargetActorUuid = null;
+            }
+          }
+          const targetActor = effectiveTargetMode === "target" ? targetToken.actor : workflow.actor;
+          const carrierToken = effectiveTargetMode === "target" ? targetToken : (workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null);
+          pendingApplications.push({ targetActor, carrierToken, targetFlag, activationSave });
+        }
+
+        if (!pendingApplications.length) {
+          debugLog(`[${MODULE_ID}] Activation annulee - aucune cible n'a recu le buff`);
           return;
         }
 
-        const activationSaveTarget = effectiveTargetMode === "target" ? selectedTargetToken : (shouldFallbackToSelf ? selfToken : null);
-        const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
-        if (!activationSave.shouldApply) {
-          debugLog(`[${MODULE_ID}] Activation annulée — JS d'activation non satisfait`);
-          return;
-        }
-
+        const existingBuffs = findExistingBuffInstances(activeFlag);
         if (existingBuffs.length) {
           for (const existing of existingBuffs) {
             await clearExistingBuffInstance(existing.actor, existing.activeBuff);
           }
-          debugLog(`[${MODULE_ID}] Ancien buff remplacÃ© : ${workflow.item.name}`);
+          debugLog(`[${MODULE_ID}] Ancien buff remplace : ${workflow.item.name}`);
         }
 
-        if (effectiveTargetMode === "target") {
-          activeFlag.targetTokenId = selectedTargetToken.id;
-          activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
-          activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
-          await selectedTargetToken.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          debugLog(`[${MODULE_ID}] Buff activé sur ${selectedTargetToken.actor.name} via ${workflow.item.name}, origine : ${sourceActorName}`);
-          if (hasMechBuffs) {
-            const changes = buildMechanicalChanges(activeFlag, selectedTargetToken.actor);
-            await refreshBuffIndicator(selectedTargetToken.actor, null, changes);
-          } else {
-            await refreshBuffIndicator(selectedTargetToken.actor);
+        for (const application of pendingApplications) {
+          await applyActivatedBuffInstance(
+            application.targetActor,
+            application.carrierToken,
+            application.targetFlag,
+            workflow,
+            application.activationSave,
+            hasMechBuffs,
+            sourceActorName
+          );
+        }
+
+        if (effectiveTargetMode !== "target" && !hasMechBuffs) {
+          for (const token of game.user.targets) {
+            if (token.actor) await applyTargetIndicator(token.actor, pendingApplications[0].targetFlag);
           }
-          await applyActivationTemporaryHp(selectedTargetToken.actor, selectedTargetToken, activeFlag, workflow);
-          await applyActivationStatus(selectedTargetToken.actor, selectedTargetToken, activeFlag, workflow, activationSave.saveResults);
-        } else {
-          if (selectedTargetToken?.actor) {
-            activeFlag.targetTokenId = selectedTargetToken.id;
-            activeFlag.storedTargetTokenUuid = selectedTargetToken.document?.uuid ?? selectedTargetToken.uuid ?? null;
-            activeFlag.storedTargetActorUuid = selectedTargetToken.actor.uuid ?? null;
-          } else if (shouldFallbackToSelf) {
-            activeFlag.targetTokenId = null;
-            activeFlag.storedTargetTokenUuid = null;
-            activeFlag.storedTargetActorUuid = null;
-          }
-          await workflow.actor.setFlag(MODULE_ID, "activeBuff", activeFlag);
-          debugLog(`[${MODULE_ID}] Buff activé sur ${workflow.actor.name} via ${workflow.item.name}`);
-          if (hasMechBuffs) {
-            const changes = buildMechanicalChanges(activeFlag, workflow.actor);
-            await refreshBuffIndicator(workflow.actor, null, changes);
-          } else {
-            await refreshBuffIndicator(workflow.actor);
-            for (const token of game.user.targets) {
-              if (token.actor) await applyTargetIndicator(token.actor, activeFlag);
-            }
-          }
-          await applyActivationTemporaryHp(workflow.actor, workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null, activeFlag, workflow);
-          await applyActivationStatus(workflow.actor, workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null, activeFlag, workflow, activationSave.saveResults);
         }
         return;
       }

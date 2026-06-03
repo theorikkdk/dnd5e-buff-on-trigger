@@ -619,6 +619,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.trigger"), value: getTriggerLabel(raw.type) },
     { label: game.i18n.localize("BOT.ui.summary.targetMode"), value: getTargetModeLabel(raw.targetMode) },
   ...(raw.fallbackToSelfIfNoTarget ? [{ label: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTarget"), value: game.i18n.localize("BOT.ui.summary.fallbackToSelfIfNoTargetValue") }] : []),
+  ...(raw.allowMultipleTargets ? [{ label: game.i18n.localize("BOT.ui.summary.allowMultipleTargets"), value: game.i18n.localize("BOT.ui.common.yes") }] : []),
     { label: game.i18n.localize("BOT.ui.summary.rememberTargetOnActivation"), value: game.i18n.localize(raw.rememberTargetOnActivation ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
@@ -938,6 +939,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       targetModeSelf:        normalizeGlobalTargetMode(raw.targetMode) === "self",
       targetModeTarget:      normalizeGlobalTargetMode(raw.targetMode) === "target",
       showFallbackToSelfIfNoTarget: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation,
+      showAllowMultipleTargets: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation,
+      allowMultipleTargets: normalizeGlobalTargetMode(raw.targetMode) === "target" && !raw.rememberTargetOnActivation && !!raw.allowMultipleTargets,
       fallbackToSelfIfNoTarget: !!raw.fallbackToSelfIfNoTarget,
       showStoredTargetSection: normalizeGlobalTargetMode(raw.targetMode) === "self",
       rememberTargetOnActivation: !!raw.rememberTargetOnActivation,
@@ -1241,6 +1244,7 @@ function buildBuffConfigFromForm(form) {
     targetMode: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")),
     rememberTargetOnActivation: !!readFormValue(form, "rememberTargetOnActivation"),
     fallbackToSelfIfNoTarget: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "fallbackToSelfIfNoTarget"),
+    allowMultipleTargets: normalizeGlobalTargetMode(readFormValue(form, "targetMode", "self")) === "target" && !readFormValue(form, "rememberTargetOnActivation") && !!readFormValue(form, "allowMultipleTargets"),
     requireStoredTargetMatch: !!readFormValue(form, "requireStoredTargetMatch"),
     requireBearerTemporaryHp: !!readFormValue(form, "requireBearerTemporaryHp"),
     type: readFormValue(form, "type", "passive"),
@@ -1374,6 +1378,7 @@ function buildDefaultBuffConfig() {
     targetMode: "self",
     rememberTargetOnActivation: false,
     fallbackToSelfIfNoTarget: false,
+    allowMultipleTargets: false,
     requireStoredTargetMatch: false,
     requireBearerTemporaryHp: false,
     type: "passive",
@@ -1491,7 +1496,7 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffIncomingAttackMode",
@@ -1564,6 +1569,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "targetMode", normalizeGlobalTargetMode(flag.targetMode));
   setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
   setFormValue(form, "fallbackToSelfIfNoTarget", !!flag.fallbackToSelfIfNoTarget);
+  setFormValue(form, "allowMultipleTargets", !!flag.allowMultipleTargets && normalizeGlobalTargetMode(flag.targetMode) === "target" && !flag.rememberTargetOnActivation);
   setFormValue(form, "requireStoredTargetMatch", !!flag.requireStoredTargetMatch);
   setFormValue(form, "requireBearerTemporaryHp", !!flag.requireBearerTemporaryHp);
   setFormValue(form, "type", flag.type ?? "passive");
@@ -1985,10 +1991,17 @@ window.botUpdateStoredTargetUI = function(selectEl) {
     storedTargetGroup.style.display = selectEl.value === "self" ? "" : "none";
   }
   const fallbackGroup = form?.querySelector?.('#bot-fallback-self-group');
+  const multiTargetGroup = form?.querySelector?.('#bot-allow-multiple-targets-group');
+  const multiTargetInput = form?.querySelector?.('[name="allowMultipleTargets"]');
   const rememberTargetInput = form?.querySelector?.('[name="rememberTargetOnActivation"]');
+  const showTargetOptions = selectEl.value === "target" && !rememberTargetInput?.checked;
   if (fallbackGroup) {
-    fallbackGroup.style.display = selectEl.value === "target" && !rememberTargetInput?.checked ? "" : "none";
+    fallbackGroup.style.display = showTargetOptions ? "" : "none";
   }
+  if (multiTargetGroup) {
+    multiTargetGroup.style.display = showTargetOptions ? "" : "none";
+  }
+  if (!showTargetOptions && multiTargetInput) multiTargetInput.checked = false;
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");
   if (app) app.resizeToContent();

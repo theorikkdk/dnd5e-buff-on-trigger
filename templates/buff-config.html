@@ -51,6 +51,10 @@
       <label>{{localize "BOT.ui.fallbackToSelfIfNoTarget"}}</label>
       <input type="checkbox" name="fallbackToSelfIfNoTarget" {{#if flag.fallbackToSelfIfNoTarget}}checked{{/if}} />
     </div>
+    <div class="form-group" id="bot-allow-multiple-targets-group" {{#unless flag.showAllowMultipleTargets}}style="display:none"{{/unless}}>
+      <label>{{localize "BOT.ui.allowMultipleTargets"}}</label>
+      <input type="checkbox" name="allowMultipleTargets" {{#if flag.allowMultipleTargets}}checked{{/if}} />
+    </div>
     <section class="bot-inline-panel" id="bot-stored-target-group" {{#unless flag.showStoredTargetSection}}style="display:none"{{/unless}}>
       <h3 class="bot-summary-title">{{localize "BOT.ui.storedTarget.title"}}</h3>
       <p class="hint">{{localize "BOT.ui.storedTarget.help"}}</p>

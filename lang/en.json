@@ -634,5 +634,7 @@
   "BOT.creatureTypes.monstrosity": "Monstrosity",
   "BOT.creatureTypes.ooze": "Ooze",
   "BOT.creatureTypes.plant": "Plant",
-  "BOT.creatureTypes.construct": "Construct"
+  "BOT.creatureTypes.construct": "Construct",
+  "BOT.ui.allowMultipleTargets": "Allow multiple targets",
+  "BOT.ui.summary.allowMultipleTargets": "Multiple targets"
 }
