@@ -649,7 +649,7 @@
   "BOT.chat.multiTargetActivation.summary": "{item} : {details}.",
   "BOT.chat.multiTargetActivation.noneAffected": "aucune cible affectée",
   "BOT.chat.multiTargetActivation.invalidList": "Cibles ignorées : {targets}.",
-  "BOT.chat.multiTargetActivation.failedList": "Échecs techniques : {targets}.",
+  "BOT.chat.multiTargetActivation.failedList": "Erreurs : {targets}.",
   "BOT.chat.multiTargetActivation.affected.one": "{count} cible affectée",
   "BOT.chat.multiTargetActivation.affected.many": "{count} cibles affectées",
   "BOT.chat.multiTargetActivation.resisted.one": "{count} cible a résisté",
@@ -657,5 +657,16 @@
   "BOT.chat.multiTargetActivation.invalid.one": "{count} cible ignorée",
   "BOT.chat.multiTargetActivation.invalid.many": "{count} cibles ignorées",
   "BOT.chat.multiTargetActivation.failed.one": "{count} cible en échec technique",
-  "BOT.chat.multiTargetActivation.failed.many": "{count} cibles en échec technique"
+  "BOT.chat.multiTargetActivation.failed.many": "{count} cibles en échec technique",
+  "BOT.chat.multiTargetActivation.affectedList": "Cibles affectées : {targets}.",
+  "BOT.chat.multiTargetActivation.resistedList": "Cibles ayant résisté : {targets}.",
+  "BOT.chat.multiTargetActivation.targetReason": "{target} — {reason}",
+  "BOT.chat.multiTargetActivation.invalidReason.generic": "restriction non respectée",
+  "BOT.chat.multiTargetActivation.invalidReason.noActor": "acteur introuvable",
+  "BOT.chat.multiTargetActivation.invalidReason.allowedTypes": "type non autorisé",
+  "BOT.chat.multiTargetActivation.invalidReason.excludedTypes": "type exclu",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityMin": "{ability} {score}, minimum requis {min}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityMax": "{ability} {score}, maximum autorisé {max}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityRange": "{ability} {score}, valeur requise entre {min} et {max}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityUnavailable": "{ability} indisponible"
 }

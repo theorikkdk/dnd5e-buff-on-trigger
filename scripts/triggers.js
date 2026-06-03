@@ -1435,6 +1435,53 @@ function buildMultiTargetActivationSummaryText(itemName, counts) {
   return game.i18n.format("BOT.chat.multiTargetActivation.summary", { item: itemName, details: parts.join(", ") });
 }
 
+function escapeMultiTargetSummaryText(value) {
+  const text = String(value ?? "");
+  if (foundry.utils.escapeHTML) return foundry.utils.escapeHTML(text);
+  return text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char]));
+}
+
+function joinMultiTargetNames(results, status) {
+  return results
+    .filter((result) => result.status === status)
+    .map((result) => escapeMultiTargetSummaryText(result.name))
+    .filter(Boolean)
+    .join(", ");
+}
+
+function formatTargetRestrictionBrief(result) {
+  if (!result) return game.i18n.localize("BOT.chat.multiTargetActivation.invalidReason.generic");
+  if (result.reason === "noActor") return game.i18n.localize("BOT.chat.multiTargetActivation.invalidReason.noActor");
+  if (result.reason === "allowedTypes") return game.i18n.localize("BOT.chat.multiTargetActivation.invalidReason.allowedTypes");
+  if (result.reason === "excludedTypes") return game.i18n.localize("BOT.chat.multiTargetActivation.invalidReason.excludedTypes");
+  if (result.reason === "abilityScore" && result.ability) {
+    const ability = game.i18n.localize(`BOT.abilities.${result.ability}`);
+    const score = result.detectedScore ?? game.i18n.localize("BOT.ui.summary.notConfigured");
+    if (result.min !== null && result.max !== null) {
+      return game.i18n.format("BOT.chat.multiTargetActivation.invalidReason.abilityRange", { ability, score, min: result.min, max: result.max });
+    }
+    if (result.min !== null) {
+      return game.i18n.format("BOT.chat.multiTargetActivation.invalidReason.abilityMin", { ability, score, min: result.min });
+    }
+    if (result.max !== null) {
+      return game.i18n.format("BOT.chat.multiTargetActivation.invalidReason.abilityMax", { ability, score, max: result.max });
+    }
+    return game.i18n.format("BOT.chat.multiTargetActivation.invalidReason.abilityUnavailable", { ability });
+  }
+  return game.i18n.localize("BOT.chat.multiTargetActivation.invalidReason.generic");
+}
+
+function buildInvalidTargetDetails(results) {
+  return results
+    .filter((result) => result.status === "invalid")
+    .map((result) => game.i18n.format("BOT.chat.multiTargetActivation.targetReason", {
+      target: escapeMultiTargetSummaryText(result.name),
+      reason: escapeMultiTargetSummaryText(formatTargetRestrictionBrief(result.restriction)),
+    }))
+    .filter(Boolean)
+    .join(", ");
+}
+
 async function reportMultiTargetActivation(workflow, activeFlag, results) {
   if (!activeFlag?.allowMultipleTargets || results.length <= 1) return;
   const itemName = activeFlag.itemName ?? workflow.item?.name ?? game.i18n.localize("BOT.fallback.effectName");
@@ -1451,11 +1498,15 @@ async function reportMultiTargetActivation(workflow, activeFlag, results) {
     return;
   }
 
-  const invalidNames = results.filter((result) => result.status === "invalid").map((result) => result.name).filter(Boolean);
-  const failedNames = results.filter((result) => result.status === "failed").map((result) => result.name).filter(Boolean);
+  const affectedNames = joinMultiTargetNames(results, "affected");
+  const resistedNames = joinMultiTargetNames(results, "resisted");
+  const invalidDetails = buildInvalidTargetDetails(results);
+  const failedNames = joinMultiTargetNames(results, "failed");
   const details = [
-    invalidNames.length ? game.i18n.format("BOT.chat.multiTargetActivation.invalidList", { targets: invalidNames.join(", ") }) : null,
-    failedNames.length ? game.i18n.format("BOT.chat.multiTargetActivation.failedList", { targets: failedNames.join(", ") }) : null,
+    affectedNames ? game.i18n.format("BOT.chat.multiTargetActivation.affectedList", { targets: affectedNames }) : null,
+    resistedNames ? game.i18n.format("BOT.chat.multiTargetActivation.resistedList", { targets: resistedNames }) : null,
+    invalidDetails ? game.i18n.format("BOT.chat.multiTargetActivation.invalidList", { targets: invalidDetails }) : null,
+    failedNames ? game.i18n.format("BOT.chat.multiTargetActivation.failedList", { targets: failedNames }) : null,
   ].filter(Boolean);
 
   const detailHtml = details.length ? "<br>" + details.join("<br>") : "";
@@ -1568,7 +1619,7 @@ export function registerTriggers() {
           debugLog(`[${MODULE_ID}] Restriction cible : ${JSON.stringify(targetFilterResult)}`);
           if (!targetFilterResult.ok) {
             ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
-            activationResults.push({ status: "invalid", name: getActivationTargetName(targetToken), reason: targetFilterResult.reason });
+            activationResults.push({ status: "invalid", name: getActivationTargetName(targetToken), restriction: targetFilterResult });
             debugLog(`[${MODULE_ID}] Cible ignoree : hors restrictions`);
             continue;
           }

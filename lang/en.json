@@ -649,7 +649,7 @@
   "BOT.chat.multiTargetActivation.summary": "{item}: {details}.",
   "BOT.chat.multiTargetActivation.noneAffected": "no target affected",
   "BOT.chat.multiTargetActivation.invalidList": "Ignored targets: {targets}.",
-  "BOT.chat.multiTargetActivation.failedList": "Technical failures: {targets}.",
+  "BOT.chat.multiTargetActivation.failedList": "Errors: {targets}.",
   "BOT.chat.multiTargetActivation.affected.one": "{count} target affected",
   "BOT.chat.multiTargetActivation.affected.many": "{count} targets affected",
   "BOT.chat.multiTargetActivation.resisted.one": "{count} target resisted",
@@ -657,5 +657,16 @@
   "BOT.chat.multiTargetActivation.invalid.one": "{count} target ignored",
   "BOT.chat.multiTargetActivation.invalid.many": "{count} targets ignored",
   "BOT.chat.multiTargetActivation.failed.one": "{count} target failed",
-  "BOT.chat.multiTargetActivation.failed.many": "{count} targets failed"
+  "BOT.chat.multiTargetActivation.failed.many": "{count} targets failed",
+  "BOT.chat.multiTargetActivation.affectedList": "Affected targets: {targets}.",
+  "BOT.chat.multiTargetActivation.resistedList": "Resisted targets: {targets}.",
+  "BOT.chat.multiTargetActivation.targetReason": "{target} — {reason}",
+  "BOT.chat.multiTargetActivation.invalidReason.generic": "restriction not met",
+  "BOT.chat.multiTargetActivation.invalidReason.noActor": "actor not found",
+  "BOT.chat.multiTargetActivation.invalidReason.allowedTypes": "invalid type",
+  "BOT.chat.multiTargetActivation.invalidReason.excludedTypes": "excluded type",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityMin": "{ability} {score}, minimum required {min}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityMax": "{ability} {score}, maximum allowed {max}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityRange": "{ability} {score}, required between {min} and {max}",
+  "BOT.chat.multiTargetActivation.invalidReason.abilityUnavailable": "{ability} unavailable"
 }
