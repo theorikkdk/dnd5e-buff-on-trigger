@@ -5,6 +5,45 @@ import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffI
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
 const INCOMING_ATTACK_CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
+const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
+const CREATURE_TYPE_ALIASES = {
+  "aberration": "aberration",
+  "celestial": "celestial",
+  "celeste": "celestial",
+  "céleste": "celestial",
+  "elemental": "elemental",
+  "elementaire": "elemental",
+  "élémentaire": "elemental",
+  "fey": "fey",
+  "fee": "fey",
+  "fée": "fey",
+  "fiend": "fiend",
+  "fielon": "fiend",
+  "fiélon": "fiend",
+  "undead": "undead",
+  "mort-vivant": "undead",
+  "mort vivant": "undead",
+  "morts-vivants": "undead",
+  "beast": "beast",
+  "bete": "beast",
+  "bête": "beast",
+  "dragon": "dragon",
+  "giant": "giant",
+  "geant": "giant",
+  "géant": "giant",
+  "humanoid": "humanoid",
+  "humanoide": "humanoid",
+  "humanoïde": "humanoid",
+  "monstrosity": "monstrosity",
+  "monstruosite": "monstrosity",
+  "monstruosité": "monstrosity",
+  "ooze": "ooze",
+  "vase": "ooze",
+  "plant": "plant",
+  "plante": "plant",
+  "construct": "construct",
+  "artificiel": "construct",
+};
 
 function resolveRollHookActor(config) {
   return config?.subject?.getFlag
@@ -117,10 +156,37 @@ function summarizeIncomingRollConfig(process, rollConfig) {
     })),
   };
 }
+function normalizeCreatureTypeText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function extractCreatureTypeTokens(value) {
+  const normalized = normalizeCreatureTypeText(value);
+  if (!normalized) return [];
+  return normalized
+    .split(/[^a-z0-9-]+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeCreatureTypeValue(value) {
+  const normalized = normalizeCreatureTypeText(value);
+  const tokens = [normalized, ...extractCreatureTypeTokens(value)];
+  const results = [];
+  for (const token of tokens) {
+    const canonical = CREATURE_TYPE_ALIASES[token] ?? token;
+    if (INCOMING_ATTACK_CREATURE_TYPES.includes(canonical)) results.push(canonical);
+  }
+  return results;
+}
+
 function normalizeIncomingAttackCreatureTypes(types = []) {
-  return [...new Set((types ?? [])
-    .map((type) => String(type ?? "").trim().toLowerCase())
-    .filter((type) => INCOMING_ATTACK_CREATURE_TYPES.includes(type)))];
+  return [...new Set((Array.isArray(types) ? types : [types])
+    .flatMap((type) => normalizeCreatureTypeValue(type)))];
 }
 
 function flattenCreatureTypeValues(value) {
@@ -134,21 +200,77 @@ function flattenCreatureTypeValues(value) {
 function getActorCreatureTypeValues(actor) {
   const midiTypeOrRace = globalThis.MidiQOL?.typeOrRace?.(actor);
   const midiRaceOrType = globalThis.MidiQOL?.raceOrType?.(actor);
-  return [
+  return [...new Set([
     midiTypeOrRace,
     midiRaceOrType,
+    actor?.system?.details?.type,
     actor?.system?.details?.type?.value,
     actor?.system?.details?.type?.subtype,
+    actor?.system?.details?.type?.custom,
     actor?.system?.details?.race,
     actor?.raceOrType,
   ]
     .flatMap((value) => flattenCreatureTypeValues(value))
-    .map((value) => String(value ?? "").trim().toLowerCase())
-    .filter(Boolean);
+    .flatMap((value) => normalizeCreatureTypeValue(value))
+    .filter(Boolean))];
+}
+
+function getTargetFilterDebugData(actor) {
+  return {
+    actorName: actor?.name ?? null,
+    detailsType: actor?.system?.details?.type ?? null,
+    detailsTypeValue: actor?.system?.details?.type?.value ?? null,
+    detailsTypeSubtype: actor?.system?.details?.type?.subtype ?? null,
+    detailsTypeCustom: actor?.system?.details?.type?.custom ?? null,
+    detailsRace: actor?.system?.details?.race ?? null,
+    raceOrType: actor?.raceOrType ?? null,
+    midiTypeOrRace: globalThis.MidiQOL?.typeOrRace?.(actor) ?? null,
+    midiRaceOrType: globalThis.MidiQOL?.raceOrType?.(actor) ?? null,
+  };
 }
 
 function getTargetFilterCreatureTypes(flag) {
   return normalizeIncomingAttackCreatureTypes(flag?.targetFilters?.creatureTypes ?? []);
+}
+
+function getExcludedTargetFilterCreatureTypes(flag) {
+  return normalizeIncomingAttackCreatureTypes(flag?.targetFilters?.excludedCreatureTypes ?? []);
+}
+
+function parseTargetFilterNumber(value, label) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    debugLog(`[${MODULE_ID}] Restriction cible ignoree : valeur non numerique pour ${label} (${value})`);
+    return null;
+  }
+  return parsed;
+}
+
+function targetFilterHasAbilityRestrictions(abilityScores = {}) {
+  return TARGET_FILTER_ABILITY_IDS.some((ability) => {
+    const restriction = abilityScores?.[ability] ?? {};
+    return parseTargetFilterNumber(restriction.min, `${ability}.min`) !== null
+      || parseTargetFilterNumber(restriction.max, `${ability}.max`) !== null;
+  });
+}
+
+function actorMatchesAbilityScoreFilters(actor, abilityScores = {}) {
+  for (const ability of TARGET_FILTER_ABILITY_IDS) {
+    const restriction = abilityScores?.[ability] ?? {};
+    const min = parseTargetFilterNumber(restriction.min, `${ability}.min`);
+    const max = parseTargetFilterNumber(restriction.max, `${ability}.max`);
+    if (min === null && max === null) continue;
+
+    const score = Number(actor?.system?.abilities?.[ability]?.value);
+    if (!Number.isFinite(score)) {
+      debugLog(`[${MODULE_ID}] Filtre cible activation : score ${ability} indisponible pour ${actor?.name ?? "inconnu"}`);
+      return false;
+    }
+    if (min !== null && score < min) return false;
+    if (max !== null && score > max) return false;
+  }
+  return true;
 }
 
 function actorMatchesCreatureTypeFilter(actor, creatureTypes = []) {
@@ -157,14 +279,95 @@ function actorMatchesCreatureTypeFilter(actor, creatureTypes = []) {
 
   const detectedTypes = getActorCreatureTypeValues(actor);
   const match = detectedTypes.some((type) => expectedTypes.includes(type));
-  debugLog(`[${MODULE_ID}] Filtre cible activation : actor=${actor?.name ?? "inconnu"}, detected=${JSON.stringify(detectedTypes)}, expected=${JSON.stringify(expectedTypes)}, match=${match}`);
+  debugLog(`[${MODULE_ID}] Restriction cible : target=${actor?.name ?? "inconnu"}, rawType=${JSON.stringify(actor?.system?.details?.type ?? null)}, race=${JSON.stringify(actor?.system?.details?.race ?? null)}, raceOrType=${JSON.stringify(actor?.raceOrType ?? null)}, detectedTypes=${JSON.stringify(detectedTypes)}, allowed=${JSON.stringify(expectedTypes)}, match=${match}`);
   return match;
 }
 
-function activationTargetMatchesFilters(flag, targetToken) {
+function evaluateTargetFilters(flag, targetToken) {
   const creatureTypes = getTargetFilterCreatureTypes(flag);
-  if (!creatureTypes.length) return true;
-  return actorMatchesCreatureTypeFilter(targetToken?.actor, creatureTypes);
+  const excludedCreatureTypes = getExcludedTargetFilterCreatureTypes(flag);
+  const abilityScores = flag?.targetFilters?.abilityScores ?? {};
+  const hasAbilityRestrictions = targetFilterHasAbilityRestrictions(abilityScores);
+  const actor = targetToken?.actor;
+  const detectedTypes = getActorCreatureTypeValues(actor);
+  const result = {
+    ok: true,
+    reason: null,
+    targetName: actor?.name ?? targetToken?.name ?? "inconnue",
+    detectedTypes,
+    allowedTypes: creatureTypes,
+    excludedTypes: excludedCreatureTypes,
+    ability: null,
+    detectedScore: null,
+    min: null,
+    max: null,
+    debug: getTargetFilterDebugData(actor),
+  };
+
+  if (!creatureTypes.length && !excludedCreatureTypes.length && !hasAbilityRestrictions) return result;
+
+  if (!actor) {
+    return { ...result, ok: false, reason: "noActor" };
+  }
+
+  if (creatureTypes.length && !detectedTypes.some((type) => creatureTypes.includes(type))) {
+    return { ...result, ok: false, reason: "allowedTypes" };
+  }
+
+  if (excludedCreatureTypes.length && detectedTypes.some((type) => excludedCreatureTypes.includes(type))) {
+    return { ...result, ok: false, reason: "excludedTypes" };
+  }
+
+  if (hasAbilityRestrictions) {
+    for (const ability of TARGET_FILTER_ABILITY_IDS) {
+      const restriction = abilityScores?.[ability] ?? {};
+      const min = parseTargetFilterNumber(restriction.min, `${ability}.min`);
+      const max = parseTargetFilterNumber(restriction.max, `${ability}.max`);
+      if (min === null && max === null) continue;
+
+      const score = Number(actor?.system?.abilities?.[ability]?.value);
+      if (!Number.isFinite(score)) {
+        return { ...result, ok: false, reason: "abilityScore", ability, detectedScore: null, min, max };
+      }
+      if ((min !== null && score < min) || (max !== null && score > max)) {
+        return { ...result, ok: false, reason: "abilityScore", ability, detectedScore: score, min, max };
+      }
+    }
+  }
+
+  return result;
+}
+
+function formatTargetRestrictionFailure(result) {
+  const base = game.i18n.format("BOT.notifications.targetRestrictionsMismatchDetailed", {
+    target: result?.targetName ?? game.i18n.localize("BOT.ui.summary.notConfigured"),
+  });
+  const details = [];
+  const detectedTypes = result?.detectedTypes?.length ? result.detectedTypes.join(", ") : "";
+  details.push(detectedTypes
+    ? game.i18n.format("BOT.notifications.targetRestrictionDetectedTypes", { types: detectedTypes })
+    : game.i18n.localize("BOT.notifications.targetRestrictionNoDetectedTypes"));
+  if (result?.allowedTypes?.length) {
+    details.push(game.i18n.format("BOT.notifications.targetRestrictionAllowedTypes", { types: result.allowedTypes.join(", ") }));
+  }
+  if (result?.excludedTypes?.length) {
+    details.push(game.i18n.format("BOT.notifications.targetRestrictionExcludedTypes", { types: result.excludedTypes.join(", ") }));
+  }
+  if (result?.reason === "abilityScore" && result.ability) {
+    const abilityLabel = game.i18n.localize(`BOT.abilities.${result.ability}`);
+    details.push(game.i18n.format("BOT.notifications.targetRestrictionAbilityDetected", {
+      ability: abilityLabel,
+      score: result.detectedScore ?? game.i18n.localize("BOT.ui.summary.notConfigured"),
+    }));
+    if (result.min !== null && result.max !== null) {
+      details.push(game.i18n.format("BOT.notifications.targetRestrictionAbilityRequiredRange", { ability: abilityLabel, min: result.min, max: result.max }));
+    } else if (result.min !== null) {
+      details.push(game.i18n.format("BOT.notifications.targetRestrictionAbilityRequiredMin", { ability: abilityLabel, min: result.min }));
+    } else if (result.max !== null) {
+      details.push(game.i18n.format("BOT.notifications.targetRestrictionAbilityRequiredMax", { ability: abilityLabel, max: result.max }));
+    }
+  }
+  return [base, ...details].filter(Boolean).join(" ");
 }
 
 function addIncomingAttackTarget(targets, token) {
@@ -1225,8 +1428,10 @@ export function registerTriggers() {
 
         const selfToken = workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? { actor: workflow.actor };
         const activationFilterTarget = effectiveTargetMode === "target" ? selectedTargetToken : selfToken;
-        if (!activationTargetMatchesFilters(activeFlag, activationFilterTarget)) {
-          ui.notifications.warn(game.i18n.localize("BOT.notifications.targetRestrictionsMismatch"));
+        const targetFilterResult = evaluateTargetFilters(activeFlag, activationFilterTarget);
+        debugLog(`[${MODULE_ID}] Restriction cible : ${JSON.stringify(targetFilterResult)}`);
+        if (!targetFilterResult.ok) {
+          ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
           debugLog(`[${MODULE_ID}] Activation annulée : cible hors restrictions`);
           return;
         }

@@ -78,6 +78,28 @@
           <input type="hidden" name="targetFilterCreatureTypesList" id="hidden-targetFilterCreatureTypesList" value="{{flag.targetFilterCreatureTypesList}}" />
         </div>
       </div>
+      <div class="form-group bot-picker-group">
+        <label>{{localize "BOT.ui.targetFilters.excludedCreatureTypes"}}</label>
+        <div class="bot-tag-picker">
+          <div class="bot-tags" id="tags-excludedTargetFilterCreatureTypesList">
+            {{#each flag.excludedTargetFilterCreatureTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'excludedTargetFilterCreatureTypesList')">&times;</span></span>{{/if}}{{/each}}
+          </div>
+          <select class="bot-tag-select" onchange="botAddTag(this,'excludedTargetFilterCreatureTypesList')">
+            {{#each flag.excludedTargetFilterCreatureTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+          </select>
+          <input type="hidden" name="excludedTargetFilterCreatureTypesList" id="hidden-excludedTargetFilterCreatureTypesList" value="{{flag.excludedTargetFilterCreatureTypesList}}" />
+        </div>
+      </div>
+      <h4 class="bot-subtitle">{{localize "BOT.ui.targetFilters.abilityScores"}}</h4>
+      <div class="bot-target-ability-grid">
+        {{#each flag.targetFilterAbilityScoreRows}}
+        <div class="bot-target-ability-row">
+          <label>{{label}}</label>
+          <input type="text" name="{{minName}}" value="{{minValue}}" placeholder="{{localize "BOT.ui.targetFilters.min"}}" />
+          <input type="text" name="{{maxName}}" value="{{maxValue}}" placeholder="{{localize "BOT.ui.targetFilters.max"}}" />
+        </div>
+        {{/each}}
+      </div>
     </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.trigger.label"}}</label>

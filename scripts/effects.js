@@ -19,6 +19,44 @@ const DAMAGE_LABEL_KEYS = {
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
+const CREATURE_TYPE_ALIASES = {
+  "aberration": "aberration",
+  "celestial": "celestial",
+  "celeste": "celestial",
+  "c?leste": "celestial",
+  "elemental": "elemental",
+  "elementaire": "elemental",
+  "?l?mentaire": "elemental",
+  "fey": "fey",
+  "fee": "fey",
+  "f?e": "fey",
+  "fiend": "fiend",
+  "fielon": "fiend",
+  "fi?lon": "fiend",
+  "undead": "undead",
+  "mort-vivant": "undead",
+  "mort vivant": "undead",
+  "morts-vivants": "undead",
+  "beast": "beast",
+  "bete": "beast",
+  "b?te": "beast",
+  "dragon": "dragon",
+  "giant": "giant",
+  "geant": "giant",
+  "g?ant": "giant",
+  "humanoid": "humanoid",
+  "humanoide": "humanoid",
+  "humano?de": "humanoid",
+  "monstrosity": "monstrosity",
+  "monstruosite": "monstrosity",
+  "monstruosit?": "monstrosity",
+  "ooze": "ooze",
+  "vase": "ooze",
+  "plant": "plant",
+  "plante": "plant",
+  "construct": "construct",
+  "artificiel": "construct",
+};
 const allowedLinkedStatusDeletions = new Set();
 let linkedStatusProtectionRegistered = false;
 
@@ -1341,10 +1379,37 @@ function resolveTargets(workflow, flag) {
   return getWorkflowConditionTargets(workflow, condition);
 }
 
+function normalizeCreatureTypeText(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function extractCreatureTypeTokens(value) {
+  const normalized = normalizeCreatureTypeText(value);
+  if (!normalized) return [];
+  return normalized
+    .split(/[^a-z0-9-]+/i)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function normalizeCreatureTypeValue(value) {
+  const normalized = normalizeCreatureTypeText(value);
+  const tokens = [normalized, ...extractCreatureTypeTokens(value)];
+  const results = [];
+  for (const token of tokens) {
+    const canonical = CREATURE_TYPE_ALIASES[token] ?? token;
+    if (CREATURE_TYPES.includes(canonical)) results.push(canonical);
+  }
+  return results;
+}
+
 function normalizeCreatureTypeFilter(types = []) {
-  return [...new Set((types ?? [])
-    .map((type) => String(type ?? "").trim().toLowerCase())
-    .filter((type) => CREATURE_TYPES.includes(type)))];
+  return [...new Set((Array.isArray(types) ? types : [types])
+    .flatMap((type) => normalizeCreatureTypeValue(type)))];
 }
 
 function flattenCreatureTypeValues(value) {
@@ -1361,13 +1426,15 @@ function getActorCreatureTypeValues(actor) {
   return [
     midiTypeOrRace,
     midiRaceOrType,
+    actor?.system?.details?.type,
     actor?.system?.details?.type?.value,
     actor?.system?.details?.type?.subtype,
+    actor?.system?.details?.type?.custom,
     actor?.system?.details?.race,
     actor?.raceOrType,
   ]
     .flatMap((value) => flattenCreatureTypeValues(value))
-    .map((value) => String(value ?? "").trim().toLowerCase())
+    .flatMap((value) => normalizeCreatureTypeValue(value))
     .filter(Boolean);
 }
 

@@ -91,12 +91,90 @@ const isFilled = value => {
   return value !== null && value !== undefined && value !== "";
 };
 
-const listSelectedLabels = (values, labels) => (values ?? [])
-  .map(value => labels[value] ?? value)
+const toSafeArray = (values) => {
+  if (Array.isArray(values)) return values.filter(Boolean);
+  if (typeof values === "string") return values.split(",").map((value) => value.trim()).filter(Boolean);
+  if (values === null || values === undefined) return [];
+  return [values].filter(Boolean);
+};
+
+const listSelectedLabels = (values, labels = {}) => toSafeArray(values)
+  .map(value => labels?.[value] ?? value)
   .filter(Boolean)
   .join(", ");
 
 const abilityFieldName = (prefix, ability) => `${prefix}${ability.charAt(0).toUpperCase()}${ability.slice(1)}`;
+
+function normalizeTargetFilterNumberValue(value, label) {
+  if (!isFilled(value)) return "";
+  const text = String(value).trim();
+  if (!Number.isFinite(Number(text))) {
+    debugLog(`[${MODULE_ID}] Restriction cible ignoree : valeur non numerique pour ${label} (${value})`);
+    return "";
+  }
+  return text;
+}
+
+function normalizeTargetFilterAbilityScores(raw = {}) {
+  const source = raw && typeof raw === "object" ? raw : {};
+  const result = {};
+  for (const ability of ABILITY_IDS) {
+    const min = normalizeTargetFilterNumberValue(source?.[ability]?.min, `${ability}.min`);
+    const max = normalizeTargetFilterNumberValue(source?.[ability]?.max, `${ability}.max`);
+    if (isFilled(min) || isFilled(max)) {
+      result[ability] = {
+        ...(isFilled(min) ? { min } : {}),
+        ...(isFilled(max) ? { max } : {}),
+      };
+    }
+  }
+  return result;
+}
+
+function buildTargetFilters(creatureTypes = [], excludedCreatureTypes = [], abilityScores = {}) {
+  const normalizedAbilityScores = normalizeTargetFilterAbilityScores(abilityScores);
+  const filters = {};
+  const includedTypes = toSafeArray(creatureTypes);
+  const excludedTypes = toSafeArray(excludedCreatureTypes);
+  if (includedTypes.length) filters.creatureTypes = includedTypes;
+  if (excludedTypes.length) filters.excludedCreatureTypes = excludedTypes;
+  if (Object.keys(normalizedAbilityScores).length) filters.abilityScores = normalizedAbilityScores;
+  return Object.keys(filters).length ? filters : null;
+}
+
+function readTargetFilterAbilityScoresFromData(data = {}) {
+  return Object.fromEntries(ABILITY_IDS.map((ability) => [ability, {
+    min: data[abilityFieldName("targetFilterAbilityMin", ability)] ?? "",
+    max: data[abilityFieldName("targetFilterAbilityMax", ability)] ?? "",
+  }]));
+}
+
+function readTargetFilterAbilityScoresFromForm(form) {
+  return Object.fromEntries(ABILITY_IDS.map((ability) => [ability, {
+    min: readFormValue(form, abilityFieldName("targetFilterAbilityMin", ability), ""),
+    max: readFormValue(form, abilityFieldName("targetFilterAbilityMax", ability), ""),
+  }]));
+}
+
+function buildTargetFilterSummary(targetFilters, labels) {
+  const parts = [];
+  const abilityScores = normalizeTargetFilterAbilityScores(targetFilters?.abilityScores ?? {});
+  const creatureTypes = toSafeArray(targetFilters?.creatureTypes);
+  const excludedCreatureTypes = toSafeArray(targetFilters?.excludedCreatureTypes);
+  if (creatureTypes.length) {
+    parts.push(listSelectedLabels(creatureTypes, labels?.creatureTypes));
+  }
+  if (excludedCreatureTypes.length) {
+    parts.push(`${game.i18n.localize("BOT.ui.targetFilters.except")} ${listSelectedLabels(excludedCreatureTypes, labels?.creatureTypes)}`);
+  }
+  for (const ability of ABILITY_IDS) {
+    const restriction = abilityScores?.[ability] ?? {};
+    const abilityLabel = labels?.abilities?.[ability] ?? ability;
+    if (isFilled(restriction.min)) parts.push(`${abilityLabel} ${game.i18n.localize("BOT.ui.targetFilters.minShort")} ${restriction.min}`);
+    if (isFilled(restriction.max)) parts.push(`${abilityLabel} ${game.i18n.localize("BOT.ui.targetFilters.maxShort")} ${restriction.max}`);
+  }
+  return parts.filter(Boolean).join(", ");
+}
 
 function readAbilityModifierValues(form, prefix) {
   return Object.fromEntries(
@@ -546,10 +624,11 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   ];
   if (raw.requireBearerTemporaryHp) summary.push({ label: game.i18n.localize("BOT.ui.summary.temporaryHpCondition"), value: game.i18n.localize("BOT.ui.summary.temporaryHpConditionBearer") });
 
-  if ((raw.targetFilters?.creatureTypes ?? []).length) {
+  const targetFilterSummary = buildTargetFilterSummary(raw.targetFilters, labels);
+  if (targetFilterSummary) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.targetFilters"),
-      value: listSelectedLabels(raw.targetFilters.creatureTypes, labels.creatureTypes)
+      value: targetFilterSummary
     });
   }
 
@@ -818,6 +897,16 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const incomingAttackCreatureTypeOptions = getCreatureTypeOptions(raw.buffs?.incomingAttackCreatureTypes ?? []);
     const damageTargetCreatureTypeOptions = getCreatureTypeOptions(raw.damage?.targetCreatureTypes ?? []);
     const targetFilterCreatureTypeOptions = getCreatureTypeOptions(raw.targetFilters?.creatureTypes ?? []);
+    const excludedTargetFilterCreatureTypeOptions = getCreatureTypeOptions(raw.targetFilters?.excludedCreatureTypes ?? []);
+    const targetFilterAbilityScores = raw.targetFilters?.abilityScores ?? {};
+    const targetFilterAbilityScoreRows = ABILITY_IDS.map((ability) => ({
+      ability,
+      label: abilityLabels[ability] ?? ability,
+      minName: abilityFieldName("targetFilterAbilityMin", ability),
+      maxName: abilityFieldName("targetFilterAbilityMax", ability),
+      minValue: targetFilterAbilityScores?.[ability]?.min ?? "",
+      maxValue: targetFilterAbilityScores?.[ability]?.max ?? "",
+    }));
     const labels = {
       skills: skillLabels,
       abilities: abilityLabels,
@@ -885,6 +974,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       damageTargetCreatureTypeOptions,
       targetFilterCreatureTypesList: (raw.targetFilters?.creatureTypes ?? []).join(","),
       targetFilterCreatureTypeOptions,
+      excludedTargetFilterCreatureTypesList: (raw.targetFilters?.excludedCreatureTypes ?? []).join(","),
+      excludedTargetFilterCreatureTypeOptions,
+      targetFilterAbilityScoreRows,
       buffSkillMode:             raw.buffs?.skillMode ?? "none",
       buffSkillBonus:            raw.buffs?.skillBonus ?? "",
       buffSkillBonusAll:         raw.buffs?.skillBonusAll ?? "",
@@ -1038,149 +1130,20 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
 
   static async #onSubmit(event, form, formData) {
     const data = foundry.utils.expandObject(formData.object);
-      if (!data.enabled) {
-        await this.item.unsetFlag(MODULE_ID, "buffTrigger");
-      } else {
-        const currentFlag = this.item.getFlag(MODULE_ID, "buffTrigger") ?? {};
-        const submittedDamageTargetMode = normalizeDamageTargetMode(data.damageTargetMode);
-        const shouldPersistDamageTargetMode = !!currentFlag.damage?.targetMode || submittedDamageTargetMode !== "triggerTarget";
-        const submittedStatusTargetMode = data.statusTargetMode ?? "triggerTarget";
-        const shouldPersistStatusTargetMode = !!currentFlag.status?.targetMode || submittedStatusTargetMode !== "triggerTarget";
-        const flag = {
-        targetMode: normalizeGlobalTargetMode(data.targetMode),
-        rememberTargetOnActivation: data.rememberTargetOnActivation ?? false,
-        fallbackToSelfIfNoTarget: normalizeGlobalTargetMode(data.targetMode) === "target" && data.rememberTargetOnActivation !== true ? (data.fallbackToSelfIfNoTarget ?? false) : false,
-        requireStoredTargetMatch: data.requireStoredTargetMatch ?? false,
-        requireBearerTemporaryHp: data.requireBearerTemporaryHp ?? false,
-        type: data.type,
-        condition: data.condition,
-        receivedAttackType: data.receivedAttackType ?? "any",
-        receivedDamageTypes: (() => {
-          const toArray = v => v ? v.split(',').filter(Boolean) : [];
-          return toArray(data.receivedDamageTypesList);
-        })(),
-        targetFilters: (() => {
-          const creatureTypes = String(data.targetFilterCreatureTypesList ?? "").split(",").filter(Boolean);
-          return creatureTypes.length ? { creatureTypes } : null;
-        })(),
-        consumeOnTrigger: data.consumeOnTrigger ?? true,
-        triggerFrequency: data.triggerFrequency ?? "none",
-        endConditions: (data.endConditionOnAttack || data.endConditionOnSpellCast || data.endConditionOnDamageDealt) ? {
-          onAttack: data.endConditionOnAttack ?? false,
-          onSpellCast: data.endConditionOnSpellCast ?? false,
-          onDamageDealt: data.endConditionOnDamageDealt ?? false,
-        } : null,
-        damage: data.damageFormula ? {
-          formula: data.damageFormula,
-          type: data.damageType || null,
-          ...(shouldPersistDamageTargetMode ? { targetMode: submittedDamageTargetMode } : {}),
-          targetCreatureTypes: String(data.damageTargetCreatureTypesList ?? "").split(",").filter(Boolean)
-        } : null,
-        healing: data.healingEnabled && data.healingFormula ? {
-          formula: data.healingFormula,
-          targetMode: normalizeHealingTargetMode(data.healingTargetMode),
-        } : null,
-        temporaryHp: data.temporaryHpEnabled && data.temporaryHpFormula ? {
-          formula: data.temporaryHpFormula,
-          timing: data.temporaryHpTiming ?? "trigger",
-          targetMode: normalizeTemporaryHpTargetMode(data.temporaryHpTargetMode),
-          mode: data.temporaryHpMode ?? "keepHighest",
-        } : null,
-        rollModifier: data.rollModifierEnabled && data.rollModifierFormula ? {
-          enabled: true,
-          formula: data.rollModifierFormula,
-          rollTypes: [
-            data.rollModifierAttack ? "attack" : null,
-            data.rollModifierSave ? "save" : null,
-            data.rollModifierAbility ? "ability" : null,
-            data.rollModifierSkill ? "skill" : null,
-          ].filter(Boolean),
-        } : null,
-          save: data.saveAbility ? {
-            ability: data.saveAbility,
-            dc: Number(data.saveDC),
-            dcSource: data.saveDcSource ?? "fixed",
-            timing: data.saveTiming ?? "trigger",
-            activationApplyOn: data.saveActivationApplyOn ?? "failure",
-            effect: data.saveEffect,
-            repeat: {
-              enabled: data.saveRepeatEnabled ?? false,
-              timing: data.saveRepeatTiming ?? "endTurn",
-              endsBuffOn: data.saveRepeatEndsBuffOn ?? "success",
-              onDamaged: data.saveRepeatOnDamaged ?? false,
-            }
-          } : null,
-          status: (() => {
-            const statusIds = String(data.statusIdsList ?? data.statusId ?? "").split(",").filter(Boolean);
-            return statusIds.length ? {
-            id: statusIds[0],
-            ids: statusIds,
-            timing: data.statusTiming ?? "trigger",
-            ...(shouldPersistStatusTargetMode ? { targetMode: submittedStatusTargetMode } : {}),
-            applyCondition: data.statusApplyCondition ?? "always",
-            removeWhenBuffEnds: data.statusRemoveWhenBuffEnds ?? false
-          } : null;
-          })(),
-        charges: data.charges ? Number(data.charges) : null,
-        buffs: (() => {
-          const toArray = v => v ? v.split(',').filter(Boolean) : [];
-          const toAbilityModifiers = (prefix) => Object.fromEntries(
-            ABILITY_IDS
-              .map((ability) => [ability, data[abilityFieldName(prefix, ability)]])
-              .filter(([, value]) => isFilled(value))
-          );
-          return {
-            ac: data.buffAC ? Number(data.buffAC) : null,
-            attackMode: data.buffAttackMode !== "none" ? data.buffAttackMode : null,
-            saveMode: data.buffSaveMode !== "none" ? data.buffSaveMode : null,
-            incomingAttackMode: data.buffIncomingAttackMode !== "none" ? data.buffIncomingAttackMode : null,
-            incomingAttackCreatureTypes: toArray(data.buffIncomingAttackCreatureTypesList),
-            skillMode: data.buffSkillMode !== "none" ? data.buffSkillMode : null,
-            abilityCheckAdvantages: toArray(data.buffAbilityCheckAdvantageList),
-            abilityCheckDisadvantages: toArray(data.buffAbilityCheckDisadvantageList),
-            savingThrowAdvantages: toArray(data.buffSavingThrowAdvantageList),
-            savingThrowDisadvantages: toArray(data.buffSavingThrowDisadvantageList),
-            abilityCheckModifiers: toAbilityModifiers("buffAbilityCheckModifier"),
-            savingThrowModifiers: toAbilityModifiers("buffSavingThrowModifier"),
-            skills: toArray(data.buffSkillAdvantageList),
-            skillBonusSkills: toArray(data.buffSkillBonusList),
-            skillBonus: data.buffSkillBonus || null,
-            skillBonusAll: data.buffSkillBonusAll || null,
-            saveBonus: data.buffSaveBonus || null,
-            attackBonus: data.buffAttackBonus || null,
-            movement: data.buffMovementEnabled && String(data.buffMovementValue ?? "").trim() ? { enabled: true, mode: data.buffMovementMode === "multiply" ? "multiply" : "add", value: String(data.buffMovementValue).trim(), types: toArray(data.buffMovementTypesList).length ? toArray(data.buffMovementTypesList) : ["walk"] } : null,
-            speed: null,
-            weaponProfs: toArray(data.buffWeaponProfsList),
-            armorProfs: toArray(data.buffArmorProfsList),
-            languages: toArray(data.buffLanguagesList),
-            darkvision: data.buffDarkvision ? Number(data.buffDarkvision) : null,
-            blindsight: data.buffBlindSight ? Number(data.buffBlindSight) : null,
-            tremorsense: data.buffTremorSense ? Number(data.buffTremorSense) : null,
-            truesight: data.buffTrueSight ? Number(data.buffTrueSight) : null,
-            sensesSpecial: data.buffSensesSpecial || null,
-            passivePerception: data.buffPassivePerception ? Number(data.buffPassivePerception) : null,
-            resistances: toArray(data.buffResistancesList),
-            vulnerabilities: toArray(data.buffVulnsList),
-            immunities: toArray(data.buffImmunitiesList),
-            conditionImmunities: toArray(data.buffConditionImmunitiesList),
-          };
-        })(),
-      };
+    if (!data.enabled) {
+      await this.item.unsetFlag(MODULE_ID, "buffTrigger");
+    } else {
+      const flag = buildBuffConfigFromForm(form);
       const itemDuration = buildItemDurationData(this.item);
       if (itemDuration) {
         flag.duration = itemDuration;
-        await this.item.update({
-          [`flags.${MODULE_ID}.buffTrigger`]: flag,
-        });
       } else {
         delete flag.duration;
-        await this.item.update({
-          [`flags.${MODULE_ID}.buffTrigger`]: flag,
-          [`flags.${MODULE_ID}.buffTrigger.-=duration`]: null,
-        });
       }
+      await this.item.unsetFlag(MODULE_ID, "buffTrigger");
+      await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
     }
-    debugLog(`[${MODULE_ID}] Configuration sauvegardée sur ${this.item.name}`);
+    debugLog(`[${MODULE_ID}] Configuration sauvegardee sur ${this.item.name}`);
   }
 }
 
@@ -1284,10 +1247,11 @@ function buildBuffConfigFromForm(form) {
     condition: readFormValue(form, "condition", "hit"),
     receivedAttackType: readFormValue(form, "receivedAttackType", "any"),
     receivedDamageTypes: readCsvFormValue(form, "receivedDamageTypesList"),
-    targetFilters: (() => {
-      const creatureTypes = readCsvFormValue(form, "targetFilterCreatureTypesList");
-      return creatureTypes.length ? { creatureTypes } : null;
-    })(),
+    targetFilters: buildTargetFilters(
+      readCsvFormValue(form, "targetFilterCreatureTypesList"),
+      readCsvFormValue(form, "excludedTargetFilterCreatureTypesList"),
+      readTargetFilterAbilityScoresFromForm(form)
+    ),
     consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
     triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
     endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt")) ? {
@@ -1509,7 +1473,7 @@ function setTagList(form, targetId, values = []) {
   const tags = form.querySelector?.(`#tags-${targetId}`);
   const select = form.querySelector?.(`#tags-${targetId} + select, select[onchange*="${targetId}"]`);
   const hidden = form.querySelector?.(`#hidden-${targetId}`);
-  const cleanValues = values.filter(Boolean);
+  const cleanValues = toSafeArray(values);
   if (!tags || !hidden) return;
 
   for (const value of cleanValues) {
@@ -1527,13 +1491,14 @@ function formHasDraftConfiguration(form) {
   const app = form?.__botApp;
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
-    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
+    "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "buffIncomingAttackMode",
     "buffIncomingAttackCreatureTypesList",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
+    ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("targetFilterAbilityMin", ability), abilityFieldName("targetFilterAbilityMax", ability)]),
     ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("buffAbilityCheckModifier", ability), abilityFieldName("buffSavingThrowModifier", ability)]),
   ];
   return relevantFields.some((name) => {
@@ -1542,7 +1507,7 @@ function formHasDraftConfiguration(form) {
     if (field.type === "checkbox") return field.checked;
     return String(field.value ?? "").trim() !== "";
   }) || [
-    "receivedDamageTypesList", "targetFilterCreatureTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
+    "receivedDamageTypesList", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
     "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
@@ -1568,26 +1533,31 @@ function getSummaryLabels() {
 }
 
 function updateSummaryFromFlag(form, flag) {
-  const list = form?.querySelector?.(".bot-summary-list");
-  if (!list) return;
-  const app = form.__botApp;
-  const itemDurationRounds = app?.item ? getItemDurationInRounds(app.item) : null;
-  const summary = buildConfigSummary(flag, getSummaryLabels(), itemDurationRounds);
-  list.replaceChildren(...summary.map((entry) => {
-    const item = document.createElement("div");
-    item.className = "bot-summary-item";
-    const label = document.createElement("span");
-    label.className = "bot-summary-label";
-    label.textContent = entry.label;
-    const value = document.createElement("span");
-    value.className = "bot-summary-value";
-    value.textContent = entry.value;
-    item.append(label, value);
-    return item;
-  }));
+  try {
+    const list = form?.querySelector?.(".bot-summary-list");
+    if (!list) return;
+    const app = form.__botApp;
+    const itemDurationRounds = app?.item ? getItemDurationInRounds(app.item) : null;
+    const summary = buildConfigSummary(flag ?? buildDefaultBuffConfig(), getSummaryLabels(), itemDurationRounds);
+    list.replaceChildren(...summary.map((entry) => {
+      const item = document.createElement("div");
+      item.className = "bot-summary-item";
+      const label = document.createElement("span");
+      label.className = "bot-summary-label";
+      label.textContent = entry.label;
+      const value = document.createElement("span");
+      value.className = "bot-summary-value";
+      value.textContent = entry.value;
+      item.append(label, value);
+      return item;
+    }));
+  } catch (error) {
+    debugLog(`[${MODULE_ID}] Summary refresh ignored after form update: ${error.message}`);
+  }
 }
 
 function applyPresetFlagToForm(form, flag) {
+  flag = convertPresetMovementDistances(mergeBuffConfig(buildDefaultBuffConfig(), flag ?? {}), form?.__botApp?.item?.parent ?? null);
   const rollTypes = flag.rollModifier?.rollTypes ?? [];
 
   setFormValue(form, "enabled", true);
@@ -1601,6 +1571,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "receivedAttackType", flag.receivedAttackType ?? "any");
   setTagList(form, "receivedDamageTypesList", flag.receivedDamageTypes ?? []);
   setTagList(form, "targetFilterCreatureTypesList", flag.targetFilters?.creatureTypes ?? []);
+  setTagList(form, "excludedTargetFilterCreatureTypesList", flag.targetFilters?.excludedCreatureTypes ?? []);
 
   setFormValue(form, "rollModifierEnabled", !!flag.rollModifier?.enabled);
   setFormValue(form, "rollModifierFormula", flag.rollModifier?.formula ?? "");
@@ -1658,19 +1629,20 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "buffAttackBonus", flag.buffs?.attackBonus ?? "");
   setFormValue(form, "buffSaveBonus", flag.buffs?.saveBonus ?? "");
   for (const ability of ABILITY_IDS) {
+    setFormValue(form, abilityFieldName("targetFilterAbilityMin", ability), flag.targetFilters?.abilityScores?.[ability]?.min ?? "");
+    setFormValue(form, abilityFieldName("targetFilterAbilityMax", ability), flag.targetFilters?.abilityScores?.[ability]?.max ?? "");
     setFormValue(form, abilityFieldName("buffAbilityCheckModifier", ability), flag.buffs?.abilityCheckModifiers?.[ability] ?? "");
     setFormValue(form, abilityFieldName("buffSavingThrowModifier", ability), flag.buffs?.savingThrowModifiers?.[ability] ?? "");
   }
   setFormValue(form, "buffSkillBonus", flag.buffs?.skillBonus ?? "");
   setFormValue(form, "buffSkillBonusAll", flag.buffs?.skillBonusAll ?? "");
-  const resolvedFlag = convertPresetMovementDistances(flag, form?.__botApp?.item?.parent ?? null);
-  const movement = getConfiguredMovement(resolvedFlag.buffs ?? {});
+  const movement = getConfiguredMovement(flag.buffs ?? {});
   setFormValue(form, "buffMovementEnabled", movement.enabled);
   setFormValue(form, "buffMovementMode", movement.mode);
   setFormValue(form, "buffMovementValue", movement.value);
   setTagList(form, "buffMovementTypesList", movement.types);
-  setFormValue(form, "buffSpeed", resolvedFlag.buffs?.speed?.value ?? "");
-  setFormValue(form, "buffSpeedType", resolvedFlag.buffs?.speed?.type ?? "walk");
+  setFormValue(form, "buffSpeed", flag.buffs?.speed?.value ?? "");
+  setFormValue(form, "buffSpeedType", flag.buffs?.speed?.type ?? "walk");
   setFormValue(form, "buffDarkvision", flag.buffs?.darkvision ?? "");
   setFormValue(form, "buffBlindSight", flag.buffs?.blindsight ?? "");
   setFormValue(form, "buffTremorSense", flag.buffs?.tremorsense ?? "");
@@ -1695,7 +1667,7 @@ function applyPresetFlagToForm(form, flag) {
   setPanelOpen(form, "bot-roll-modifier-panel", !!flag.rollModifier?.enabled);
   setPanelOpen(form, "bot-damage-panel", !!flag.damage?.formula);
   setPanelOpen(form, "bot-save-panel", !!flag.save?.ability);
-  setPanelOpen(form, "bot-status-panel", !!flag.status?.id);
+  setPanelOpen(form, "bot-status-panel", statusIds.length > 0);
 
   window.botUpdateStoredTargetUI(form.querySelector('[name="targetMode"]'));
   window.botUpdateTriggerUI(form.querySelector('[name="type"]'));

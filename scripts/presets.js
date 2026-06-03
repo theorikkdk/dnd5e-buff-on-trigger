@@ -1200,6 +1200,40 @@ export const BUFF_PRESETS = [
     },
   },
   {
+    id: "holdMonster",
+    label: "BOT.presets.holdMonster.label",
+    description: "BOT.presets.holdMonster.description",
+    flag: {
+      targetMode: "target",
+      targetFilters: {
+        excludedCreatureTypes: ["undead"],
+      },
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
+      },
+      status: {
+        id: "paralyzed",
+        ids: ["paralyzed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
     id: "charmPerson",
     label: "BOT.presets.charmPerson.label",
     description: "BOT.presets.charmPerson.description",
@@ -1207,6 +1241,38 @@ export const BUFF_PRESETS = [
       targetMode: "target",
       targetFilters: {
         creatureTypes: ["humanoid"],
+      },
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+      },
+      status: {
+        id: "charmed",
+        ids: ["charmed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "animalFriendship",
+    label: "BOT.presets.animalFriendship.label",
+    description: "BOT.presets.animalFriendship.description",
+    flag: {
+      targetMode: "target",
+      targetFilters: {
+        creatureTypes: ["beast"],
+        abilityScores: {
+          int: { max: 3 },
+        },
       },
       type: "passive",
       save: {
@@ -1263,6 +1329,66 @@ export const BUFF_PRESETS = [
     },
   },
   {
+    id: "dominatePerson",
+    label: "BOT.presets.dominatePerson.label",
+    description: "BOT.presets.dominatePerson.description",
+    flag: {
+      targetMode: "target",
+      targetFilters: {
+        creatureTypes: ["humanoid"],
+      },
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+        repeat: {
+          enabled: true,
+          timing: "endTurn",
+          endsBuffOn: "success",
+        },
+      },
+      status: {
+        id: "charmed",
+        ids: ["charmed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "charmMonster",
+    label: "BOT.presets.charmMonster.label",
+    description: "BOT.presets.charmMonster.description",
+    flag: {
+      targetMode: "target",
+      type: "passive",
+      save: {
+        enabled: true,
+        timing: "activation",
+        ability: "wis",
+        dcSource: "origin",
+        activationApplyOn: "failure",
+      },
+      status: {
+        id: "charmed",
+        ids: ["charmed"],
+        timing: "activation",
+        targetMode: "self",
+        applyCondition: "saveFailure",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
     id: "faerieFire",
     label: "BOT.presets.faerieFire.label",
     description: "BOT.presets.faerieFire.description",
@@ -1289,6 +1415,11 @@ export const BUFF_PRESETS = [
     description: "BOT.presets.tashasHideousLaughter.description",
     flag: {
       targetMode: "target",
+      targetFilters: {
+        abilityScores: {
+          int: { min: 5 },
+        },
+      },
       type: "passive",
       save: {
         enabled: true,
