@@ -1094,7 +1094,7 @@ export const BUFF_PRESETS = [
         enabled: true,
         message: "BOT.presets.protectionFromEvilAndGood.reminder",
         timing: {
-          activation: true,
+          turnStart: true,
         },
         visibility: "gm",
       },
@@ -1117,7 +1117,7 @@ export const BUFF_PRESETS = [
         enabled: true,
         message: "BOT.presets.freedomOfMovement.reminder",
         timing: {
-          activation: true,
+          turnStart: true,
         },
         visibility: "gm",
       },
