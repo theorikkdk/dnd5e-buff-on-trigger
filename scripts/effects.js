@@ -64,6 +64,39 @@ function localize(key) {
   return game.i18n.localize(key);
 }
 
+function resolveReminderMessage(message) {
+  const text = String(message ?? "").trim();
+  if (!text) return "";
+  return text.startsWith("BOT.") ? localize(text) : text;
+}
+
+function escapeReminderText(value) {
+  const text = String(value ?? "");
+  if (foundry.utils.escapeHTML) return foundry.utils.escapeHTML(text);
+  return text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[char]));
+}
+
+function shouldShowBuffReminder(flag, timing) {
+  return flag?.reminders?.enabled === true
+    && flag.reminders?.timing?.[timing] === true
+    && !!resolveReminderMessage(flag.reminders?.message);
+}
+
+export async function showBuffReminder(actor, flag, timing) {
+  if (!shouldShowBuffReminder(flag, timing)) return;
+  const itemName = escapeReminderText(flag.itemName ?? localize("BOT.fallback.effectName"));
+  const message = escapeReminderText(resolveReminderMessage(flag.reminders.message));
+  const content = `<div class="dnd5e-buff-on-trigger-reminder">${game.i18n.format("BOT.chat.reminder", { name: itemName, message })}</div>`;
+  const chatData = {
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content,
+  };
+  if ((flag.reminders.visibility ?? "gm") === "gm") {
+    chatData.whisper = game.users.filter((user) => user.isGM).map((user) => user.id);
+  }
+  await ChatMessage.create(chatData);
+}
+
 function localizeDamageType(type) {
   return game.i18n.localize(DAMAGE_LABEL_KEYS[type] ?? type);
 }
@@ -1634,6 +1667,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
           return;
         }
+        await showBuffReminder(actor, currentFlag, "buffEnd");
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         debugLog(`[${MODULE_ID}] Buff �puis� � toutes les charges consomm�es`);
@@ -1671,6 +1705,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
         return;
       }
+      await showBuffReminder(actor, currentFlag, "buffEnd");
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
       debugLog(`[${MODULE_ID}] Buff consomm� sur ${actor?.name}`);

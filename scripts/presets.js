@@ -368,6 +368,14 @@ export const BUFF_PRESETS = [
         type: "radiant",
         targetMode: "triggerTarget",
       },
+      reminders: {
+        enabled: true,
+        message: "BOT.presets.holyWeapon.reminder",
+        timing: {
+          activation: true,
+        },
+        visibility: "gm",
+      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },
@@ -1082,6 +1090,14 @@ export const BUFF_PRESETS = [
         incomingAttackCreatureTypes: ["aberration", "celestial", "elemental", "fey", "fiend", "undead"],
         conditionImmunities: ["charmed", "frightened"],
       },
+      reminders: {
+        enabled: true,
+        message: "BOT.presets.protectionFromEvilAndGood.reminder",
+        timing: {
+          activation: true,
+        },
+        visibility: "gm",
+      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },
@@ -1096,6 +1112,14 @@ export const BUFF_PRESETS = [
       type: "passive",
       buffs: {
         conditionImmunities: ["restrained", "paralyzed"],
+      },
+      reminders: {
+        enabled: true,
+        message: "BOT.presets.freedomOfMovement.reminder",
+        timing: {
+          activation: true,
+        },
+        visibility: "gm",
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
@@ -1521,6 +1545,14 @@ export const BUFF_PRESETS = [
           dex: "-2",
         },
         movement: { enabled: true, mode: "multiply", value: "0.5", types: ["all"] },
+      },
+      reminders: {
+        enabled: true,
+        message: "BOT.presets.slow.reminder",
+        timing: {
+          turnStart: true,
+        },
+        visibility: "gm",
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",

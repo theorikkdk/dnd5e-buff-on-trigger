@@ -413,6 +413,16 @@ function getEndConditionSummaryLabels(endConditions) {
   ].filter(Boolean);
 }
 
+function getReminderSummaryLabels(reminders) {
+  if (reminders?.enabled !== true) return [];
+  return [
+    reminders.timing?.activation ? game.i18n.localize("BOT.ui.reminders.summary.activation") : null,
+    reminders.timing?.turnStart ? game.i18n.localize("BOT.ui.reminders.summary.turnStart") : null,
+    reminders.timing?.turnEnd ? game.i18n.localize("BOT.ui.reminders.summary.turnEnd") : null,
+    reminders.timing?.buffEnd ? game.i18n.localize("BOT.ui.reminders.summary.buffEnd") : null,
+  ].filter(Boolean);
+}
+
 function normalizeDamageTargetMode(targetMode) {
   if (targetMode === "target") return "triggerTarget";
   return ["triggerTarget", "self", "attacker", "storedTarget"].includes(targetMode) ? targetMode : "triggerTarget";
@@ -789,6 +799,14 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     });
   }
 
+  const reminderLabels = getReminderSummaryLabels(raw.reminders);
+  if (reminderLabels.length) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.reminders"),
+      value: reminderLabels.join(", ")
+    });
+  }
+
   summary.push({
     label: game.i18n.localize("BOT.ui.summary.consumeOnTrigger"),
     value: game.i18n.localize(raw.consumeOnTrigger ?? true ? "BOT.ui.common.yes" : "BOT.ui.common.no")
@@ -998,6 +1016,14 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       endConditionOnAttack:      !!raw.endConditions?.onAttack,
       endConditionOnSpellCast:  !!raw.endConditions?.onSpellCast,
       endConditionOnDamageDealt: !!raw.endConditions?.onDamageDealt,
+      remindersEnabled:          !!raw.reminders?.enabled,
+      remindersMessage:          raw.reminders?.message ?? "",
+      remindersTimingActivation: !!raw.reminders?.timing?.activation,
+      remindersTimingTurnStart:  !!raw.reminders?.timing?.turnStart,
+      remindersTimingTurnEnd:    !!raw.reminders?.timing?.turnEnd,
+      remindersTimingBuffEnd:    !!raw.reminders?.timing?.buffEnd,
+      remindersVisibilityGM:     (raw.reminders?.visibility ?? "gm") === "gm",
+      remindersVisibilityPublic: (raw.reminders?.visibility ?? "gm") === "public",
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
@@ -1302,6 +1328,17 @@ function buildBuffConfigFromForm(form) {
       onSpellCast: !!readFormValue(form, "endConditionOnSpellCast"),
       onDamageDealt: !!readFormValue(form, "endConditionOnDamageDealt"),
     } : null,
+    reminders: readFormValue(form, "remindersEnabled") && String(readFormValue(form, "remindersMessage", "")).trim() ? {
+      enabled: true,
+      message: String(readFormValue(form, "remindersMessage", "")).trim(),
+      timing: {
+        activation: !!readFormValue(form, "remindersTimingActivation"),
+        turnStart: !!readFormValue(form, "remindersTimingTurnStart"),
+        turnEnd: !!readFormValue(form, "remindersTimingTurnEnd"),
+        buffEnd: !!readFormValue(form, "remindersTimingBuffEnd"),
+      },
+      visibility: readFormValue(form, "remindersVisibility", "gm") === "public" ? "public" : "gm",
+    } : null,
     charges: readNumberFormValue(form, "charges"),
     damage: damageFormula ? {
       formula: damageFormula,
@@ -1429,6 +1466,7 @@ function buildDefaultBuffConfig() {
     consumeOnTrigger: true,
     triggerFrequency: "none",
     endConditions: null,
+    reminders: null,
     charges: null,
     damage: null,
     save: null,
@@ -1539,6 +1577,7 @@ function formHasDraftConfiguration(form) {
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
+    "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
     "buffIncomingAttackCreatureTypesList",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
@@ -1668,6 +1707,14 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "endConditionOnAttack", !!flag.endConditions?.onAttack);
   setFormValue(form, "endConditionOnSpellCast", !!flag.endConditions?.onSpellCast);
   setFormValue(form, "endConditionOnDamageDealt", !!flag.endConditions?.onDamageDealt);
+  const reminderMessage = String(flag.reminders?.message ?? "");
+  setFormValue(form, "remindersEnabled", !!flag.reminders?.enabled);
+  setFormValue(form, "remindersMessage", reminderMessage.startsWith("BOT.") ? game.i18n.localize(reminderMessage) : reminderMessage);
+  setFormValue(form, "remindersTimingActivation", !!flag.reminders?.timing?.activation);
+  setFormValue(form, "remindersTimingTurnStart", !!flag.reminders?.timing?.turnStart);
+  setFormValue(form, "remindersTimingTurnEnd", !!flag.reminders?.timing?.turnEnd);
+  setFormValue(form, "remindersTimingBuffEnd", !!flag.reminders?.timing?.buffEnd);
+  setFormValue(form, "remindersVisibility", flag.reminders?.visibility ?? "gm");
   setFormValue(form, "charges", flag.charges ?? "");
 
   setFormValue(form, "buffAttackMode", flag.buffs?.attackMode ?? "none");

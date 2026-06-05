@@ -872,6 +872,42 @@
         <span>{{localize "BOT.ui.endConditions.onDamageDealt"}}</span>
       </label>
     </section>
+    <section class="bot-inline-panel">
+      <h3 class="bot-summary-title">{{localize "BOT.ui.reminders.title"}}</h3>
+      <label class="bot-check-row">
+        <input type="checkbox" name="remindersEnabled" {{#if flag.remindersEnabled}}checked{{/if}} />
+        <span>{{localize "BOT.ui.reminders.enabled"}}</span>
+      </label>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.reminders.message"}}</label>
+        <textarea name="remindersMessage" rows="3">{{flag.remindersMessage}}</textarea>
+      </div>
+      <div class="bot-responsive-grid">
+        <label class="bot-check-row">
+          <input type="checkbox" name="remindersTimingActivation" {{#if flag.remindersTimingActivation}}checked{{/if}} />
+          <span>{{localize "BOT.ui.reminders.timing.activation"}}</span>
+        </label>
+        <label class="bot-check-row">
+          <input type="checkbox" name="remindersTimingTurnStart" {{#if flag.remindersTimingTurnStart}}checked{{/if}} />
+          <span>{{localize "BOT.ui.reminders.timing.turnStart"}}</span>
+        </label>
+        <label class="bot-check-row">
+          <input type="checkbox" name="remindersTimingTurnEnd" {{#if flag.remindersTimingTurnEnd}}checked{{/if}} />
+          <span>{{localize "BOT.ui.reminders.timing.turnEnd"}}</span>
+        </label>
+        <label class="bot-check-row">
+          <input type="checkbox" name="remindersTimingBuffEnd" {{#if flag.remindersTimingBuffEnd}}checked{{/if}} />
+          <span>{{localize "BOT.ui.reminders.timing.buffEnd"}}</span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label>{{localize "BOT.ui.reminders.visibilityLabel"}}</label>
+        <select name="remindersVisibility">
+          <option value="gm" {{#if flag.remindersVisibilityGM}}selected{{/if}}>{{localize "BOT.ui.reminders.visibility.gm"}}</option>
+          <option value="public" {{#if flag.remindersVisibilityPublic}}selected{{/if}}>{{localize "BOT.ui.reminders.visibility.public"}}</option>
+        </select>
+      </div>
+    </section>
     <div class="form-group">
       <label>{{localize "BOT.ui.settings.durationRounds"}}</label>
       <p class="bot-duration-info">{{flag.itemDurationLabel}}</p>
