@@ -142,6 +142,7 @@
       </select>
     </div>
     <p class="hint" id="bot-passive-help" {{#unless flag.typePassive}}style="display:none"{{/unless}}>{{localize "BOT.ui.trigger.passiveHelp"}}</p>
+    <p class="hint" id="bot-recurring-turn-help" {{#unless flag.showRecurringTurnHelp}}style="display:none"{{/unless}}>{{localize "BOT.ui.trigger.recurringTurnHelp"}}</p>
     <div class="form-group" id="bot-condition-group" {{#unless flag.showAttackCondition}}style="display:none"{{/unless}}>
       <label>{{localize "BOT.ui.condition.label"}}</label>
       <select name="condition">

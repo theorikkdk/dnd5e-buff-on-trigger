@@ -688,5 +688,15 @@
   "BOT.presets.holyWeapon.reminder": "The spell’s final burst must be handled manually.",
   "BOT.presets.freedomOfMovement.reminder": "Manually check effects related to difficult terrain, swimming, and specific restraints.",
   "BOT.presets.protectionFromEvilAndGood.reminder": "Possession and some specific interactions must be handled manually.",
-  "BOT.ui.reminders.visibilityLabel": "Visibility"
+  "BOT.ui.reminders.visibilityLabel": "Visibility",
+  "BOT.ui.trigger.recurringTurnHelp": "This trigger is useful for recurring effects: damage, healing, temporary hit points, or statuses applied on each of the bearer’s turns.",
+  "BOT.ui.summary.recurringEffect": "Recurring effect",
+  "BOT.ui.recurringEffect.summary": "{effect} at each {timing}",
+  "BOT.ui.recurringEffect.timing.turnStart": "turn start",
+  "BOT.ui.recurringEffect.timing.turnEnd": "turn end",
+  "BOT.ui.recurringEffect.healing": "healing {formula}",
+  "BOT.ui.recurringEffect.temporaryHp": "temporary HP {formula}",
+  "BOT.ui.recurringEffect.status": "status {statuses}",
+  "BOT.presets.simpleRegeneration.label": "Simple Regeneration",
+  "BOT.presets.simpleRegeneration.description": "At the start of the bearer’s turn, they regain 1d6 hit points."
 }

@@ -423,6 +423,38 @@ function getReminderSummaryLabels(reminders) {
   ].filter(Boolean);
 }
 
+function isBearerTurnTrigger(type) {
+  return type === "turnStart" || type === "turnEnd";
+}
+
+function getRecurringTriggerTimingLabel(type) {
+  return game.i18n.localize(type === "turnEnd" ? "BOT.ui.recurringEffect.timing.turnEnd" : "BOT.ui.recurringEffect.timing.turnStart");
+}
+
+function buildRecurringEffectSummary(raw, labels) {
+  if (!isBearerTurnTrigger(raw?.type)) return null;
+  const effects = [];
+  if (raw.damage?.formula) {
+    const damageType = raw.damage.type ? labels.damageTypes?.[raw.damage.type] ?? raw.damage.type : "";
+    effects.push([raw.damage.formula, damageType].filter(Boolean).join(" "));
+  }
+  if (raw.healing?.formula) {
+    effects.push(game.i18n.format("BOT.ui.recurringEffect.healing", { formula: raw.healing.formula }));
+  }
+  if (raw.temporaryHp?.formula) {
+    effects.push(game.i18n.format("BOT.ui.recurringEffect.temporaryHp", { formula: raw.temporaryHp.formula }));
+  }
+  const statusIds = getConfiguredStatusIds(raw.status);
+  if (statusIds.length && ["trigger", "both"].includes(raw.status?.timing ?? "trigger")) {
+    effects.push(game.i18n.format("BOT.ui.recurringEffect.status", { statuses: statusIds.map((id) => labels.statuses?.[id] ?? id).join(", ") }));
+  }
+  if (!effects.length) return null;
+  return game.i18n.format("BOT.ui.recurringEffect.summary", {
+    effect: effects.join(" + "),
+    timing: getRecurringTriggerTimingLabel(raw.type),
+  });
+}
+
 function normalizeDamageTargetMode(targetMode) {
   if (targetMode === "target") return "triggerTarget";
   return ["triggerTarget", "self", "attacker", "storedTarget"].includes(targetMode) ? targetMode : "triggerTarget";
@@ -660,6 +692,14 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     { label: game.i18n.localize("BOT.ui.summary.requireStoredTargetMatch"), value: game.i18n.localize(raw.requireStoredTargetMatch ? "BOT.ui.common.yes" : "BOT.ui.common.no") },
   ];
   if (raw.requireBearerTemporaryHp) summary.push({ label: game.i18n.localize("BOT.ui.summary.temporaryHpCondition"), value: game.i18n.localize("BOT.ui.summary.temporaryHpConditionBearer") });
+
+  const recurringEffectSummary = buildRecurringEffectSummary(raw, labels);
+  if (recurringEffectSummary) {
+    summary.push({
+      label: game.i18n.localize("BOT.ui.summary.recurringEffect"),
+      value: recurringEffectSummary
+    });
+  }
 
   const targetFilterSummary = buildTargetFilterSummary(raw.targetFilters, labels);
   if (targetFilterSummary) {
@@ -1007,6 +1047,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       typeHealed:            raw.type === "healed",
       typeTurnStart:         raw.type === "turnStart",
       typeTurnEnd:           raw.type === "turnEnd",
+      showRecurringTurnHelp: isBearerTurnTrigger(raw.type),
       typeTargetTurnStart:   raw.type === "targetTurnStart",
       typeTargetTurnEnd:     raw.type === "targetTurnEnd",
       consumeOnTrigger:      raw.consumeOnTrigger ?? true,
@@ -2056,6 +2097,7 @@ window.botUpdateTriggerUI = function(selectEl) {
   const conditionGroup = form?.querySelector?.("#bot-condition-group");
   const receivedConditionsGroup = form?.querySelector?.("#bot-received-conditions-group");
   const passiveHelp = form?.querySelector?.("#bot-passive-help");
+  const recurringTurnHelp = form?.querySelector?.("#bot-recurring-turn-help");
 
   if (conditionGroup) {
     conditionGroup.style.display = ATTACK_TRIGGER_TYPES.includes(selectEl.value) ? "" : "none";
@@ -2069,7 +2111,19 @@ window.botUpdateTriggerUI = function(selectEl) {
     passiveHelp.style.display = selectEl.value === "passive" ? "" : "none";
   }
 
+  if (recurringTurnHelp) {
+    recurringTurnHelp.style.display = isBearerTurnTrigger(selectEl.value) ? "" : "none";
+  }
+
   window.botUpdateTargetModeOptions(form, selectEl.value);
+
+  const consumeInput = form?.querySelector?.('[name="consumeOnTrigger"]');
+  const chargesInput = form?.querySelector?.('[name="charges"]');
+  const initialized = selectEl.dataset.botTriggerInitialized === "true";
+  if (initialized && isBearerTurnTrigger(selectEl.value) && consumeInput?.checked && !String(chargesInput?.value ?? "").trim()) {
+    consumeInput.checked = false;
+  }
+  selectEl.dataset.botTriggerInitialized = "true";
 
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");

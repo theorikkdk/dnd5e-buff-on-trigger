@@ -688,5 +688,15 @@
   "BOT.presets.holyWeapon.reminder": "La décharge finale du sort doit être gérée manuellement.",
   "BOT.presets.freedomOfMovement.reminder": "Vérifiez manuellement les effets liés au terrain difficile, à la nage et aux entraves spécifiques.",
   "BOT.presets.protectionFromEvilAndGood.reminder": "La possession et certaines interactions spécifiques doivent être gérées manuellement.",
-  "BOT.ui.reminders.visibilityLabel": "Visibilité"
+  "BOT.ui.reminders.visibilityLabel": "Visibilité",
+  "BOT.ui.trigger.recurringTurnHelp": "Ce déclencheur est utile pour les effets récurrents : dégâts, soins, PV temporaires ou statuts appliqués à chaque tour du porteur.",
+  "BOT.ui.summary.recurringEffect": "Effet récurrent",
+  "BOT.ui.recurringEffect.summary": "{effect} à chaque {timing}",
+  "BOT.ui.recurringEffect.timing.turnStart": "début de tour",
+  "BOT.ui.recurringEffect.timing.turnEnd": "fin de tour",
+  "BOT.ui.recurringEffect.healing": "soin {formula}",
+  "BOT.ui.recurringEffect.temporaryHp": "PV temporaires {formula}",
+  "BOT.ui.recurringEffect.status": "statut {statuses}",
+  "BOT.presets.simpleRegeneration.label": "Régénération simple / Simple Regeneration",
+  "BOT.presets.simpleRegeneration.description": "Au début du tour du porteur, il récupère 1d6 points de vie."
 }

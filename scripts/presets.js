@@ -205,6 +205,22 @@ export const BUFF_PRESETS = [
     },
   },
   {
+    id: "simpleRegeneration",
+    label: "BOT.presets.simpleRegeneration.label",
+    description: "BOT.presets.simpleRegeneration.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "turnStart",
+      healing: {
+        formula: "1d6",
+        targetMode: "self",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
     id: "divineFavor",
     label: "BOT.presets.divineFavor.label",
     description: "BOT.presets.divineFavor.description",
