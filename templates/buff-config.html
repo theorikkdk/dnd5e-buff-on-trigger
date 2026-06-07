@@ -281,6 +281,12 @@
             <option value="origin" {{#if flag.saveDcSourceOrigin}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.origin"}}</option>
             <option value="owner" {{#if flag.saveDcSourceOwner}}selected{{/if}}>{{localize "BOT.ui.saveDcSource.owner"}}</option>
           </select>
+          <label class="bot-label-sm">{{localize "BOT.ui.saveRollMode.label"}}</label>
+          <select name="saveRollMode" class="bot-input-flex">
+            <option value="normal" {{#if flag.saveRollModeNormal}}selected{{/if}}>{{localize "BOT.ui.saveRollMode.normal"}}</option>
+            <option value="advantage" {{#if flag.saveRollModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.saveRollMode.advantage"}}</option>
+            <option value="disadvantage" {{#if flag.saveRollModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.saveRollMode.disadvantage"}}</option>
+          </select>
         </div>
         <div class="bot-row bot-save-row">
           <label class="bot-label-sm">{{localize "BOT.ui.saveTiming.label"}}</label>
@@ -324,6 +330,12 @@
             <select name="saveRepeatEndsBuffOn" class="bot-input-flex">
               <option value="success" {{#if flag.saveRepeatEndsBuffOnSuccess}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.endsBuffOn.success"}}</option>
               <option value="failure" {{#if flag.saveRepeatEndsBuffOnFailure}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.endsBuffOn.failure"}}</option>
+            </select>
+            <label class="bot-label-sm">{{localize "BOT.ui.saveRepeat.rollMode.label"}}</label>
+            <select name="saveRepeatRollMode" class="bot-input-flex">
+              <option value="normal" {{#if flag.saveRepeatRollModeNormal}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.rollMode.normal"}}</option>
+              <option value="advantage" {{#if flag.saveRepeatRollModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.rollMode.advantage"}}</option>
+              <option value="disadvantage" {{#if flag.saveRepeatRollModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.rollMode.disadvantage"}}</option>
             </select>
           </div>
           <label class="bot-check-row">

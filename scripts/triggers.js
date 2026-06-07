@@ -5,6 +5,7 @@ import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffI
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
 const SAVE_REPEAT_DAMAGE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
+const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const INCOMING_ATTACK_CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
 const CREATURE_TYPE_ALIASES = {
@@ -1033,6 +1034,31 @@ function normalizeDamagedRepeatedSaveRollMode(value) {
   return SAVE_REPEAT_DAMAGE_ROLL_MODES.includes(value) ? value : "normal";
 }
 
+function normalizeSaveRollMode(value) {
+  return SAVE_ROLL_MODES.includes(value) ? value : "normal";
+}
+
+function applySaveRollModeToConfig(config, rollMode) {
+  const normalized = normalizeSaveRollMode(rollMode);
+  if (normalized === "advantage") {
+    config.advantage = true;
+    config.disadvantage = false;
+  } else if (normalized === "disadvantage") {
+    config.advantage = false;
+    config.disadvantage = true;
+  }
+  return config;
+}
+
+function buildConfiguredSaveRollConfig(save, saveDc) {
+  return applySaveRollModeToConfig({
+    ability: save.ability,
+    target: saveDc,
+    targetValue: saveDc,
+    dc: saveDc,
+  }, save.rollMode);
+}
+
 function buildRepeatedSaveRollConfig(flag, saveDc, timing) {
   const config = {
     ability: flag.save.ability,
@@ -1040,16 +1066,10 @@ function buildRepeatedSaveRollConfig(flag, saveDc, timing) {
     targetValue: saveDc,
     dc: saveDc,
   };
-  if (timing !== "damaged") return config;
-  const rollMode = normalizeDamagedRepeatedSaveRollMode(flag.save.repeat?.onDamagedRollMode);
-  if (rollMode === "advantage") {
-    config.advantage = true;
-    config.disadvantage = false;
-  } else if (rollMode === "disadvantage") {
-    config.advantage = false;
-    config.disadvantage = true;
-  }
-  return config;
+  const rollMode = timing === "damaged"
+    ? flag.save.repeat?.onDamagedRollMode
+    : flag.save.repeat?.rollMode;
+  return applySaveRollModeToConfig(config, rollMode);
 }
 
 function resolveActorUuid(uuid) {
@@ -1187,7 +1207,9 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
       linkedFlag?.saveDcSource ?? "fixed",
       linkedFlag?.saveDc ?? "",
       linkedFlag?.saveRepeat?.endsBuffOn ?? "success",
-      timing === "damaged" ? normalizeDamagedRepeatedSaveRollMode(linkedFlag?.saveRepeat?.onDamagedRollMode) : "turn",
+      timing === "damaged"
+        ? normalizeDamagedRepeatedSaveRollMode(linkedFlag?.saveRepeat?.onDamagedRollMode)
+        : normalizeSaveRollMode(linkedFlag?.saveRepeat?.rollMode),
     ].join("|");
     const group = groups.get(key) ?? { linkedFlag, effects: [] };
     group.effects.push(effect);
@@ -1358,12 +1380,7 @@ async function shouldApplyBuffAfterActivationSave(workflow, activeFlag, targetTo
   }
 
   const saveRolls = await targetToken.actor.rollSavingThrow(
-    {
-      ability: activeFlag.save.ability,
-      target: saveDc,
-      targetValue: saveDc,
-      dc: saveDc,
-    },
+    buildConfiguredSaveRollConfig(activeFlag.save, saveDc),
     { configure: false },
     { create: true }
   );

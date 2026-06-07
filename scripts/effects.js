@@ -19,6 +19,7 @@ const DAMAGE_LABEL_KEYS = {
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
+const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
   "celestial": "celestial",
@@ -68,6 +69,32 @@ function resolveReminderMessage(message) {
   const text = String(message ?? "").trim();
   if (!text) return "";
   return text.startsWith("BOT.") ? localize(text) : text;
+}
+
+function normalizeSaveRollMode(value) {
+  return SAVE_ROLL_MODES.includes(value) ? value : "normal";
+}
+
+function applySaveRollModeToConfig(config, rollMode) {
+  const normalized = normalizeSaveRollMode(rollMode);
+  if (normalized === "advantage") {
+    config.advantage = true;
+    config.disadvantage = false;
+  } else if (normalized === "disadvantage") {
+    config.advantage = false;
+    config.disadvantage = true;
+  }
+  return config;
+}
+
+function buildConfiguredSaveRollConfig(save, saveDc) {
+  return applySaveRollModeToConfig({
+    ability: save.ability,
+    // Provide DC context to dnd5e so the native save card can display target information when supported.
+    target: saveDc,
+    targetValue: saveDc,
+    dc: saveDc
+  }, save.rollMode);
 }
 
 function escapeReminderText(value) {
@@ -1072,13 +1099,7 @@ async function resolveConfiguredSavingThrows(workflow, flag) {
     }
 
     const saveRolls = await targetActor.rollSavingThrow(
-      {
-        ability: flag.save.ability,
-        // Provide DC context to dnd5e so the native save card can display target information when supported.
-        target: saveDc,
-        targetValue: saveDc,
-        dc: saveDc
-      },
+      buildConfiguredSaveRollConfig(flag.save, saveDc),
       { configure: false },
       { create: true }
     );

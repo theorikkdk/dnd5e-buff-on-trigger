@@ -494,21 +494,37 @@ function getSaveRepeatTimingLabel(timing) {
 function getSaveRepeatEndsBuffOnLabel(value) {
   return game.i18n.localize(`BOT.ui.saveRepeat.endsBuffOn.${value ?? "success"}`);
 }
-function normalizeSaveRepeatOnDamagedRollMode(value) {
+function normalizeSaveRollMode(value) {
   return ["advantage", "disadvantage"].includes(value) ? value : "normal";
+}
+function getSaveRollModeLabel(value) {
+  return game.i18n.localize(`BOT.ui.saveRollMode.${normalizeSaveRollMode(value)}`);
+}
+function normalizeSaveRepeatOnDamagedRollMode(value) {
+  return normalizeSaveRollMode(value);
+}
+function getSaveRepeatRollModeLabel(value) {
+  return game.i18n.localize(`BOT.ui.saveRepeat.rollMode.${normalizeSaveRollMode(value)}`);
 }
 function getSaveRepeatOnDamagedRollModeLabel(value) {
   return game.i18n.localize(`BOT.ui.saveRepeat.onDamagedRollMode.${normalizeSaveRepeatOnDamagedRollMode(value)}`);
 }
 function getSaveRepeatTimingSummary(repeat) {
   const timing = getSaveRepeatTimingLabel(repeat?.timing);
-  if (!repeat?.onDamaged) return timing;
+  const repeatRollMode = normalizeSaveRollMode(repeat?.rollMode);
+  const timingWithRollMode = repeatRollMode === "normal"
+    ? timing
+    : game.i18n.format("BOT.ui.summary.saveRepeatTimingWithRollMode", {
+      timing,
+      rollMode: getSaveRepeatRollModeLabel(repeatRollMode).toLowerCase(),
+    });
+  if (!repeat?.onDamaged) return timingWithRollMode;
   const rollMode = normalizeSaveRepeatOnDamagedRollMode(repeat?.onDamagedRollMode);
   if (rollMode === "normal") {
-    return game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamage", { timing });
+    return game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamage", { timing: timingWithRollMode });
   }
   return game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamageRollMode", {
-    timing,
+    timing: timingWithRollMode,
     rollMode: getSaveRepeatOnDamagedRollModeLabel(rollMode).toLowerCase(),
   });
 }
@@ -796,6 +812,8 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     ];
     if (saveTiming === "activation" || saveTiming === "both") parts.push(`${game.i18n.localize("BOT.ui.activationApplyOn.summary")} ${getActivationApplyOnLabel(raw.save.activationApplyOn)}`);
     if (saveTiming === "trigger" || saveTiming === "both") parts.push(`${game.i18n.localize("BOT.ui.success.label")} ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`);
+    const saveRollMode = normalizeSaveRollMode(raw.save.rollMode);
+    if (saveRollMode !== "normal") parts.push(game.i18n.format("BOT.ui.summary.saveRollMode", { rollMode: getSaveRollModeLabel(saveRollMode).toLowerCase() }));
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
       value: parts.join(" - ")
@@ -1175,6 +1193,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveDcSourceFixed:     (raw.save?.dcSource ?? "fixed") === "fixed",
       saveDcSourceOrigin:    raw.save?.dcSource === "origin",
       saveDcSourceOwner:     raw.save?.dcSource === "owner",
+      saveRollModeNormal: normalizeSaveRollMode(raw.save?.rollMode) === "normal",
+      saveRollModeAdvantage: normalizeSaveRollMode(raw.save?.rollMode) === "advantage",
+      saveRollModeDisadvantage: normalizeSaveRollMode(raw.save?.rollMode) === "disadvantage",
       saveTimingTrigger:     (raw.save?.timing ?? "trigger") === "trigger",
       saveTimingActivation:  raw.save?.timing === "activation",
       saveTimingBoth:        raw.save?.timing === "both",
@@ -1190,6 +1211,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveRepeatTimingStartTurn: raw.save?.repeat?.timing === "startTurn",
       saveRepeatEndsBuffOnSuccess: (raw.save?.repeat?.endsBuffOn ?? "success") === "success",
       saveRepeatEndsBuffOnFailure: raw.save?.repeat?.endsBuffOn === "failure",
+      saveRepeatRollModeNormal: normalizeSaveRollMode(raw.save?.repeat?.rollMode) === "normal",
+      saveRepeatRollModeAdvantage: normalizeSaveRollMode(raw.save?.repeat?.rollMode) === "advantage",
+      saveRepeatRollModeDisadvantage: normalizeSaveRollMode(raw.save?.repeat?.rollMode) === "disadvantage",
       saveRepeatOnDamaged:    raw.save?.repeat?.onDamaged === true,
       saveRepeatOnDamagedRollModeNormal: normalizeSaveRepeatOnDamagedRollMode(raw.save?.repeat?.onDamagedRollMode) === "normal",
       saveRepeatOnDamagedRollModeAdvantage: normalizeSaveRepeatOnDamagedRollMode(raw.save?.repeat?.onDamagedRollMode) === "advantage",
@@ -1412,6 +1436,7 @@ function buildBuffConfigFromForm(form) {
       ability: saveAbility,
       dc: Number(readFormValue(form, "saveDC", 15)),
       dcSource: readFormValue(form, "saveDcSource", "fixed"),
+      rollMode: normalizeSaveRollMode(readFormValue(form, "saveRollMode", "normal")),
       timing: readFormValue(form, "saveTiming", "trigger"),
       activationApplyOn: readFormValue(form, "saveActivationApplyOn", "failure"),
       effect: readFormValue(form, "saveEffect", "half"),
@@ -1419,6 +1444,7 @@ function buildBuffConfigFromForm(form) {
         enabled: !!readFormValue(form, "saveRepeatEnabled"),
         timing: readFormValue(form, "saveRepeatTiming", "endTurn"),
         endsBuffOn: readFormValue(form, "saveRepeatEndsBuffOn", "success"),
+        rollMode: normalizeSaveRollMode(readFormValue(form, "saveRepeatRollMode", "normal")),
         onDamaged: !!readFormValue(form, "saveRepeatOnDamaged"),
         onDamagedRollMode: normalizeSaveRepeatOnDamagedRollMode(readFormValue(form, "saveRepeatOnDamagedRollMode", "normal")),
       },
@@ -1638,7 +1664,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
@@ -1740,12 +1766,14 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveAbility", flag.save?.ability ?? "");
   setFormValue(form, "saveDC", flag.save?.dc ?? 15);
   setFormValue(form, "saveDcSource", flag.save?.dcSource ?? "fixed");
+  setFormValue(form, "saveRollMode", normalizeSaveRollMode(flag.save?.rollMode));
   setFormValue(form, "saveTiming", flag.save?.timing ?? "trigger");
   setFormValue(form, "saveActivationApplyOn", flag.save?.activationApplyOn ?? "failure");
   setFormValue(form, "saveEffect", flag.save?.effect ?? "half");
   setFormValue(form, "saveRepeatEnabled", !!flag.save?.repeat?.enabled);
   setFormValue(form, "saveRepeatTiming", flag.save?.repeat?.timing ?? "endTurn");
   setFormValue(form, "saveRepeatEndsBuffOn", flag.save?.repeat?.endsBuffOn ?? "success");
+  setFormValue(form, "saveRepeatRollMode", normalizeSaveRollMode(flag.save?.repeat?.rollMode));
   setFormValue(form, "saveRepeatOnDamaged", !!flag.save?.repeat?.onDamaged);
   setFormValue(form, "saveRepeatOnDamagedRollMode", normalizeSaveRepeatOnDamagedRollMode(flag.save?.repeat?.onDamagedRollMode));
 
