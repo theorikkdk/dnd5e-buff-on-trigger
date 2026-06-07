@@ -330,12 +330,20 @@
             <input type="checkbox" name="saveRepeatOnDamaged" {{#if flag.saveRepeatOnDamaged}}checked{{/if}}>
             <span>{{localize "BOT.ui.saveRepeat.onDamaged"}}</span>
           </label>
+          <div class="bot-row bot-save-row" id="bot-save-repeat-damage-roll-mode" {{#unless flag.saveRepeatOnDamaged}}style="display:none"{{/unless}}>
+            <label class="bot-label-sm">{{localize "BOT.ui.saveRepeat.onDamagedRollMode.label"}}</label>
+            <select name="saveRepeatOnDamagedRollMode" class="bot-input-flex">
+              <option value="normal" {{#if flag.saveRepeatOnDamagedRollModeNormal}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.onDamagedRollMode.normal"}}</option>
+              <option value="advantage" {{#if flag.saveRepeatOnDamagedRollModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.onDamagedRollMode.advantage"}}</option>
+              <option value="disadvantage" {{#if flag.saveRepeatOnDamagedRollModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.saveRepeat.onDamagedRollMode.disadvantage"}}</option>
+            </select>
+          </div>
         </div>
       </div>
     </details>
 
     <details class="bot-collapsible-panel bot-effect-panel" id="bot-status-panel" {{#if flag.hasStatus}}open{{/if}}>
-      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.hasStatus}} � {{flag.statusSummary}}{{/if}}</summary>
+      <summary class="bot-collapsible-summary">{{localize "BOT.ui.summary.status"}}{{#if flag.hasStatus}} - {{flag.statusSummary}}{{/if}}</summary>
       <div class="bot-collapsible-body">
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.status.label"}}</label>

@@ -1515,6 +1515,7 @@ export const BUFF_PRESETS = [
           timing: "endTurn",
           endsBuffOn: "success",
           onDamaged: true,
+          onDamagedRollMode: "advantage",
         },
       },
       status: {

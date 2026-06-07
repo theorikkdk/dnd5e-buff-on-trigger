@@ -23,33 +23,33 @@ const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
   "celestial": "celestial",
   "celeste": "celestial",
-  "c?leste": "celestial",
+  "c\u00e9leste": "celestial",
   "elemental": "elemental",
   "elementaire": "elemental",
-  "?l?mentaire": "elemental",
+  "\u00e9l\u00e9mentaire": "elemental",
   "fey": "fey",
   "fee": "fey",
-  "f?e": "fey",
+  "f\u00e9e": "fey",
   "fiend": "fiend",
   "fielon": "fiend",
-  "fi?lon": "fiend",
+  "fi\u00e9lon": "fiend",
   "undead": "undead",
   "mort-vivant": "undead",
   "mort vivant": "undead",
   "morts-vivants": "undead",
   "beast": "beast",
   "bete": "beast",
-  "b?te": "beast",
+  "b\u00eate": "beast",
   "dragon": "dragon",
   "giant": "giant",
   "geant": "giant",
-  "g?ant": "giant",
+  "g\u00e9ant": "giant",
   "humanoid": "humanoid",
   "humanoide": "humanoid",
-  "humano?de": "humanoid",
+  "humano\u00efde": "humanoid",
   "monstrosity": "monstrosity",
   "monstruosite": "monstrosity",
-  "monstruosit?": "monstrosity",
+  "monstruosit\u00e9": "monstrosity",
   "ooze": "ooze",
   "vase": "ooze",
   "plant": "plant",
@@ -197,7 +197,7 @@ async function deleteDocumentIfExists(document, context = "document") {
   } catch (error) {
     const message = String(error?.message ?? error ?? "");
     if (message.includes("does not exist")) {
-      debugLog(`[${MODULE_ID}] Suppression ignor�e : ${context} d�j� supprim�`, error);
+      debugLog(`[${MODULE_ID}] Suppression ignoree : ${context} deja supprime`, error);
       return false;
     }
     throw error;
@@ -236,7 +236,7 @@ function getChargeCountLabel(count) {
 function getActiveBuffIndicatorName(activeBuff) {
   const baseName = activeBuff.itemName ?? localize("BOT.fallback.effectName");
   const remaining = getRemainingCharges(activeBuff);
-  if (remaining !== null) return `${baseName} � ${getChargeCountLabel(remaining)}`;
+  if (remaining !== null) return `${baseName} - ${getChargeCountLabel(remaining)}`;
   return `${baseName} \u26A1`;
 }
 
@@ -246,7 +246,7 @@ async function updateActiveBuffIndicatorName(actor, activeBuff) {
   try {
     await existing.update({ name: getActiveBuffIndicatorName(activeBuff) });
   } catch (error) {
-    debugLog(`[${MODULE_ID}] Mise � jour de l'indicateur actif ignor�e : effet d�j� supprim�`, error);
+    debugLog(`[${MODULE_ID}] Mise a jour de l'indicateur actif ignoree : effet deja supprime`, error);
   }
 }
 
@@ -414,7 +414,7 @@ async function removeStoredTargetIndicator(ownerActor, flag) {
   for (const effect of existing) {
     await effect.delete();
   }
-  debugLog(`[${MODULE_ID}] Indicateur de marque retir� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque retire sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
 }
 
 export async function refreshStoredTargetIndicator(ownerActor, previousFlag = null) {
@@ -447,7 +447,7 @@ export async function refreshStoredTargetIndicator(ownerActor, previousFlag = nu
     flags: { [MODULE_ID]: metadata.effectFlags },
     duration: {},
   }]);
-  debugLog(`[${MODULE_ID}] Indicateur de marque ajout� sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
 }
 
 export async function resolveSaveDC(workflow, flag) {
@@ -456,7 +456,7 @@ export async function resolveSaveDC(workflow, flag) {
 
   if (source === "fixed") {
     if (fixedDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${fixedDc} via fixed`);
     }
     return fixedDc;
   }
@@ -465,7 +465,7 @@ export async function resolveSaveDC(workflow, flag) {
     const originItem = await resolveDocumentFromUuid(flag.itemUuid) ?? workflow.item ?? null;
     const itemDc = readNumericSaveDCFromItem(originItem);
     if (itemDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${itemDc} via origin-item`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${itemDc} via origin-item`);
       return itemDc;
     }
 
@@ -475,12 +475,12 @@ export async function resolveSaveDC(workflow, flag) {
       ?? null;
     const actorDc = readNumericSaveDCFromActor(originActor);
     if (actorDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${actorDc} via origin-actor`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${actorDc} via origin-actor`);
       return actorDc;
     }
 
     if (fixedDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${fixedDc} via fixed-fallback`);
     }
     return fixedDc;
   }
@@ -488,18 +488,18 @@ export async function resolveSaveDC(workflow, flag) {
   if (source === "owner") {
     const ownerDc = readNumericSaveDCFromActor(workflow.actor);
     if (ownerDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${ownerDc} via owner`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${ownerDc} via owner`);
       return ownerDc;
     }
 
     if (fixedDc !== null) {
-      debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+      debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${fixedDc} via fixed-fallback`);
     }
     return fixedDc;
   }
 
   if (fixedDc !== null) {
-    debugLog(`[${MODULE_ID}] DD de sauvegarde r�solu : ${fixedDc} via fixed-fallback`);
+    debugLog(`[${MODULE_ID}] DD de sauvegarde resolu : ${fixedDc} via fixed-fallback`);
   }
   return fixedDc;
 }
@@ -750,7 +750,7 @@ export async function buildFormulaRollData(workflow, flag) {
     stored: storedData
   };
 
-  debugLog(`[${MODULE_ID}] Donn�es de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
+  debugLog(`[${MODULE_ID}] Donnees de formule : spellLevel=${aliasRollData.spellLevel}, prof=${aliasRollData.prof}`);
   if (attackerActor) {
     debugLog(`[${MODULE_ID}] Source formule attacker : ${attackerActor.name}`);
   }
@@ -921,7 +921,7 @@ function prepareMidiDamageRoll(roll, damageType) {
       }
     }
   } catch (error) {
-    debugLog(`[${MODULE_ID}] Conversion du jet de d�g�ts Midi-QOL ignor�e :`, error);
+    debugLog(`[${MODULE_ID}] Conversion du jet de degats Midi-QOL ignoree :`, error);
   }
 
   return roll;
@@ -932,7 +932,7 @@ async function applyDamageWithMidiWorkflow(workflow, flag, damageType, damageTot
 
   const DamageOnlyWorkflow = globalThis.MidiQOL?.DamageOnlyWorkflow;
   if (typeof DamageOnlyWorkflow !== "function") {
-    console.warn(`[${MODULE_ID}] Workflow de d�g�ts Midi-QOL indisponible, retour au mode automatique`);
+    console.warn(`[${MODULE_ID}] Workflow de degats Midi-QOL indisponible, retour au mode automatique`);
     return false;
   }
 
@@ -954,7 +954,7 @@ async function applyDamageWithMidiWorkflow(workflow, flag, damageType, damageTot
     );
     return true;
   } catch (error) {
-    console.warn(`[${MODULE_ID}] Workflow de d�g�ts Midi-QOL indisponible, retour au mode automatique`, error);
+    console.warn(`[${MODULE_ID}] Workflow de degats Midi-QOL indisponible, retour au mode automatique`, error);
     return false;
   }
 }
@@ -986,7 +986,7 @@ async function createBonusDamageSummaryMessage(workflow, flag, damageType, appli
 
   await ChatMessage.create({
     content: `<div style="border-left: 3px solid #f0a500; padding: 4px 8px;">
-      <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> � ${localize("BOT.chat.bonusDamageSummary.heading")} : ${summaryParts.join(" ")}
+        <strong>${flag.itemName ?? localize("BOT.fallback.effectName")}</strong> - ${localize("BOT.chat.bonusDamageSummary.heading")} : ${summaryParts.join(" ")}
     </div>`,
     speaker: ChatMessage.getSpeaker({ actor: workflow.actor }),
   });
@@ -1010,9 +1010,9 @@ function isTurnTriggerType(type) {
 
 function resolveTriggerTargetTokens(workflow, flag, effectType = "effet") {
   if (isTurnTriggerType(flag.type)) {
-    debugLog(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
+    debugLog(`[${MODULE_ID}] Cible du declenchement indisponible pour ce trigger de tour`);
     if ((flag.condition ?? "hit") !== "hit") {
-      debugLog(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (${effectType})`);
+      debugLog(`[${MODULE_ID}] Condition ignoree pour le trigger de tour (${effectType})`);
     }
     return new Set();
   }
@@ -1091,7 +1091,7 @@ async function resolveConfiguredSavingThrows(workflow, flag) {
 
     const saveRoll = saveRolls[0];
     const success = saveRoll.total >= saveDc;
-    debugLog(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} â€” ${success ? "rÃ©ussite" : "Ã©chec"}`);
+    debugLog(`[${MODULE_ID}] JS ${flag.save.ability} ${saveRoll.total} vs DD ${saveDc} - ${success ? "reussite" : "echec"}`);
     if (success) saveResults.successes.add(tokenKey);
     else saveResults.failures.add(tokenKey);
     saveResults.resolvedCount += 1;
@@ -1372,7 +1372,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     flags: { [MODULE_ID]: { targetIndicator: true } },
     duration: {},
   }]);
-  debugLog(`[${MODULE_ID}] Indicateur posÃ© sur ${targetActor.name}`);
+  debugLog(`[${MODULE_ID}] Indicateur pose sur ${targetActor.name}`);
 }
 
 export async function removeTargetIndicator(targetActor, itemName) {
@@ -1393,7 +1393,7 @@ function resolveTargets(workflow, flag) {
     if (!token) return new Set();
     const targetIds = new Set((workflow.targets ?? []).map((t) => t.id));
     if (!targetIds.has(token.id)) {
-      debugLog(`[${MODULE_ID}] Mode target â€” cible fixe non visÃ©e, pas de dÃ©clenchement`);
+      debugLog(`[${MODULE_ID}] Mode target - cible fixe non visee, pas de declenchement`);
       return new Set();
     }
     if (condition === "hit" && !hitIds.has(token.id)) return new Set();
@@ -1403,9 +1403,9 @@ function resolveTargets(workflow, flag) {
 
   // "self" : les cibles viennent du workflow
   if (isTurnTriggerType(flag.type)) {
-    debugLog(`[${MODULE_ID}] Cible du d�clenchement indisponible pour ce trigger de tour`);
+    debugLog(`[${MODULE_ID}] Cible du declenchement indisponible pour ce trigger de tour`);
     if (condition !== "hit") {
-      debugLog(`[${MODULE_ID}] Condition ignor�e pour le trigger de tour (ciblage par d�faut)`);
+      debugLog(`[${MODULE_ID}] Condition ignoree pour le trigger de tour (ciblage par defaut)`);
     }
     return new Set();
   }
@@ -1494,7 +1494,7 @@ function resolveBonusDamageTargets(workflow, flag) {
   if (!targetMode) return resolveTargets(workflow, flag);
 
   if (targetMode === "triggerTarget") {
-    return resolveTriggerTargetTokens(workflow, flag, "d�g�ts bonus");
+    return resolveTriggerTargetTokens(workflow, flag, "degats bonus");
   }
 
   if (targetMode === "self") {
@@ -1514,7 +1514,7 @@ function resolveBonusDamageTargets(workflow, flag) {
       return new Set();
     }
     if (attackerToken) {
-      debugLog(`[${MODULE_ID}] Cibles d�g�ts bonus r�solues : mode=attacker, cibles=${attackerToken.name}`);
+      debugLog(`[${MODULE_ID}] Cibles degats bonus resolues : mode=attacker, cibles=${attackerToken.name}`);
     }
     return attackerToken ? new Set([attackerToken]) : new Set();
   }
@@ -1647,12 +1647,12 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       const actor = workflow.actor;
       const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
       if (!isSameActiveBuff(currentFlag, flag)) {
-        debugLog(`[${MODULE_ID}] Consommation ignor�e : buff actif d�j� modifi� ou supprim�`);
+        debugLog(`[${MODULE_ID}] Consommation ignoree : buff actif deja modifie ou supprime`);
         return;
       }
       const currentCharges = Number(currentFlag.chargesRemaining);
       if (!Number.isFinite(currentCharges) || currentCharges <= 0) {
-        debugLog(`[${MODULE_ID}] Consommation ignor�e : charges d�j� consomm�es`);
+        debugLog(`[${MODULE_ID}] Consommation ignoree : charges deja consommees`);
         return;
       }
       const newCharges = currentCharges - 1;
@@ -1670,15 +1670,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         await showBuffReminder(actor, currentFlag, "buffEnd");
         await actor?.unsetFlag(MODULE_ID, "activeBuff");
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-        debugLog(`[${MODULE_ID}] Buff �puis� � toutes les charges consomm�es`);
+        debugLog(`[${MODULE_ID}] Buff epuise a toutes les charges consommees`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-        for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet m�canique");
+        for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mecanique");
         const concentrationEffect = actor?.effects.find(
           (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
         );
         if (concentrationEffect) {
           await deleteDocumentIfExists(concentrationEffect, "concentration");
-          debugLog(`[${MODULE_ID}] Concentration retir�e (charges �puis�es) sur ${actor.name}`);
+          debugLog(`[${MODULE_ID}] Concentration retiree (charges epuisees) sur ${actor.name}`);
         }
         await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
         for (const token of targets) {
@@ -1694,7 +1694,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       const actor = workflow.actor;
       const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
       if (!isSameActiveBuff(currentFlag, flag)) {
-        debugLog(`[${MODULE_ID}] Consommation ignor�e : buff actif d�j� modifi� ou supprim�`);
+        debugLog(`[${MODULE_ID}] Consommation ignoree : buff actif deja modifie ou supprime`);
         return;
       }
       if (shouldRetainBuffForRepeatedSave(currentFlag)) {
@@ -1708,15 +1708,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       await showBuffReminder(actor, currentFlag, "buffEnd");
       await actor?.unsetFlag(MODULE_ID, "activeBuff");
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      debugLog(`[${MODULE_ID}] Buff consomm� sur ${actor?.name}`);
+      debugLog(`[${MODULE_ID}] Buff consomme sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-      for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet m�canique");
+      for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mecanique");
       const concentrationEffect = actor?.effects.find(
         (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
       );
       if (concentrationEffect) {
         await deleteDocumentIfExists(concentrationEffect, "concentration");
-        debugLog(`[${MODULE_ID}] Concentration retir�e sur ${actor?.name}`);
+        debugLog(`[${MODULE_ID}] Concentration retiree sur ${actor?.name}`);
       }
       await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
       for (const token of targets) {
@@ -1818,7 +1818,7 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
     const rollList = Array.isArray(rolls) ? rolls : [];
     if (hasFinalizedRollModifier(actor, metadata, rollList)) {
       metadata.consumed = true;
-      debugLog(`[${MODULE_ID}] Consommation roll modifier ignor�e : d�j� trait�e`);
+      debugLog(`[${MODULE_ID}] Consommation roll modifier ignoree : deja traitee`);
       return false;
     }
     if (!rollList.some((roll) => rollContainsModifierFormula(roll, metadata.formula))) {
@@ -1832,7 +1832,7 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
     const flag = actor.getFlag(MODULE_ID, "activeBuff");
     if (!flag?.rollModifier?.enabled) return false;
     if (!reserveRollModifierConsumption(actor, flag, metadata)) {
-      debugLog(`[${MODULE_ID}] Consommation roll modifier ignor�e : d�j� trait�e`);
+      debugLog(`[${MODULE_ID}] Consommation roll modifier ignoree : deja traitee`);
       return false;
     }
 
@@ -1992,19 +1992,19 @@ export function buildMechanicalChanges(flag, actor = null) {
     const modifier = savingThrowModifiers?.[ability];
     if (modifier) changes.push({ key: `system.abilities.${ability}.bonuses.save`, mode: 2, value: String(modifier), priority: 20 });
   }
-  // Avantage sur les compÃ©tences sÃ©lectionnÃ©es
+  // Avantage sur les competences selectionnees
   if (skills?.length) {
     for (const id of skills) {
       changes.push({ key: `flags.midi-qol.advantage.skill.${id}`, mode: 5, value: "1", priority: 20 });
     }
   }
-  // Bonus sur les compÃ©tences sÃ©lectionnÃ©es
+  // Bonus sur les competences selectionnees
   if (skillBonusSkills?.length && skillBonus) {
     for (const id of skillBonusSkills) {
       changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonus), priority: 20 });
     }
   }
-  // Bonus sur TOUTES les compÃ©tences
+  // Bonus sur TOUTES les competences
   if (skillBonusAll) {
     for (const id of SKILL_IDS) {
       changes.push({ key: `system.skills.${id}.bonuses.check`, mode: 2, value: String(skillBonusAll), priority: 20 });
@@ -2070,7 +2070,7 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
       duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
       flags: { [MODULE_ID]: { mechanicalBuff: true } },
     }]);
-    debugLog(`[${MODULE_ID}] Buffs m�caniques appliqu�s sur ${actor.name}`);
+    debugLog(`[${MODULE_ID}] Buffs mecaniques appliques sur ${actor.name}`);
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans applyMechanicalBuffs :`, error);
   }
@@ -2080,7 +2080,7 @@ export async function applyBonusDamage(workflow, flag) {
   try {
     const rawDamageTargetMode = flag.damage?.targetMode;
     const damageTargetMode = normalizeDamageTargetMode(rawDamageTargetMode);
-    debugLog(`[${MODULE_ID}] Cible d�g�ts bonus : raw=${rawDamageTargetMode ?? "absent"}, normalized=${damageTargetMode}`);
+    debugLog(`[${MODULE_ID}] Cible degats bonus : raw=${rawDamageTargetMode ?? "absent"}, normalized=${damageTargetMode}`);
     const resolvedTargets = resolveBonusDamageTargets(workflow, flag);
     const targets = filterBonusDamageTargetsByCreatureType(resolvedTargets, flag);
 
@@ -2106,7 +2106,7 @@ export async function applyBonusDamage(workflow, flag) {
       ? getDnd5eCriticalSettings()
       : null;
     if (systemCriticalSettings?.detected?.length) {
-      debugLog(`[${MODULE_ID}] R�glages critiques dnd5e d�tect�s : maximizeDice=${systemCriticalSettings.maximizeDice}, multiplyModifiers=${systemCriticalSettings.multiplyModifiers}`);
+      debugLog(`[${MODULE_ID}] Reglages critiques dnd5e detectes : maximizeDice=${systemCriticalSettings.maximizeDice}, multiplyModifiers=${systemCriticalSettings.multiplyModifiers}`);
     }
     if (critical && (criticalMode === "system" || criticalMode === "doubleDice" || criticalMode === "maxBaseDice")) {
       // Bonus damage is rolled separately from native dnd5e/Midi-QOL damage resolution,
@@ -2127,7 +2127,7 @@ export async function applyBonusDamage(workflow, flag) {
         formula = doubleDiceFormula(formula);
       }
       if (formula !== flag.damage.formula) {
-        debugLog(`[${MODULE_ID}] Critique : formule des dÃ©gÃ¢ts bonus ajustÃ©e`);
+        debugLog(`[${MODULE_ID}] Critique : formule des degats bonus ajustee`);
       }
     }
     let fullTargets = targets;
@@ -2161,7 +2161,7 @@ export async function applyBonusDamage(workflow, flag) {
     const rollData = await buildFormulaRollData(workflow, flag);
     const roll = await new Roll(formula, rollData).evaluate();
 
-    debugLog(`[${MODULE_ID}] DÃ©gÃ¢ts bonus : ${roll.total} ${damageType}`);
+    debugLog(`[${MODULE_ID}] Degats bonus : ${roll.total} ${damageType}`);
 
     const halfDamage = Math.floor(roll.total / 2);
     const appliedResults = [
@@ -2191,7 +2191,7 @@ export async function applyBonusDamage(workflow, flag) {
       await sendRollMessage(
         workflow.actor,
         roll,
-        `${localize("BOT.chat.bonusDamageRoll")} â€” ${flag.itemName ?? localize("BOT.fallback.effectName")} (${localizeDamageType(damageType)})`,
+        `${localize("BOT.chat.bonusDamageRoll")} - ${flag.itemName ?? localize("BOT.fallback.effectName")} (${localizeDamageType(damageType)})`,
         "bonus-damage"
       );
     }
@@ -2337,7 +2337,7 @@ export async function applyBonusHealing(workflow, flag) {
     await sendRollMessage(
       workflow.actor,
       roll,
-      `${localize("BOT.chat.bonusHealingRoll")} â€” ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
+      `${localize("BOT.chat.bonusHealingRoll")} - ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
       "bonus-healing"
     );
     const healAmount = Math.max(0, roll.total ?? 0);
@@ -2391,7 +2391,7 @@ export async function applyTemporaryHp(workflow, flag, options = {}) {
     await sendRollMessage(
       workflow.actor,
       roll,
-      `${localize("BOT.chat.temporaryHpRoll")} â€” ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
+      `${localize("BOT.chat.temporaryHpRoll")} - ${flag.itemName ?? localize("BOT.fallback.effectName")}`,
       "temporary-hp"
     );
     const tempHpAmount = Math.max(0, roll.total ?? 0);
@@ -2437,18 +2437,18 @@ export async function applyEffect(workflow, flag) {
   const shouldApplyTemporaryHpOnTrigger = !!flag.temporaryHp && ["trigger", "both"].includes(flag.temporaryHp?.timing ?? "trigger");
   const shouldApplyStatusOnTrigger = !!flag.status && ["trigger", "both"].includes(flag.status?.timing ?? "trigger");
   if (!flag.damage && !shouldApplyStatusOnTrigger && !flag.healing && !shouldApplyTemporaryHpOnTrigger) {
-    debugLog(`[${MODULE_ID}] Aucun effet configurÃ© dans le flag`);
+    debugLog(`[${MODULE_ID}] Aucun effet configure dans le flag`);
     return false;
   }
 
   if (await shouldBlockTriggerFrequency(workflow.actor, flag)) {
-    debugLog(`[${MODULE_ID}] DÃ©clenchement ignorÃ© : frÃ©quence dÃ©jÃ  utilisÃ©e`);
+    debugLog(`[${MODULE_ID}] Declenchement ignore : frequence deja utilisee`);
     return false;
   }
 
   if (flag.requireBearerTemporaryHp) {
     const temporaryHpCondition = getBearerTemporaryHpForTrigger(workflow, workflow.actor, flag);
-    debugLog(`[${MODULE_ID}] Condition PV temporaires : valeur v�rifi�e = ${temporaryHpCondition.value}, source = ${temporaryHpCondition.source}`);
+    debugLog(`[${MODULE_ID}] Condition PV temporaires : valeur verifiee = ${temporaryHpCondition.value}, source = ${temporaryHpCondition.source}`);
     if (temporaryHpCondition.value <= 0) {
       debugLog(`[${MODULE_ID}] D\u00e9clenchement ignor\u00e9 : le porteur n'a plus de PV temporaires`);
       return false;

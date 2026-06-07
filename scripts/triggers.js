@@ -4,6 +4,7 @@ import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffI
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
+const SAVE_REPEAT_DAMAGE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const INCOMING_ATTACK_CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
 const CREATURE_TYPE_ALIASES = {
@@ -1028,6 +1029,29 @@ function shouldRollRepeatedSave(flag, timing) {
     );
 }
 
+function normalizeDamagedRepeatedSaveRollMode(value) {
+  return SAVE_REPEAT_DAMAGE_ROLL_MODES.includes(value) ? value : "normal";
+}
+
+function buildRepeatedSaveRollConfig(flag, saveDc, timing) {
+  const config = {
+    ability: flag.save.ability,
+    target: saveDc,
+    targetValue: saveDc,
+    dc: saveDc,
+  };
+  if (timing !== "damaged") return config;
+  const rollMode = normalizeDamagedRepeatedSaveRollMode(flag.save.repeat?.onDamagedRollMode);
+  if (rollMode === "advantage") {
+    config.advantage = true;
+    config.disadvantage = false;
+  } else if (rollMode === "disadvantage") {
+    config.advantage = false;
+    config.disadvantage = true;
+  }
+  return config;
+}
+
 function resolveActorUuid(uuid) {
   if (!uuid) return null;
   try {
@@ -1125,12 +1149,7 @@ async function handleRepeatedSave(actor, flag, timing) {
   }
 
   const saveRolls = await actor.rollSavingThrow(
-    {
-      ability: flag.save.ability,
-      target: saveDc,
-      targetValue: saveDc,
-      dc: saveDc,
-    },
+    buildRepeatedSaveRollConfig(flag, saveDc, timing),
     { configure: false },
     { create: true }
   );
@@ -1168,6 +1187,7 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
       linkedFlag?.saveDcSource ?? "fixed",
       linkedFlag?.saveDc ?? "",
       linkedFlag?.saveRepeat?.endsBuffOn ?? "success",
+      timing === "damaged" ? normalizeDamagedRepeatedSaveRollMode(linkedFlag?.saveRepeat?.onDamagedRollMode) : "turn",
     ].join("|");
     const group = groups.get(key) ?? { linkedFlag, effects: [] };
     group.effects.push(effect);
@@ -1194,12 +1214,7 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
     }
 
     const saveRolls = await actor.rollSavingThrow(
-      {
-        ability: flag.save.ability,
-        target: saveDc,
-        targetValue: saveDc,
-        dc: saveDc,
-      },
+      buildRepeatedSaveRollConfig(flag, saveDc, timing),
       { configure: false },
       { create: true }
     );
@@ -1238,8 +1253,8 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
     ? fromUuidSync(nextFlag.originActorUuid)?.name ?? actor.name
     : actor.name;
-  debugLog(`[${MODULE_ID}] Cible mÃ©morisÃ©e changÃ©e : ${previousName} â†’ ${nextName}`);
-  debugLog(`[${MODULE_ID}] Indicateur de marque ajoutÃ© sur ${nextName}, origine ${originName}`);
+  debugLog(`[${MODULE_ID}] Cible memorisee changee : ${previousName} -> ${nextName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${nextName}, origine ${originName}`);
   return true;
 }
 

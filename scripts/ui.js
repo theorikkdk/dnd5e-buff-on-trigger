@@ -494,6 +494,24 @@ function getSaveRepeatTimingLabel(timing) {
 function getSaveRepeatEndsBuffOnLabel(value) {
   return game.i18n.localize(`BOT.ui.saveRepeat.endsBuffOn.${value ?? "success"}`);
 }
+function normalizeSaveRepeatOnDamagedRollMode(value) {
+  return ["advantage", "disadvantage"].includes(value) ? value : "normal";
+}
+function getSaveRepeatOnDamagedRollModeLabel(value) {
+  return game.i18n.localize(`BOT.ui.saveRepeat.onDamagedRollMode.${normalizeSaveRepeatOnDamagedRollMode(value)}`);
+}
+function getSaveRepeatTimingSummary(repeat) {
+  const timing = getSaveRepeatTimingLabel(repeat?.timing);
+  if (!repeat?.onDamaged) return timing;
+  const rollMode = normalizeSaveRepeatOnDamagedRollMode(repeat?.onDamagedRollMode);
+  if (rollMode === "normal") {
+    return game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamage", { timing });
+  }
+  return game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamageRollMode", {
+    timing,
+    rollMode: getSaveRepeatOnDamagedRollModeLabel(rollMode).toLowerCase(),
+  });
+}
 function getAbilityLabel(ability) {
   return ability ? game.i18n.localize(`BOT.abilities.${ability}`) : game.i18n.localize("BOT.ui.none");
 }
@@ -780,15 +798,13 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     if (saveTiming === "trigger" || saveTiming === "both") parts.push(`${game.i18n.localize("BOT.ui.success.label")} ${game.i18n.localize(`BOT.ui.saveEffect.${raw.save.effect ?? "half"}`)}`);
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.save"),
-      value: parts.join(" • ")
+      value: parts.join(" - ")
     });
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.saveRepeat"),
       value: raw.save.repeat?.enabled
         ? game.i18n.format("BOT.ui.summary.saveRepeatConfigured", {
-            timing: raw.save.repeat?.onDamaged
-              ? game.i18n.format("BOT.ui.summary.saveRepeatTimingWithDamage", { timing: getSaveRepeatTimingLabel(raw.save.repeat.timing) })
-              : getSaveRepeatTimingLabel(raw.save.repeat.timing),
+            timing: getSaveRepeatTimingSummary(raw.save.repeat),
             endsBuffOn: getSaveRepeatEndsBuffOnLabel(raw.save.repeat.endsBuffOn),
           })
         : game.i18n.localize("BOT.ui.summary.saveRepeatNone")
@@ -827,7 +843,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
   if (mechanicalSummary.length) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.mechanical"),
-      value: mechanicalSummary.join(" • ")
+      value: mechanicalSummary.join(" - ")
     });
   }
 
@@ -915,6 +931,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (saveTimingSelect) window.botUpdateSaveTimingUI(saveTimingSelect);
     const saveAbilitySelect = this.element.querySelector?.('[name="saveAbility"]');
     if (saveAbilitySelect) saveAbilitySelect.addEventListener("change", () => window.botUpdateSaveRepeatUI(form));
+    const saveRepeatOnDamaged = this.element.querySelector?.('[name="saveRepeatOnDamaged"]');
+    if (saveRepeatOnDamaged) saveRepeatOnDamaged.addEventListener("change", () => window.botUpdateSaveRepeatUI(form));
     if (form) window.botUpdateSaveRepeatUI(form);
     const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]') ?? [];
     for (const input of formulaInputs) {
@@ -1173,6 +1191,9 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       saveRepeatEndsBuffOnSuccess: (raw.save?.repeat?.endsBuffOn ?? "success") === "success",
       saveRepeatEndsBuffOnFailure: raw.save?.repeat?.endsBuffOn === "failure",
       saveRepeatOnDamaged:    raw.save?.repeat?.onDamaged === true,
+      saveRepeatOnDamagedRollModeNormal: normalizeSaveRepeatOnDamagedRollMode(raw.save?.repeat?.onDamagedRollMode) === "normal",
+      saveRepeatOnDamagedRollModeAdvantage: normalizeSaveRepeatOnDamagedRollMode(raw.save?.repeat?.onDamagedRollMode) === "advantage",
+      saveRepeatOnDamagedRollModeDisadvantage: normalizeSaveRepeatOnDamagedRollMode(raw.save?.repeat?.onDamagedRollMode) === "disadvantage",
       showAttackCondition:   ATTACK_TRIGGER_TYPES.includes(raw.type),
       conditionHit:          (raw.condition ?? "hit") === "hit",
       conditionMiss:         raw.condition === "miss",
@@ -1399,6 +1420,7 @@ function buildBuffConfigFromForm(form) {
         timing: readFormValue(form, "saveRepeatTiming", "endTurn"),
         endsBuffOn: readFormValue(form, "saveRepeatEndsBuffOn", "success"),
         onDamaged: !!readFormValue(form, "saveRepeatOnDamaged"),
+        onDamagedRollMode: normalizeSaveRepeatOnDamagedRollMode(readFormValue(form, "saveRepeatOnDamagedRollMode", "normal")),
       },
     } : null,
     status: statusId ? {
@@ -1616,7 +1638,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRepeatEnabled", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
@@ -1725,6 +1747,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "saveRepeatTiming", flag.save?.repeat?.timing ?? "endTurn");
   setFormValue(form, "saveRepeatEndsBuffOn", flag.save?.repeat?.endsBuffOn ?? "success");
   setFormValue(form, "saveRepeatOnDamaged", !!flag.save?.repeat?.onDamaged);
+  setFormValue(form, "saveRepeatOnDamagedRollMode", normalizeSaveRepeatOnDamagedRollMode(flag.save?.repeat?.onDamagedRollMode));
 
   const statusIds = getConfiguredStatusIds(flag.status);
   setFormValue(form, "statusId", statusIds[0] ?? "");
@@ -2072,6 +2095,11 @@ window.botUpdateSaveRepeatUI = function(form) {
   if (repeatSection && saveAbility) {
     repeatSection.style.display = saveAbility.value ? "" : "none";
   }
+  const damagedRollModeRow = form.querySelector('#bot-save-repeat-damage-roll-mode');
+  const onDamaged = form.querySelector('[name="saveRepeatOnDamaged"]');
+  if (damagedRollModeRow && onDamaged) {
+    damagedRollModeRow.style.display = onDamaged.checked ? "" : "none";
+  }
 };
 window.botUpdateSaveTimingUI = function(selectEl) {
   const form = selectEl?.closest?.('form');
@@ -2336,7 +2364,7 @@ window.botInsertFormulaVariable = function(buttonEl, variableName) {
 };
 
 export function registerItemSheetButton() {
-  debugLog(`[${MODULE_ID}] registerItemSheetButton enregistré`);
+  debugLog(`[${MODULE_ID}] registerItemSheetButton enregistre`);
 
   Hooks.on("renderItemSheet5e", (app, html) => {
     const item = app?.item ?? app?.document ?? app?.object;
