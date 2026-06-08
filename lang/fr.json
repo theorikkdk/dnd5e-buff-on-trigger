@@ -238,7 +238,7 @@
   "BOT.ui.buffs.damageTraits": "Résistances et immunités aux dégâts",
   "BOT.ui.buffs.conditionTraits": "Immunités aux conditions",
   "BOT.ui.combat.acBonus": "Modificateur de CA",
-  "BOT.ui.combat.attackRolls": "Jets d'attaque",
+  "BOT.ui.combat.attackRolls": "Attaques du porteur",
   "BOT.ui.combat.saveRolls": "Jets de sauvegarde",
   "BOT.ui.combat.abilityRolls": "Jets de caractéristique",
   "BOT.ui.combat.attackBonus": "Modificateur aux attaques",
@@ -714,8 +714,8 @@
   "BOT.ui.recurringEffect.status": "statut {statuses}",
   "BOT.presets.simpleRegeneration.label": "Régénération simple / Simple Regeneration",
   "BOT.presets.simpleRegeneration.description": "Au début du tour du porteur, il récupère 1d6 points de vie.",
-  "BOT.presets.testSaveActivationAdvantage.label": "[TEST] JS activation avec avantage",
-  "BOT.presets.testSaveActivationAdvantage.description": "Preset temporaire de test. La cible fait un JS de Sagesse avec avantage à l’activation. En cas d’échec, elle devient Effrayée.",
-  "BOT.presets.testRepeatedSaveDisadvantage.label": "[TEST] JS répété avec désavantage",
-  "BOT.presets.testRepeatedSaveDisadvantage.description": "Preset temporaire de test. La cible fait un JS de Sagesse normal à l’activation. En cas d’échec, elle devient Effrayée. À la fin de son tour, elle refait le JS avec désavantage ; en cas de réussite, le buff prend fin."
+  "BOT.presets.testOutgoingAttackAdvantage.label": "[TEST] Attaques du porteur avec avantage",
+  "BOT.presets.testOutgoingAttackAdvantage.description": "Preset temporaire de test. Les attaques effectuées par le porteur se font avec avantage.",
+  "BOT.presets.testOutgoingAttackDisadvantage.label": "[TEST] Attaques du porteur avec désavantage",
+  "BOT.presets.testOutgoingAttackDisadvantage.description": "Preset temporaire de test. Les attaques effectuées par le porteur se font avec désavantage."
 }

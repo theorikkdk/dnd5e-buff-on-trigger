@@ -238,7 +238,7 @@
   "BOT.ui.buffs.damageTraits": "Damage resistances and immunities",
   "BOT.ui.buffs.conditionTraits": "Condition immunities",
   "BOT.ui.combat.acBonus": "AC modifier",
-  "BOT.ui.combat.attackRolls": "Attack rolls",
+  "BOT.ui.combat.attackRolls": "Bearer attacks",
   "BOT.ui.combat.saveRolls": "Saving throws",
   "BOT.ui.combat.abilityRolls": "Ability rolls",
   "BOT.ui.combat.attackBonus": "Attack modifier",
@@ -714,8 +714,8 @@
   "BOT.ui.recurringEffect.status": "status {statuses}",
   "BOT.presets.simpleRegeneration.label": "Simple Regeneration",
   "BOT.presets.simpleRegeneration.description": "At the start of the bearer’s turn, they regain 1d6 hit points.",
-  "BOT.presets.testSaveActivationAdvantage.label": "[TEST] Activation save with advantage",
-  "BOT.presets.testSaveActivationAdvantage.description": "Temporary test preset. The target makes a Wisdom saving throw with advantage on activation. On a failure, it becomes Frightened.",
-  "BOT.presets.testRepeatedSaveDisadvantage.label": "[TEST] Repeated save with disadvantage",
-  "BOT.presets.testRepeatedSaveDisadvantage.description": "Temporary test preset. The target makes a normal Wisdom saving throw on activation. On a failure, it becomes Frightened. At the end of its turn, it repeats the save with disadvantage; on a success, the buff ends."
+  "BOT.presets.testOutgoingAttackAdvantage.label": "[TEST] Bearer attacks with advantage",
+  "BOT.presets.testOutgoingAttackAdvantage.description": "Temporary test preset. Attacks made by the bearer are rolled with advantage.",
+  "BOT.presets.testOutgoingAttackDisadvantage.label": "[TEST] Bearer attacks with disadvantage",
+  "BOT.presets.testOutgoingAttackDisadvantage.description": "Temporary test preset. Attacks made by the bearer are rolled with disadvantage."
 }
