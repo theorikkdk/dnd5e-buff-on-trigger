@@ -1361,11 +1361,11 @@ function getStoredTargetName(flag) {
 function getControlledToken() {
   const controlled = canvas?.tokens?.controlled ?? [];
   if (!controlled.length) {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.selectMarkOwner"));
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetSelectOwner"));
     return null;
   }
   if (controlled.length > 1) {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.selectSingleMarkOwner"));
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetSelectSingleOwner"));
     return null;
   }
   return controlled[0] ?? null;
@@ -1375,11 +1375,11 @@ function getSingleUserTarget() {
   const targetSet = game.user?.targets ?? new Set();
   const targets = typeof targetSet.first === "function" ? [targetSet.first()].filter(Boolean) : [...targetSet];
   if (!targets.length) {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.targetNewCreature"));
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetTargetNew"));
     return null;
   }
   if (targets.length > 1) {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.targetSingleCreature"));
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetTargetSingle"));
     return null;
   }
   return targets[0] ?? null;
@@ -1720,10 +1720,17 @@ async function handleLinkedStatusRepeatedSaves(actor, timing) {
   }
 }
 async function moveStoredTarget(actor, activeBuff, newTargetToken) {
-  if (!actor?.setFlag || !activeBuff?.rememberTargetOnActivation || !newTargetToken?.actor) return false;
+  if (!actor?.setFlag || !activeBuff?.rememberTargetOnActivation || !newTargetToken?.actor) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetInvalidContext"));
+    return false;
+  }
   const previousFlag = foundry.utils.deepClone(activeBuff);
   const previousName = getStoredTargetName(previousFlag);
   const nextName = newTargetToken.name ?? newTargetToken.actor.name;
+  if (tokenMatchesStoredTarget(newTargetToken, previousFlag)) {
+    ui.notifications.warn(game.i18n.format("BOT.notifications.changeStoredTargetSameTarget", { target: nextName }));
+    return false;
+  }
   const updatedFlag = {
     ...activeBuff,
     targetTokenId: newTargetToken.id ?? null,
@@ -1737,21 +1744,35 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
     ? fromUuidSync(nextFlag.originActorUuid)?.name ?? actor.name
     : actor.name;
-  debugLog(`[${MODULE_ID}] Cible memorisee changee : ${previousName} -> ${nextName}`);
-  debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${nextName}, origine ${originName}`);
+  const buffName = nextFlag.itemName ?? activeBuff.itemName ?? game.i18n.localize("BOT.fallback.effectName");
+  ui.notifications.info(game.i18n.format("BOT.notifications.changeStoredTargetSuccessForBuff", { buff: buffName, target: nextName }));
+  debugLog(`[${MODULE_ID}] Cible mémorisée changée : ${previousName} -> ${nextName}`);
+  debugLog(`[${MODULE_ID}] Indicateur de marque ajouté sur ${nextName}, origine ${originName}`);
   return true;
 }
 
 export async function changeStoredTarget() {
   const ownerToken = getControlledToken();
-  if (!ownerToken?.actor) return false;
+  if (!ownerToken) return false;
+  if (!ownerToken.actor) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetInvalidContext"));
+    return false;
+  }
 
   const newTargetToken = getSingleUserTarget();
-  if (!newTargetToken?.actor) return false;
+  if (!newTargetToken) return false;
+  if (!newTargetToken.actor) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetInvalidContext"));
+    return false;
+  }
 
   const activeBuff = ownerToken.actor.getFlag(MODULE_ID, "activeBuff");
-  if (!activeBuff?.rememberTargetOnActivation) {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.noActiveMarkFound"));
+  if (!activeBuff) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetNoActiveBuff"));
+    return false;
+  }
+  if (!activeBuff.rememberTargetOnActivation) {
+    ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetNoStoredTarget"));
     return false;
   }
 

@@ -3,6 +3,15 @@ import { syncItemDurationFlag } from "./duration.js";
 import { changeStoredTarget, registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 
+const MODULE_MACROS = [
+  {
+    utility: "changeStoredTarget",
+    nameKey: "BOT.macro.changeStoredTarget.name",
+    command: `game.modules.get("${MODULE_ID}").api.changeStoredTarget();`,
+    img: STORED_TARGET_ICON,
+  },
+];
+
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "debug", {
     name: "BOT.settings.debug.name",
@@ -46,6 +55,16 @@ Hooks.once("init", () => {
       midiWorkflow: game.i18n.localize("BOT.settings.bonusDamageApplicationMode.midiWorkflow"),
     },
   });
+
+  game.settings.registerMenu(MODULE_ID, "moduleMacros", {
+    name: "BOT.settings.moduleMacros.name",
+    label: "BOT.settings.moduleMacros.label",
+    hint: "BOT.settings.moduleMacros.hint",
+    icon: "fas fa-scroll",
+    type: ModuleMacrosConfig,
+    restricted: true,
+  });
+
   debugLog(`[${MODULE_ID}] Module initialized`);
 });
 
@@ -73,7 +92,7 @@ Hooks.once("ready", () => {
     };
   }
 
-  ensureChangeStoredTargetMacro();
+  ensureModuleMacros();
   registerTriggers();
   registerItemSheetButton();
 
@@ -82,18 +101,74 @@ Hooks.once("ready", () => {
   });
 });
 
-async function ensureChangeStoredTargetMacro() {
-  if (!game.user?.isGM || !game.macros || typeof Macro === "undefined") return;
-  const name = game.i18n.localize("BOT.macro.changeStoredTarget.name");
-  const existing = game.macros.find((macro) => macro.flags?.[MODULE_ID]?.utility === "changeStoredTarget");
-  if (existing) return;
+class ModuleMacrosConfig extends FormApplication {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "bot-module-macros",
+      title: game.i18n.localize("BOT.settings.moduleMacros.name"),
+      template: `modules/${MODULE_ID}/templates/module-macros.html`,
+      width: 420,
+    });
+  }
 
-  await Macro.create({
-    name,
-    type: "script",
-    command: `game.modules.get("${MODULE_ID}").api.changeStoredTarget();`,
-    img: STORED_TARGET_ICON,
-    flags: { [MODULE_ID]: { utility: "changeStoredTarget" } },
-  });
+  async _updateObject() {
+    if (!game.user?.isGM) {
+      ui.notifications.warn(game.i18n.localize("BOT.notifications.gmOnly"));
+      return;
+    }
+
+    const result = await ensureModuleMacros({ updateExisting: true });
+    if (result.created > 0 || result.updated > 0) {
+      ui.notifications.info(game.i18n.localize("BOT.notifications.moduleMacrosRecreated"));
+    } else if (result.existing > 0) {
+      ui.notifications.info(game.i18n.localize("BOT.notifications.moduleMacroAlreadyExists"));
+    }
+  }
+}
+
+async function ensureModuleMacros({ updateExisting = false } = {}) {
+  const result = { created: 0, updated: 0, existing: 0 };
+  if (!game.user?.isGM || !game.macros || typeof Macro === "undefined") return result;
+
+  for (const macroData of MODULE_MACROS) {
+    const name = game.i18n.localize(macroData.nameKey);
+    const existing = findModuleMacro(macroData, name);
+    const desired = {
+      name,
+      type: "script",
+      command: macroData.command,
+      img: macroData.img,
+      flags: { [MODULE_ID]: { utility: macroData.utility } },
+    };
+
+    if (!existing) {
+      await Macro.create(desired);
+      result.created += 1;
+      continue;
+    }
+
+    if (updateExisting && shouldUpdateMacro(existing, desired, macroData.utility)) {
+      await existing.update(desired);
+      result.updated += 1;
+    } else {
+      result.existing += 1;
+    }
+  }
+
+  return result;
+}
+
+function findModuleMacro(macroData, localizedName) {
+  return game.macros.find((macro) => macro.flags?.[MODULE_ID]?.utility === macroData.utility)
+    ?? game.macros.find((macro) => macro.command === macroData.command)
+    ?? game.macros.find((macro) => macro.name === localizedName);
+}
+
+function shouldUpdateMacro(existing, desired, utility) {
+  return existing.name !== desired.name
+    || existing.type !== desired.type
+    || existing.command !== desired.command
+    || existing.img !== desired.img
+    || existing.flags?.[MODULE_ID]?.utility !== utility;
 }
 
