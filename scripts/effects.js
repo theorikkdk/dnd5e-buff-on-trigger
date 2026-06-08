@@ -19,7 +19,6 @@ const DAMAGE_LABEL_KEYS = {
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
-const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", "rwak", "msak", "rsak"];
 const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
@@ -1936,17 +1935,10 @@ function normalizeIncomingAttackCreatureTypes(types = []) {
   return normalizeCreatureTypeFilter(types);
 }
 
-function normalizeAttackModeAttackTypes(types = []) {
-  const values = Array.isArray(types) ? types : [types];
-  return [...new Set(values.map((type) => String(type ?? "").trim()).filter((type) => ATTACK_MODE_ATTACK_TYPES.includes(type)))];
-}
-
 export function buildMechanicalChanges(flag, actor = null) {
   if (!flag.buffs) return [];
   const {
     ac,
-    attackMode,
-    attackModeAttackTypes,
     saveMode,
     incomingAttackMode,
     incomingAttackCreatureTypes,
@@ -1980,10 +1972,6 @@ export function buildMechanicalChanges(flag, actor = null) {
   } = flag.buffs;
   const changes = [];
   if (ac) changes.push({ key: "system.attributes.ac.bonus", mode: 2, value: String(ac), priority: 20 });
-  if (attackMode && !normalizeAttackModeAttackTypes(attackModeAttackTypes).length) {
-    const key = attackMode === "advantage" ? "flags.midi-qol.advantage.attack.all" : "flags.midi-qol.disadvantage.attack.all";
-    changes.push({ key, mode: 5, value: "1", priority: 20 });
-  }
   if (saveMode) {
     const key = saveMode === "advantage" ? "flags.midi-qol.advantage.save.all" : "flags.midi-qol.disadvantage.save.all";
     changes.push({ key, mode: 5, value: "1", priority: 20 });

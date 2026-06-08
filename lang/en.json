@@ -242,6 +242,7 @@
   "BOT.ui.combat.acBonus": "AC modifier",
   "BOT.ui.combat.attackRolls": "Attack rolls",
   "BOT.ui.combat.attackModeAttackTypes": "Affected attack types",
+  "BOT.ui.combat.attackModeAttackTypesHelp": "Without selected types, advantage or disadvantage applies to all attacks. Select one or more types to limit it.",
   "BOT.ui.combat.attackBonusAttackTypes": "Affected attack types",
   "BOT.ui.combat.attackBonusLegacyHelp": "Without selected types, this modifier applies to all attacks. Select one or more types to limit it.",
   "BOT.ui.combat.saveRolls": "Saving throws",
@@ -735,10 +736,10 @@
   "BOT.ui.recurringEffect.status": "status {statuses}",
   "BOT.presets.simpleRegeneration.label": "Simple Regeneration",
   "BOT.presets.simpleRegeneration.description": "At the start of the bearer’s turn, they regain 1d6 hit points.",
-  "BOT.presets.testWeaponAttackBonus.label": "[TEST] +2 to weapon attacks",
-  "BOT.presets.testWeaponAttackBonus.description": "Temporary test preset. The bearer gains +2 to weapon attack rolls. Spell attacks remain normal.",
-  "BOT.presets.testSpellAttackPenalty.label": "[TEST] -1d4 to spell attacks",
-  "BOT.presets.testSpellAttackPenalty.description": "Temporary test preset. The bearer takes -1d4 to spell attack rolls. Weapon attacks remain normal.",
-  "BOT.presets.testAllAttackBonus.label": "[TEST] +2 to all attacks",
-  "BOT.presets.testAllAttackBonus.description": "Temporary test preset. The bearer gains +2 to all attack rolls."
+  "BOT.presets.testAllAttackAdvantage.label": "[TEST] Advantage on all attacks",
+  "BOT.presets.testAllAttackAdvantage.description": "Temporary test preset. The bearer has advantage on all attack rolls.",
+  "BOT.presets.testWeaponAttackAdvantage.label": "[TEST] Advantage on weapon attacks",
+  "BOT.presets.testWeaponAttackAdvantage.description": "Temporary test preset. The bearer has advantage on weapon attack rolls. Spell attacks remain normal.",
+  "BOT.presets.testSpellAttackDisadvantage.label": "[TEST] Disadvantage on spell attacks",
+  "BOT.presets.testSpellAttackDisadvantage.description": "Temporary test preset. The bearer has disadvantage on spell attack rolls. Weapon attacks remain normal."
 }

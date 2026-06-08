@@ -568,11 +568,11 @@ function applyFilteredBearerAttackMode(workflow = null, rollConfig = null, proce
   const activeBuff = attacker?.getFlag?.(MODULE_ID, "activeBuff");
   const mode = activeBuff?.buffs?.attackMode;
   const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackModeAttackTypes ?? []);
-  if (!["advantage", "disadvantage"].includes(mode) || !filters.length) return false;
+  if (!["advantage", "disadvantage"].includes(mode)) return false;
 
   const actionType = resolveAttackActionType(workflow, process, rollConfig);
   const categories = getAttackActionCategories(actionType);
-  const match = filters.some((type) => categories.has(type));
+  const match = filters.length ? filters.some((type) => categories.has(type)) : true;
   debugLog(`[${MODULE_ID}] Filtre jets d'attaque : attacker=${attacker?.name ?? "inconnu"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, match=${match}, mode=${mode}`);
   if (!match) return false;
 
