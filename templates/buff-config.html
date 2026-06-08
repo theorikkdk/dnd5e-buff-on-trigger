@@ -973,6 +973,27 @@
         <input type="checkbox" name="endConditionOnDamageDealt" {{#if flag.endConditionOnDamageDealt}}checked{{/if}} />
         <span>{{localize "BOT.ui.endConditions.onDamageDealt"}}</span>
       </label>
+      <label class="bot-check-row">
+        <input type="checkbox" name="endConditionOnDamageTaken" {{#if flag.endConditionOnDamageTaken}}checked{{/if}} />
+        <span>{{localize "BOT.ui.endConditions.onDamageTaken"}}</span>
+      </label>
+      <div class="form-group bot-picker-group">
+        <label>{{localize "BOT.ui.endConditions.onDamageTakenTypes"}}</label>
+        <div class="bot-tag-picker">
+          <div class="bot-tags" id="tags-endConditionOnDamageTakenTypesList">
+            {{#each flag.endConditionDamageTakenTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'endConditionOnDamageTakenTypesList')">&times;</span></span>{{/if}}{{/each}}
+          </div>
+          <select class="bot-tag-select" onchange="botAddTag(this,'endConditionOnDamageTakenTypesList')">
+            {{#each flag.endConditionDamageTakenTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+          </select>
+          <input type="hidden" name="endConditionOnDamageTakenTypesList" id="hidden-endConditionOnDamageTakenTypesList" value="{{flag.endConditionOnDamageTakenTypesList}}" />
+        </div>
+        <p class="hint">{{localize "BOT.ui.endConditions.onDamageTakenTypesHelp"}}</p>
+      </div>
+      <label class="bot-check-row">
+        <input type="checkbox" name="endConditionOnTemporaryHpLost" {{#if flag.endConditionOnTemporaryHpLost}}checked{{/if}} />
+        <span>{{localize "BOT.ui.endConditions.onTemporaryHpLost"}}</span>
+      </label>
     </section>
     <section class="bot-inline-panel">
       <h3 class="bot-summary-title">{{localize "BOT.ui.reminders.title"}}</h3>

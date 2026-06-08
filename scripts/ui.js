@@ -423,12 +423,20 @@ function getChargesSummary(charges) {
   return game.i18n.format(count === 1 ? "BOT.ui.chargeSummary.one" : "BOT.ui.chargeSummary.many", { count });
 }
 
-function getEndConditionSummaryLabels(endConditions) {
+function getEndConditionSummaryLabels(endConditions, damageLabels = {}) {
   if (!endConditions) return [];
+  const damageTakenTypes = toSafeArray(endConditions.onDamageTakenTypes).filter((type) => DAMAGE_TYPES.includes(type));
+  const damageTakenLabel = endConditions.onDamageTaken
+    ? damageTakenTypes.length
+      ? `${game.i18n.localize("BOT.ui.endConditions.summary.damageTaken")} ${listSelectedLabels(damageTakenTypes, damageLabels).replace(/, /g, "/")}`
+      : game.i18n.localize("BOT.ui.endConditions.summary.damageTaken")
+    : null;
   return [
     endConditions.onAttack ? game.i18n.localize("BOT.ui.endConditions.summary.attack") : null,
     endConditions.onSpellCast ? game.i18n.localize("BOT.ui.endConditions.summary.spellCast") : null,
     endConditions.onDamageDealt ? game.i18n.localize("BOT.ui.endConditions.summary.damageDealt") : null,
+    damageTakenLabel,
+    endConditions.onTemporaryHpLost ? game.i18n.localize("BOT.ui.endConditions.summary.temporaryHpLost") : null,
   ].filter(Boolean);
 }
 
@@ -989,7 +997,7 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
     });
   }
 
-  const endConditionLabels = getEndConditionSummaryLabels(raw.endConditions);
+  const endConditionLabels = getEndConditionSummaryLabels(raw.endConditions, labels.damageTypes);
   if (endConditionLabels.length) {
     summary.push({
       label: game.i18n.localize("BOT.ui.summary.endConditions"),
@@ -1205,6 +1213,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const vulnOptions           = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.vulnerabilities ?? []).includes(t) }));
     const immunityOptions       = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.buffs?.immunities ?? []).includes(t) }));
     const receivedDamageTypeOptions = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.receivedDamageTypes ?? []).includes(t) }));
+    const endConditionDamageTakenTypeOptions = DAMAGE_TYPES.map(t => ({ value: t, label: damageLabels[t], selected: (raw.endConditions?.onDamageTakenTypes ?? []).includes(t) }));
     const weaponProfOptions     = WEAPON_PROF_IDS.map(value => ({ value, label: weaponProfLabels[value], selected: (raw.buffs?.weaponProfs ?? []).includes(value) }));
     const armorProfOptions      = ARMOR_PROF_IDS.map(value => ({ value, label: armorProfLabels[value], selected: (raw.buffs?.armorProfs ?? []).includes(value) }));
     const languageOptions       = LANGUAGE_IDS.map(value => ({ value, label: languageLabels[value], selected: (raw.buffs?.languages ?? []).includes(value) }));
@@ -1248,6 +1257,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       endConditionOnAttack:      !!raw.endConditions?.onAttack,
       endConditionOnSpellCast:  !!raw.endConditions?.onSpellCast,
       endConditionOnDamageDealt: !!raw.endConditions?.onDamageDealt,
+      endConditionOnDamageTaken: !!raw.endConditions?.onDamageTaken,
+      endConditionOnDamageTakenTypesList: (raw.endConditions?.onDamageTakenTypes ?? []).join(","),
+      endConditionDamageTakenTypeOptions,
+      endConditionOnTemporaryHpLost: !!raw.endConditions?.onTemporaryHpLost,
       remindersEnabled:          !!raw.reminders?.enabled,
       remindersMessage:          raw.reminders?.message ?? "",
       remindersTimingActivation: !!raw.reminders?.timing?.activation,
@@ -1671,10 +1684,13 @@ function buildBuffConfigFromForm(form) {
     consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
     triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
     presetMeta: readPresetMetaFromForm(form),
-    endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt")) ? {
+    endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt") || readFormValue(form, "endConditionOnDamageTaken") || readFormValue(form, "endConditionOnTemporaryHpLost")) ? {
       onAttack: !!readFormValue(form, "endConditionOnAttack"),
       onSpellCast: !!readFormValue(form, "endConditionOnSpellCast"),
       onDamageDealt: !!readFormValue(form, "endConditionOnDamageDealt"),
+      onDamageTaken: !!readFormValue(form, "endConditionOnDamageTaken"),
+      onDamageTakenTypes: readFormValue(form, "endConditionOnDamageTaken") ? readCsvFormValue(form, "endConditionOnDamageTakenTypesList").filter((type) => DAMAGE_TYPES.includes(type)) : [],
+      onTemporaryHpLost: !!readFormValue(form, "endConditionOnTemporaryHpLost"),
     } : null,
     reminders: readFormValue(form, "remindersEnabled") && String(readFormValue(form, "remindersMessage", "")).trim() ? {
       enabled: true,
@@ -1944,7 +1960,7 @@ function formHasDraftConfiguration(form) {
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
     "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
-    "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt",
+    "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt", "endConditionOnDamageTaken", "endConditionOnDamageTakenTypesList", "endConditionOnTemporaryHpLost",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
     "buffAttackModeAttackTypesList",
@@ -1963,6 +1979,7 @@ function formHasDraftConfiguration(form) {
     return String(field.value ?? "").trim() !== "";
   }) || [
     "receivedDamageTypesList", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
+    "endConditionOnDamageTakenTypesList",
     "buffAttackModeAttackTypesList", "buffAttackBonusAttackTypesList",
     "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffIncomingAttackAttackTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
@@ -2084,6 +2101,9 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "endConditionOnAttack", !!flag.endConditions?.onAttack);
   setFormValue(form, "endConditionOnSpellCast", !!flag.endConditions?.onSpellCast);
   setFormValue(form, "endConditionOnDamageDealt", !!flag.endConditions?.onDamageDealt);
+  setFormValue(form, "endConditionOnDamageTaken", !!flag.endConditions?.onDamageTaken);
+  setTagList(form, "endConditionOnDamageTakenTypesList", flag.endConditions?.onDamageTakenTypes ?? []);
+  setFormValue(form, "endConditionOnTemporaryHpLost", !!flag.endConditions?.onTemporaryHpLost);
   const reminderMessage = String(flag.reminders?.message ?? "");
   setFormValue(form, "remindersEnabled", !!flag.reminders?.enabled);
   setFormValue(form, "remindersMessage", reminderMessage.startsWith("BOT.") ? game.i18n.localize(reminderMessage) : reminderMessage);

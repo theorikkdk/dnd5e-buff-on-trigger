@@ -200,6 +200,9 @@ export const BUFF_PRESETS = [
         type: "cold",
         targetMode: "attacker",
       },
+      endConditions: {
+        onTemporaryHpLost: true,
+      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },
@@ -1708,29 +1711,47 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testIncomingRangedAttackDisadvantage",
-    label: "BOT.presets.testIncomingRangedAttackDisadvantage.label",
-    description: "BOT.presets.testIncomingRangedAttackDisadvantage.description",
+    id: "testEndOnDamageTaken",
+    label: "BOT.presets.testEndOnDamageTaken.label",
+    description: "BOT.presets.testEndOnDamageTaken.description",
     flag: {
       targetMode: "self",
       type: "passive",
-      buffs: {
-        incomingAttackMode: "disadvantage",
-        incomingAttackAttackTypes: ["ranged"],
+      endConditions: {
+        onDamageTaken: true,
       },
       consumeOnTrigger: false,
     },
   },
   {
-    id: "testIncomingSpellAttackAdvantage",
-    label: "BOT.presets.testIncomingSpellAttackAdvantage.label",
-    description: "BOT.presets.testIncomingSpellAttackAdvantage.description",
+    id: "testEndOnFireDamageTaken",
+    label: "BOT.presets.testEndOnFireDamageTaken.label",
+    description: "BOT.presets.testEndOnFireDamageTaken.description",
     flag: {
       targetMode: "self",
       type: "passive",
-      buffs: {
-        incomingAttackMode: "advantage",
-        incomingAttackAttackTypes: ["spell"],
+      endConditions: {
+        onDamageTaken: true,
+        onDamageTakenTypes: ["fire"],
+      },
+      consumeOnTrigger: false,
+    },
+  },
+  {
+    id: "testEndOnTemporaryHpLost",
+    label: "BOT.presets.testEndOnTemporaryHpLost.label",
+    description: "BOT.presets.testEndOnTemporaryHpLost.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      temporaryHp: {
+        formula: "5",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      endConditions: {
+        onTemporaryHpLost: true,
       },
       consumeOnTrigger: false,
     },
