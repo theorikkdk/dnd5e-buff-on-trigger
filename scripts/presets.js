@@ -1708,29 +1708,43 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testWeaponAttackAdvantage",
-    label: "BOT.presets.testWeaponAttackAdvantage.label",
-    description: "BOT.presets.testWeaponAttackAdvantage.description",
+    id: "testWeaponAttackBonus",
+    label: "BOT.presets.testWeaponAttackBonus.label",
+    description: "BOT.presets.testWeaponAttackBonus.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
-        attackMode: "advantage",
-        attackModeAttackTypes: ["weapon"],
+        attackBonus: "+2",
+        attackBonusAttackTypes: ["weapon"],
       },
       consumeOnTrigger: false,
     },
   },
   {
-    id: "testSpellAttackDisadvantage",
-    label: "BOT.presets.testSpellAttackDisadvantage.label",
-    description: "BOT.presets.testSpellAttackDisadvantage.description",
+    id: "testSpellAttackPenalty",
+    label: "BOT.presets.testSpellAttackPenalty.label",
+    description: "BOT.presets.testSpellAttackPenalty.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
-        attackMode: "disadvantage",
-        attackModeAttackTypes: ["spell"],
+        attackBonus: "-1d4",
+        attackBonusAttackTypes: ["spell"],
+      },
+      consumeOnTrigger: false,
+    },
+  },
+  {
+    id: "testAllAttackBonus",
+    label: "BOT.presets.testAllAttackBonus.label",
+    description: "BOT.presets.testAllAttackBonus.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      buffs: {
+        attackBonus: "+2",
+        attackBonusAttackTypes: [],
       },
       consumeOnTrigger: false,
     },

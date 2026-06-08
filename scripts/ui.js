@@ -651,6 +651,7 @@ function hasMechanicalChanges(buffs = {}) {
     buffs.skillBonusAll,
     buffs.saveBonus,
     buffs.attackBonus,
+    buffs.attackBonus && buffs.attackBonusAttackTypes?.length ? buffs.attackBonusAttackTypes.join(",") : null,
     getConfiguredMovement(buffs).enabled ? getConfiguredMovement(buffs).value : null,
     buffs.darkvision,
     buffs.blindsight,
@@ -716,7 +717,11 @@ function buildMechanicalSummary(raw, labels) {
     addEntry(`${game.i18n.localize("BOT.ui.skills.bonus")} : ${listSelectedLabels(buffs.skillBonusSkills, labels.skills)} (${formatModifierValue(buffs.skillBonus)})`);
   }
   if (isFilled(buffs.skillBonusAll)) addEntry(`${game.i18n.localize("BOT.ui.skills.bonusAll")} : ${formatModifierValue(buffs.skillBonusAll)}`);
-  if (isFilled(buffs.attackBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.attackBonus")} : ${formatModifierValue(buffs.attackBonus)}`);
+  if (isFilled(buffs.attackBonus)) {
+    const attackBonusFilters = normalizeAttackModeAttackTypes(buffs.attackBonusAttackTypes);
+    const filterSummary = attackBonusFilters.length ? `, ${listSelectedLabels(attackBonusFilters, labels.attackTypes)}` : "";
+    addEntry(`${game.i18n.localize("BOT.ui.combat.attackBonus")} : ${formatModifierValue(buffs.attackBonus)}${filterSummary}`);
+  }
   if (isFilled(buffs.saveBonus)) addEntry(`${game.i18n.localize("BOT.ui.combat.saveBonus")} : ${formatModifierValue(buffs.saveBonus)}`);
   addEntry(formatMovementSummary(getConfiguredMovement(buffs), labels));
   if ((buffs.resistances ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.defense.resistances")} : ${listSelectedLabels(buffs.resistances, labels.damageTypes)}`);
@@ -734,6 +739,96 @@ function buildMechanicalSummary(raw, labels) {
   if (isFilled(buffs.passivePerception)) addEntry(`${game.i18n.localize("BOT.ui.capacities.passivePerception")} : ${buffs.passivePerception}`);
 
   return entries;
+}
+
+function buildMechanicalModuleSummaries(raw, labels) {
+  const buffs = raw.buffs ?? {};
+  const summaries = {};
+  const join = (parts) => parts.filter(Boolean).join(" - ");
+  const modeLabel = (mode) => game.i18n.localize(`BOT.ui.common.${mode}`);
+
+  const attackMode = isFilled(buffs.attackMode)
+    ? `${game.i18n.localize("BOT.ui.combat.attackRolls")} : ${modeLabel(buffs.attackMode)}${normalizeAttackModeAttackTypes(buffs.attackModeAttackTypes).length ? `, ${listSelectedLabels(normalizeAttackModeAttackTypes(buffs.attackModeAttackTypes), labels.attackTypes)}` : ""}`
+    : null;
+  const saveMode = isFilled(buffs.saveMode)
+    ? `${game.i18n.localize("BOT.ui.combat.saveRolls")} : ${modeLabel(buffs.saveMode)}`
+    : null;
+  const skillMode = isFilled(buffs.skillMode)
+    ? `${game.i18n.localize("BOT.ui.combat.abilityRolls")} : ${modeLabel(buffs.skillMode)}`
+    : null;
+  summaries.combatAdvantages = join([attackMode, saveMode, skillMode]);
+
+  summaries.abilities = join([
+    (buffs.abilityCheckAdvantages ?? []).length ? `${game.i18n.localize("BOT.ui.abilities.checkAdvantage")} : ${listSelectedLabels(buffs.abilityCheckAdvantages, labels.abilities)}` : null,
+    (buffs.abilityCheckDisadvantages ?? []).length ? `${game.i18n.localize("BOT.ui.abilities.checkDisadvantage")} : ${listSelectedLabels(buffs.abilityCheckDisadvantages, labels.abilities)}` : null,
+    (buffs.savingThrowAdvantages ?? []).length ? `${game.i18n.localize("BOT.ui.abilities.saveAdvantage")} : ${listSelectedLabels(buffs.savingThrowAdvantages, labels.abilities)}` : null,
+    (buffs.savingThrowDisadvantages ?? []).length ? `${game.i18n.localize("BOT.ui.abilities.saveDisadvantage")} : ${listSelectedLabels(buffs.savingThrowDisadvantages, labels.abilities)}` : null,
+  ]);
+
+  const attackBonusFilters = normalizeAttackModeAttackTypes(buffs.attackBonusAttackTypes);
+  const attackBonus = isFilled(buffs.attackBonus)
+    ? `${game.i18n.localize("BOT.ui.combat.attackBonus")} : ${formatModifierValue(buffs.attackBonus)}${attackBonusFilters.length ? `, ${listSelectedLabels(attackBonusFilters, labels.attackTypes)}` : ""}`
+    : null;
+  const abilityModifiers = [];
+  for (const ability of ABILITY_IDS) {
+    const modifier = buffs.abilityCheckModifiers?.[ability];
+    if (isFilled(modifier)) abilityModifiers.push(`${game.i18n.format("BOT.ui.summary.abilityCheckModifier", { ability: labels.abilities[ability] ?? ability })} : ${formatModifierValue(modifier)}`);
+  }
+  for (const ability of ABILITY_IDS) {
+    const modifier = buffs.savingThrowModifiers?.[ability];
+    if (isFilled(modifier)) abilityModifiers.push(`${game.i18n.format("BOT.ui.summary.savingThrowModifier", { ability: labels.abilities[ability] ?? ability })} : ${formatModifierValue(modifier)}`);
+  }
+  summaries.numericModifiers = join([
+    attackBonus,
+    isFilled(buffs.saveBonus) ? `${game.i18n.localize("BOT.ui.combat.saveBonus")} : ${formatModifierValue(buffs.saveBonus)}` : null,
+  ]);
+  summaries.abilityModifiers = join(abilityModifiers);
+
+  summaries.skillAdvantages = (buffs.skills ?? []).length
+    ? `${game.i18n.localize("BOT.ui.skills.advantage")} : ${listSelectedLabels(buffs.skills, labels.skills)}`
+    : "";
+  summaries.skillBonuses = (buffs.skillBonusSkills ?? []).length && isFilled(buffs.skillBonus)
+    ? `${game.i18n.localize("BOT.ui.skills.bonus")} : ${listSelectedLabels(buffs.skillBonusSkills, labels.skills)} (${formatModifierValue(buffs.skillBonus)})`
+    : "";
+  summaries.allSkillBonus = isFilled(buffs.skillBonusAll)
+    ? `${game.i18n.localize("BOT.ui.skills.bonusAll")} : ${formatModifierValue(buffs.skillBonusAll)}`
+    : "";
+
+  summaries.armorClass = isFilled(buffs.ac)
+    ? `${game.i18n.localize("BOT.ui.combat.acBonus")} : ${formatModifierValue(buffs.ac)}`
+    : "";
+  summaries.damageTraits = join([
+    (buffs.resistances ?? []).length ? `${game.i18n.localize("BOT.ui.defense.resistances")} : ${listSelectedLabels(buffs.resistances, labels.damageTypes)}` : null,
+    (buffs.vulnerabilities ?? []).length ? `${game.i18n.localize("BOT.ui.defense.vulnerabilities")} : ${listSelectedLabels(buffs.vulnerabilities, labels.damageTypes)}` : null,
+    (buffs.immunities ?? []).length ? `${game.i18n.localize("BOT.ui.defense.immunities")} : ${listSelectedLabels(buffs.immunities, labels.damageTypes)}` : null,
+  ]);
+  summaries.conditionTraits = (buffs.conditionImmunities ?? []).length
+    ? `${game.i18n.localize("BOT.ui.defense.conditionImmunities")} : ${listSelectedLabels(buffs.conditionImmunities, labels.conditions)}`
+    : "";
+  if (isFilled(buffs.incomingAttackMode)) {
+    const creatureTypes = buffs.incomingAttackCreatureTypes ?? [];
+    const creatureFilter = creatureTypes.length
+      ? `, ${game.i18n.localize("BOT.ui.defense.incomingAttackCreatureTypesSummary")} : ${listSelectedLabels(creatureTypes, labels.creatureTypes)}`
+      : "";
+    summaries.incomingAttacks = `${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${modeLabel(buffs.incomingAttackMode)}${creatureFilter}`;
+  } else {
+    summaries.incomingAttacks = "";
+  }
+
+  summaries.movement = formatMovementSummary(getConfiguredMovement(buffs), labels) ?? "";
+  summaries.otherCapacities = join([
+    isFilled(buffs.darkvision) ? `${game.i18n.localize("BOT.ui.capacities.senses.darkvision")} : ${buffs.darkvision} ${game.i18n.localize("BOT.ui.units.feet")}` : null,
+    isFilled(buffs.blindsight) ? `${game.i18n.localize("BOT.ui.capacities.senses.blindsight")} : ${buffs.blindsight} ${game.i18n.localize("BOT.ui.units.feet")}` : null,
+    isFilled(buffs.tremorsense) ? `${game.i18n.localize("BOT.ui.capacities.senses.tremorsense")} : ${buffs.tremorsense} ${game.i18n.localize("BOT.ui.units.feet")}` : null,
+    isFilled(buffs.truesight) ? `${game.i18n.localize("BOT.ui.capacities.senses.truesight")} : ${buffs.truesight} ${game.i18n.localize("BOT.ui.units.feet")}` : null,
+    isFilled(buffs.sensesSpecial) ? `${game.i18n.localize("BOT.ui.capacities.senses.special")} : ${buffs.sensesSpecial}` : null,
+    isFilled(buffs.passivePerception) ? `${game.i18n.localize("BOT.ui.capacities.passivePerception")} : ${buffs.passivePerception}` : null,
+    (buffs.weaponProfs ?? []).length ? `${game.i18n.localize("BOT.ui.capacities.weaponProficiencies")} : ${listSelectedLabels(buffs.weaponProfs, labels.weaponProfs)}` : null,
+    (buffs.armorProfs ?? []).length ? `${game.i18n.localize("BOT.ui.capacities.armorProficiencies")} : ${listSelectedLabels(buffs.armorProfs, labels.armorProfs)}` : null,
+    (buffs.languages ?? []).length ? `${game.i18n.localize("BOT.ui.capacities.languages")} : ${listSelectedLabels(buffs.languages, labels.languages)}` : null,
+  ]);
+
+  return summaries;
 }
 
 function buildConfigSummary(raw, labels, itemDurationRounds) {
@@ -1000,6 +1095,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffAttackModeSelect.addEventListener("change", () => window.botUpdateAttackModeFilterUI(form));
       window.botUpdateAttackModeFilterUI(form);
     }
+    const buffAttackBonusInput = this.element.querySelector?.('[name="buffAttackBonus"]');
+    if (buffAttackBonusInput) {
+      buffAttackBonusInput.addEventListener("input", () => window.botUpdateAttackBonusFilterUI(form));
+      window.botUpdateAttackBonusFilterUI(form);
+    }
     const presetSelect = this.element.querySelector?.('[name="presetId"]');
     if (presetSelect) {
       window.botFilterPresets(this.element.querySelector?.('[name="presetSearch"]'));
@@ -1061,6 +1161,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
     const creatureTypeLabels = getCreatureTypeLabels();
     const attackModeAttackTypeOptions = getAttackModeAttackTypeOptions(raw.buffs?.attackModeAttackTypes ?? []);
+    const attackBonusAttackTypeOptions = getAttackModeAttackTypeOptions(raw.buffs?.attackBonusAttackTypes ?? []);
     const incomingAttackCreatureTypeOptions = getCreatureTypeOptions(raw.buffs?.incomingAttackCreatureTypes ?? []);
     const damageTargetCreatureTypeOptions = getCreatureTypeOptions(raw.damage?.targetCreatureTypes ?? []);
     const targetFilterCreatureTypeOptions = getCreatureTypeOptions(raw.targetFilters?.creatureTypes ?? []);
@@ -1087,6 +1188,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       statuses: statusLabels,
       movementTypes: Object.fromEntries(movementTypeOptions.map((option) => [option.value, option.label.toLowerCase()])),
     };
+    const mechanicalModuleSummaries = buildMechanicalModuleSummaries(raw, labels);
     const abilityCheckAdvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckAdvantages ?? []);
     const abilityCheckDisadvantageOptions = getAbilityOptions(raw.buffs?.abilityCheckDisadvantages ?? []);
     const savingThrowAdvantageOptions = getAbilityOptions(raw.buffs?.savingThrowAdvantages ?? []);
@@ -1158,6 +1260,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffAttackModeAttackTypesList: normalizeAttackModeAttackTypes(raw.buffs?.attackModeAttackTypes ?? []).join(","),
       attackModeAttackTypeOptions,
+      buffAttackBonusAttackTypesList: normalizeAttackModeAttackTypes(raw.buffs?.attackBonusAttackTypes ?? []).join(","),
+      attackBonusAttackTypeOptions,
       buffSaveMode:              raw.buffs?.saveMode ?? "none",
       buffIncomingAttackMode:    raw.buffs?.incomingAttackMode ?? "none",
       buffIncomingAttackCreatureTypesList: (raw.buffs?.incomingAttackCreatureTypes ?? []).join(","),
@@ -1174,6 +1278,19 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffSkillBonusAll:         raw.buffs?.skillBonusAll ?? "",
       buffSaveBonus:             raw.buffs?.saveBonus ?? "",
       buffAttackBonus:           raw.buffs?.attackBonus ?? "",
+      buffModuleCombatAdvantagesSummary: mechanicalModuleSummaries.combatAdvantages,
+      buffModuleAbilitiesSummary: mechanicalModuleSummaries.abilities,
+      buffModuleNumericModifiersSummary: mechanicalModuleSummaries.numericModifiers,
+      buffModuleAbilityModifiersSummary: mechanicalModuleSummaries.abilityModifiers,
+      buffModuleSkillAdvantagesSummary: mechanicalModuleSummaries.skillAdvantages,
+      buffModuleSkillBonusesSummary: mechanicalModuleSummaries.skillBonuses,
+      buffModuleAllSkillBonusSummary: mechanicalModuleSummaries.allSkillBonus,
+      buffModuleArmorClassSummary: mechanicalModuleSummaries.armorClass,
+      buffModuleDamageTraitsSummary: mechanicalModuleSummaries.damageTraits,
+      buffModuleConditionTraitsSummary: mechanicalModuleSummaries.conditionTraits,
+      buffModuleIncomingAttacksSummary: mechanicalModuleSummaries.incomingAttacks,
+      buffModuleMovementSummary: mechanicalModuleSummaries.movement,
+      buffModuleOtherCapacitiesSummary: mechanicalModuleSummaries.otherCapacities,
       ...getAbilityModifierFlagFields(raw),
       buffMovementEnabled:       configuredMovement.enabled,
       buffMovementMode:          configuredMovement.mode,
@@ -1231,6 +1348,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffAttackModeAdvantage:   raw.buffs?.attackMode === "advantage",
       buffAttackModeDisadvantage: raw.buffs?.attackMode === "disadvantage",
       showBuffAttackModeAttackTypes: ["advantage", "disadvantage"].includes(raw.buffs?.attackMode),
+      showBuffAttackBonusAttackTypes: isFilled(raw.buffs?.attackBonus),
       buffSaveModeNone:          (raw.buffs?.saveMode ?? "none") === "none",
       buffSaveModeAdvantage:     raw.buffs?.saveMode === "advantage",
       buffSaveModeDisadvantage:  raw.buffs?.saveMode === "disadvantage",
@@ -1628,6 +1746,7 @@ function buildBuffConfigFromForm(form) {
       skillBonusAll: readFormValue(form, "buffSkillBonusAll", "") || null,
       saveBonus: readFormValue(form, "buffSaveBonus", "") || null,
       attackBonus: readFormValue(form, "buffAttackBonus", "") || null,
+      attackBonusAttackTypes: readFormValue(form, "buffAttackBonus", "") ? readCsvFormValue(form, "buffAttackBonusAttackTypesList") : [],
       movement: readFormValue(form, "buffMovementEnabled") && movementValue ? { enabled: true, mode: readFormValue(form, "buffMovementMode", "add") === "multiply" ? "multiply" : "add", value: movementValue, types: movementTypes.length ? movementTypes : ["walk"] } : null,
       speed: null,
       weaponProfs: readCsvFormValue(form, "buffWeaponProfsList"),
@@ -1725,6 +1844,7 @@ function buildDefaultBuffConfig() {
       skillBonusAll: null,
       saveBonus: null,
       attackBonus: null,
+      attackBonusAttackTypes: [],
       movement: null,
       speed: null,
       weaponProfs: [],
@@ -1818,6 +1938,7 @@ function formHasDraftConfiguration(form) {
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
     "buffAttackModeAttackTypesList",
+    "buffAttackBonusAttackTypesList",
     "buffIncomingAttackCreatureTypesList",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
@@ -1831,7 +1952,7 @@ function formHasDraftConfiguration(form) {
     return String(field.value ?? "").trim() !== "";
   }) || [
     "receivedDamageTypesList", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
-    "buffAttackModeAttackTypesList",
+    "buffAttackModeAttackTypesList", "buffAttackBonusAttackTypesList",
     "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
@@ -1970,6 +2091,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "buffSkillMode", flag.buffs?.skillMode ?? "none");
   setFormValue(form, "buffAC", flag.buffs?.ac ?? "");
   setFormValue(form, "buffAttackBonus", flag.buffs?.attackBonus ?? "");
+  setTagList(form, "buffAttackBonusAttackTypesList", flag.buffs?.attackBonusAttackTypes ?? []);
   setFormValue(form, "buffSaveBonus", flag.buffs?.saveBonus ?? "");
   for (const ability of ABILITY_IDS) {
     setFormValue(form, abilityFieldName("targetFilterAbilityMin", ability), flag.targetFilters?.abilityScores?.[ability]?.min ?? "");
@@ -2021,6 +2143,7 @@ function applyPresetFlagToForm(form, flag) {
   window.botUpdateEffectSectionsUI(form);
   window.botUpdateRollModifierUI(form);
   window.botUpdateAttackModeFilterUI(form);
+  window.botUpdateAttackBonusFilterUI(form);
   updateSummaryFromFlag(form, flag);
   form.__botSuppressPresetDirty = false;
 }
@@ -2311,6 +2434,13 @@ window.botUpdateAttackModeFilterUI = function(form) {
   const group = form.querySelector("#bot-attack-mode-attack-types-group");
   const mode = form.querySelector('[name="buffAttackMode"]')?.value ?? "none";
   if (group) group.style.display = ["advantage", "disadvantage"].includes(mode) ? "" : "none";
+};
+
+window.botUpdateAttackBonusFilterUI = function(form) {
+  if (!form) return;
+  const group = form.querySelector("#bot-attack-bonus-attack-types-group");
+  const value = String(form.querySelector('[name="buffAttackBonus"]')?.value ?? "").trim();
+  if (group) group.style.display = value ? "" : "none";
 };
 
 window.botUpdateSaveTimingUI = function(selectEl) {

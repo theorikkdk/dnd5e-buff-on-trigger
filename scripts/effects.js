@@ -1962,7 +1962,6 @@ export function buildMechanicalChanges(flag, actor = null) {
     skillBonusSkills,
     skillBonusAll,
     saveBonus,
-    attackBonus,
     movement,
     speed,
     resistances,
@@ -2039,10 +2038,6 @@ export function buildMechanicalChanges(flag, actor = null) {
     }
   }
   if (saveBonus) changes.push({ key: "system.bonuses.abilities.save", mode: 2, value: String(saveBonus), priority: 20 });
-  if (attackBonus) {
-    changes.push({ key: "system.bonuses.mwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
-    changes.push({ key: "system.bonuses.rwak.attack", mode: 2, value: String(attackBonus), priority: 20 });
-  }
   changes.push(...buildMovementChanges({ movement, speed }, actor));
   if (resistances?.length) {
     for (const type of resistances) changes.push({ key: "system.traits.dr.value", mode: 2, value: type, priority: 20 });

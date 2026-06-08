@@ -411,6 +411,15 @@
   padding: 0 10px 10px;
 }
 
+.bot-module-summary {
+  font-weight: 400;
+  color: var(--color-text-dark-secondary, #4b4a44);
+}
+
+.bot-subtab-panel > .bot-collapsible-panel:first-child {
+  margin-top: 0;
+}
+
 .bot-effect-panel .bot-row {
   display: grid;
   grid-template-columns: minmax(110px, max-content) minmax(160px, 1fr);

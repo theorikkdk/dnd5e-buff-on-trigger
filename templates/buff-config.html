@@ -204,6 +204,7 @@
       <details class="bot-collapsible-panel bot-effect-panel" id="bot-roll-modifier-panel" {{#if flag.rollModifierEnabled}}open{{/if}}>
         <summary class="bot-collapsible-summary">{{localize "BOT.ui.rollModifier.title"}}{{#if flag.rollModifierFormula}} — {{flag.rollModifierFormula}}{{/if}}</summary>
         <div class="bot-collapsible-body">
+          <p class="hint">{{localize "BOT.ui.rollModifier.help"}}</p>
           <div class="form-group">
             <label>{{localize "BOT.ui.rollModifier.enabled"}}</label>
             <input type="checkbox" name="rollModifierEnabled" {{#if flag.rollModifierEnabled}}checked{{/if}} />
@@ -500,6 +501,7 @@
 
   <!-- Onglet 3 : Buffs -->
   <div id="bot-tab-buffs" class="bot-tab-panel" style="display:none">
+    <p class="hint">{{localize "BOT.ui.buffs.help"}}</p>
     <div class="bot-subtabs-container">
       <div class="bot-tabs">
         <button type="button" class="bot-tab-btn bot-subtab-btn bot-tab-active" onclick="botShowSubTab(this,'bot-subtab-combat')">{{localize "BOT.ui.subtabs.combat"}}</button>
@@ -509,8 +511,9 @@
       </div>
 
       <div id="bot-subtab-combat" class="bot-subtab-panel">
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.generalAdvantages"}}</h4>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleCombatAdvantagesSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.generalAdvantages"}}{{#if flag.buffModuleCombatAdvantagesSummary}} - <span class="bot-module-summary">{{flag.buffModuleCombatAdvantagesSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
           <select name="buffAttackMode" onchange="botUpdateAttackModeFilterUI(this.closest('form'))">
@@ -547,9 +550,11 @@
             <option value="disadvantage" {{#if flag.buffSkillModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.abilities"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleAbilitiesSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.abilities"}}{{#if flag.buffModuleAbilitiesSummary}} - <span class="bot-module-summary">{{flag.buffModuleAbilitiesSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="bot-row bot-responsive-grid">
           <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.abilities.checkAdvantage"}}</label>
@@ -602,22 +607,39 @@
             </div>
           </div>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.numericModifiers"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleNumericModifiersSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.numericModifiers"}}{{#if flag.buffModuleNumericModifiersSummary}} - <span class="bot-module-summary">{{flag.buffModuleNumericModifiersSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="bot-row bot-responsive-grid">
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.attackBonus"}}</label>
-            <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="±1" class="bot-input-xs" />
+            <input type="text" name="buffAttackBonus" value="{{flag.buffAttackBonus}}" placeholder="+/-1" class="bot-input-xs" oninput="botUpdateAttackBonusFilterUI(this.closest('form'))" />
           </div>
           <div class="form-group">
             <label>{{localize "BOT.ui.combat.saveBonus"}}</label>
             <input type="text" name="buffSaveBonus" value="{{flag.buffSaveBonus}}" placeholder="1d4" class="bot-input-xs" />
           </div>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.abilityModifiers"}}</h4>
+        <div class="form-group bot-picker-group" id="bot-attack-bonus-attack-types-group" {{#unless flag.showBuffAttackBonusAttackTypes}}style="display:none"{{/unless}}>
+          <label>{{localize "BOT.ui.combat.attackBonusAttackTypes"}}</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffAttackBonusAttackTypesList">
+              {{#each flag.attackBonusAttackTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffAttackBonusAttackTypesList')">&times;</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffAttackBonusAttackTypesList')">
+              {{#each flag.attackBonusAttackTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffAttackBonusAttackTypesList" id="hidden-buffAttackBonusAttackTypesList" value="{{flag.buffAttackBonusAttackTypesList}}" />
+          </div>
+        </div>
+        <p class="hint">{{localize "BOT.ui.combat.attackBonusLegacyHelp"}}</p>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleAbilityModifiersSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.abilityModifiers"}}{{#if flag.buffModuleAbilityModifiersSummary}} - <span class="bot-module-summary">{{flag.buffModuleAbilityModifiersSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
           <div class="bot-ability-modifier-grid">
             <div></div>
             <div class="bot-ability-modifier-header">{{localize "BOT.ui.abilities.checkShort"}}</div>
@@ -641,12 +663,14 @@
             <input type="text" name="buffAbilityCheckModifierCha" value="{{flag.buffAbilityCheckModifierCha}}" placeholder="+2" />
             <input type="text" name="buffSavingThrowModifierCha" value="{{flag.buffSavingThrowModifierCha}}" placeholder="-2" />
           </div>
-        </section>
+          </div>
+        </details>
       </div>
 
       <div id="bot-subtab-skills" class="bot-subtab-panel" style="display:none">
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.skillAdvantages"}}</h4>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleSkillAdvantagesSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.skillAdvantages"}}{{#if flag.buffModuleSkillAdvantagesSummary}} - <span class="bot-module-summary">{{flag.buffModuleSkillAdvantagesSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.skills.advantage"}}</label>
           <div class="bot-tag-picker">
@@ -659,9 +683,11 @@
             <input type="hidden" name="buffSkillAdvantageList" id="hidden-buffSkillAdvantageList" value="{{#each flag.skillAdvantageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.skillBonuses"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleSkillBonusesSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.skillBonuses"}}{{#if flag.buffModuleSkillBonusesSummary}} - <span class="bot-module-summary">{{flag.buffModuleSkillBonusesSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="bot-row bot-responsive-grid">
           <div class="form-group bot-picker-group bot-input-flex">
             <label>{{localize "BOT.ui.skills.bonus"}}</label>
@@ -680,26 +706,32 @@
             <input type="text" name="buffSkillBonus" value="{{flag.buffSkillBonus}}" placeholder="1d4" class="bot-input-full" />
           </div>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.allSkillBonus"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleAllSkillBonusSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.allSkillBonus"}}{{#if flag.buffModuleAllSkillBonusSummary}} - <span class="bot-module-summary">{{flag.buffModuleAllSkillBonusSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group">
           <label>{{localize "BOT.ui.skills.bonusAll"}}</label>
           <input type="text" name="buffSkillBonusAll" value="{{flag.buffSkillBonusAll}}" placeholder="{{localize "BOT.ui.skills.bonusAllPlaceholder"}}" />
         </div>
-        </section>
+          </div>
+        </details>
       </div>
 
       <div id="bot-subtab-defense" class="bot-subtab-panel" style="display:none">
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.armorClass"}}</h4>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleArmorClassSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.armorClass"}}{{#if flag.buffModuleArmorClassSummary}} - <span class="bot-module-summary">{{flag.buffModuleArmorClassSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.acBonus"}}</label>
-          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="±2" step="1" class="bot-input-xs" />
+          <input type="number" name="buffAC" value="{{flag.buffAC}}" placeholder="+/-2" step="1" class="bot-input-xs" />
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.defense.incomingAttackMode"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleIncomingAttacksSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.defense.incomingAttackMode"}}{{#if flag.buffModuleIncomingAttacksSummary}} - <span class="bot-module-summary">{{flag.buffModuleIncomingAttacksSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
           <div class="form-group">
             <label>{{localize "BOT.ui.defense.incomingAttackMode"}}</label>
             <select name="buffIncomingAttackMode">
@@ -720,9 +752,11 @@
               <input type="hidden" name="buffIncomingAttackCreatureTypesList" id="hidden-buffIncomingAttackCreatureTypesList" value="{{flag.buffIncomingAttackCreatureTypesList}}" />
             </div>
           </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.damageTraits"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleDamageTraitsSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.damageTraits"}}{{#if flag.buffModuleDamageTraitsSummary}} - <span class="bot-module-summary">{{flag.buffModuleDamageTraitsSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.resistances"}}</label>
           <div class="bot-tag-picker">
@@ -759,9 +793,11 @@
             <input type="hidden" name="buffImmunitiesList" id="hidden-buffImmunitiesList" value="{{#each flag.immunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        </section>
-        <section class="bot-config-block">
-          <h4>{{localize "BOT.ui.buffs.conditionTraits"}}</h4>
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleConditionTraitsSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.conditionTraits"}}{{#if flag.buffModuleConditionTraitsSummary}} - <span class="bot-module-summary">{{flag.buffModuleConditionTraitsSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <div class="form-group bot-picker-group">
           <label>{{localize "BOT.ui.defense.conditionImmunities"}}</label>
           <div class="bot-tag-picker">
@@ -774,11 +810,14 @@
             <input type="hidden" name="buffConditionImmunitiesList" id="hidden-buffConditionImmunitiesList" value="{{#each flag.conditionImmunityOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
-        </section>
+          </div>
+        </details>
       </div>
 
       <div id="bot-subtab-capacities" class="bot-subtab-panel" style="display:none">
-        <p class="bot-section-label">{{localize "BOT.ui.movement.title"}}</p>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleMovementSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.movement.title"}}{{#if flag.buffModuleMovementSummary}} - <span class="bot-module-summary">{{flag.buffModuleMovementSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <label class="bot-check-row">
           <input type="checkbox" name="buffMovementEnabled" {{#if flag.buffMovementEnabled}}checked{{/if}}>
           <span>{{localize "BOT.ui.movement.enabled"}}</span>
@@ -810,25 +849,30 @@
         </div>
         <p class="hint">{{localize "BOT.ui.movement.help"}}</p>
 
+          </div>
+        </details>
+        <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleOtherCapacitiesSummary}}open{{/if}}>
+          <summary class="bot-collapsible-summary">{{localize "BOT.ui.buffs.otherCapacities"}}{{#if flag.buffModuleOtherCapacitiesSummary}} - <span class="bot-module-summary">{{flag.buffModuleOtherCapacitiesSummary}}</span>{{/if}}</summary>
+          <div class="bot-collapsible-body">
         <p class="bot-section-label">{{localize "BOT.ui.capacities.senses.title"}}</p>
         <div class="bot-capacity-row">
           <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.darkvision"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="±" />
+          <input class="bot-capacity-input" type="number" name="buffDarkvision" value="{{flag.buffDarkvision}}" placeholder="+/-" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
           <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.blindsight"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="±" />
+          <input class="bot-capacity-input" type="number" name="buffBlindSight" value="{{flag.buffBlindSight}}" placeholder="+/-" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
           <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.tremorsense"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="±" />
+          <input class="bot-capacity-input" type="number" name="buffTremorSense" value="{{flag.buffTremorSense}}" placeholder="+/-" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
           <label class="bot-capacity-label">{{localize "BOT.ui.capacities.senses.truesight"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="±" />
+          <input class="bot-capacity-input" type="number" name="buffTrueSight" value="{{flag.buffTrueSight}}" placeholder="+/-" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.units.feet"}}</label>
         </div>
         <div class="bot-capacity-row">
@@ -838,7 +882,7 @@
 
         <div class="bot-capacity-row">
           <label class="bot-capacity-label">{{localize "BOT.ui.capacities.passivePerception"}}</label>
-          <input class="bot-capacity-input" type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="±" />
+          <input class="bot-capacity-input" type="number" name="buffPassivePerception" value="{{flag.buffPassivePerception}}" placeholder="+/-" />
           <label class="bot-capacity-unit">{{localize "BOT.ui.capacities.passivePerceptionUnit"}}</label>
         </div>
         <div class="form-group bot-picker-group bot-capacity-picker-group">
@@ -877,6 +921,8 @@
             <input type="hidden" name="buffLanguagesList" id="hidden-buffLanguagesList" value="{{#each flag.languageOptions}}{{#if selected}}{{value}},{{/if}}{{/each}}" />
           </div>
         </div>
+          </div>
+        </details>
       </div>
     </div>
   </div>

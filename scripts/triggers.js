@@ -497,6 +497,23 @@ function applyFilteredAttackModeToRollConfig(rollConfig, mode) {
   }
 }
 
+function addAttackBonusFormulaToRollConfig(rollConfig, formula) {
+  if (!rollConfig || !formula) return false;
+  const value = String(formula).trim();
+  if (!value) return false;
+  const appendToConfig = (config) => {
+    if (!config || typeof config !== "object") return false;
+    if (!Array.isArray(config.parts)) config.parts = [];
+    config.parts.push(value);
+    return true;
+  };
+  if (Array.isArray(rollConfig.rolls)) {
+    const targetRoll = rollConfig.rolls.find((roll) => roll && typeof roll === "object");
+    if (appendToConfig(targetRoll)) return true;
+  }
+  return appendToConfig(rollConfig);
+}
+
 function getAttackActionCategories(actionType) {
   const categories = new Set();
   if (actionType === "mwak") {
@@ -562,6 +579,22 @@ function applyFilteredBearerAttackMode(workflow = null, rollConfig = null, proce
   if (workflow) applyFilteredAttackModeToMidiWorkflow(workflow, mode, getAttackModeAttributionLabel(activeBuff));
   applyFilteredAttackModeToRollConfig(rollConfig, mode);
   return true;
+}
+
+function applyFilteredAttackBonus(workflow = null, rollConfig = null, process = null) {
+  const attacker = workflow?.actor ?? workflow?.item?.actor ?? resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
+  const activeBuff = attacker?.getFlag?.(MODULE_ID, "activeBuff");
+  const formula = String(activeBuff?.buffs?.attackBonus ?? "").trim();
+  const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackBonusAttackTypes ?? []);
+  if (!formula) return false;
+
+  const actionType = resolveAttackActionType(workflow, process, rollConfig);
+  const categories = getAttackActionCategories(actionType);
+  const match = filters.length ? filters.some((type) => categories.has(type)) : true;
+  debugLog(`[${MODULE_ID}] Filtre modificateur attaques : attacker=${attacker?.name ?? "inconnu"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, match=${match}, formula=${formula}`);
+  if (!match) return false;
+
+  return addAttackBonusFormulaToRollConfig(rollConfig, formula);
 }
 
 function getFilteredIncomingAttackMatches(attacker, targets) {
@@ -2127,10 +2160,12 @@ export function registerTriggers() {
     const fallbackTargets = rollConfig?.targets ?? process?.targets ?? process?.config?.targets ?? game.user?.targets ?? new Set();
     const fallbackWorkflow = workflow ?? (attacker ? { actor: attacker, targets: fallbackTargets, rollOptions: rollConfig?.midiOptions ?? {}, midiOptions: rollConfig?.midiOptions ?? {} } : null);
     const bearerAttackApplied = applyFilteredBearerAttackMode(fallbackWorkflow, rollConfig, process);
+    const attackBonusApplied = applyFilteredAttackBonus(fallbackWorkflow, rollConfig, process);
     const applied = fallbackWorkflow ? applyFilteredIncomingAttackMode(fallbackWorkflow, rollConfig) : false;
     incomingFilterLog("postBuildAttackRollConfig result", {
       applied,
       bearerAttackApplied,
+      attackBonusApplied,
       rollConfig: summarizeIncomingRollConfig(process, rollConfig),
     });
     handleRollModifierBuildHook("dnd5e.postBuildAttackRollConfig", "attack", process, rollConfig);
