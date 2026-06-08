@@ -1240,7 +1240,8 @@ function shouldBlockLinkedStatusDeletion(effect, options = {}) {
   const activeBuff = ownerActor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
   if (!activeBuff?.status?.removeWhenBuffEnds) return false;
   if (!linkedStatusMatchesBuff(effect, ownerActor, activeBuff)) return false;
-  return true;
+  if (activeBuff.status?.endBuffWhenRemoved === true) return false;
+  return activeBuff.status?.protectWhileBuffActive === true;
 }
 
 export function registerLinkedStatusProtection() {
@@ -1327,7 +1328,7 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
       const activeOriginItemUuid = getLinkedStatusOriginItemUuid(activeBuff);
       if (currentOriginItemUuid && activeOriginItemUuid && currentOriginItemUuid !== activeOriginItemUuid) return;
     }
-    if (activeBuff.status?.removeWhenBuffEnds !== true) return;
+    if (activeBuff.status?.removeWhenBuffEnds !== true || activeBuff.status?.protectWhileBuffActive !== true) return;
 
     const statusIds = getConfiguredStatusIds(activeBuff);
     if (!statusIds.length) return;

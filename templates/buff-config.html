@@ -409,6 +409,16 @@
           <input type="checkbox" name="statusRemoveWhenBuffEnds" {{#if flag.statusRemoveWhenBuffEnds}}checked{{/if}}>
           <span>{{localize "BOT.ui.status.removeWhenBuffEnds"}}</span>
         </label>
+        <label class="bot-check-row" id="bot-status-end-buff-when-removed-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
+          <input type="checkbox" name="statusEndBuffWhenRemoved" {{#if flag.statusEndBuffWhenRemoved}}checked{{/if}}>
+          <span>{{localize "BOT.ui.status.endBuffWhenRemoved"}}</span>
+        </label>
+        <p class="notes" id="bot-status-end-buff-when-removed-help" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>{{localize "BOT.ui.status.endBuffWhenRemovedHelp"}}</p>
+        <label class="bot-check-row" id="bot-status-protect-while-buff-active-row" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>
+          <input type="checkbox" name="statusProtectWhileBuffActive" {{#if flag.statusProtectWhileBuffActive}}checked{{/if}}>
+          <span>{{localize "BOT.ui.status.protectWhileBuffActive"}}</span>
+        </label>
+        <p class="notes" id="bot-status-protect-while-buff-active-help" {{#unless flag.hasStatus}}style="display:none"{{/unless}}>{{localize "BOT.ui.status.protectWhileBuffActiveHelp"}}</p>
       </div>
     </details>
     <details class="bot-collapsible-panel bot-formula-help-panel">

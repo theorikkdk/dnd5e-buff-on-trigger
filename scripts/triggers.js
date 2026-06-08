@@ -1541,6 +1541,26 @@ function activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag) {
   return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId;
 }
 
+function isAllowedLinkedStatusDeletion(options = {}) {
+  return options?.[MODULE_ID]?.allowLinkedStatusDeletion === true || options?.botAllowLinkedStatusDeletion === true;
+}
+
+async function maybeEndBuffWhenLinkedStatusRemoved(effect, options = {}) {
+  const linkedFlag = effect?.flags?.[MODULE_ID];
+  if (linkedFlag?.linkedStatus !== true || !linkedFlag.statusId) return false;
+  if (isAllowedLinkedStatusDeletion(options)) return false;
+
+  const ownerActor = resolveActorUuid(linkedFlag.ownerActorUuid);
+  if (!ownerActor?.getFlag) return false;
+  const activeBuff = ownerActor.getFlag(MODULE_ID, "activeBuff");
+  if (activeBuff?.status?.endBuffWhenRemoved !== true) return false;
+  if (!activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag)) return false;
+
+  debugLog(`[${MODULE_ID}] Statut lie ${linkedFlag.statusId} retire hors cleanup - fin du buff ${activeBuff.itemName ?? "buff"}`);
+  await endActiveBuff(ownerActor, activeBuff);
+  return true;
+}
+
 function getLinkedStatusRepeatedSaveEffects(actor, timing) {
   const effects = actor?.effects?.filter((effect) => {
     const linkedFlag = effect.flags?.[MODULE_ID];
@@ -2595,6 +2615,8 @@ export function registerTriggers() {
 
   Hooks.on("deleteActiveEffect", async (effect, options, userId) => {
     try {
+      if (await maybeEndBuffWhenLinkedStatusRemoved(effect, options)) return;
+
       if (effect.statuses?.has("bot-active")) {
         const actor = effect.parent;
         if (!actor) return;

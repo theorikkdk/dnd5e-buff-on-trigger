@@ -987,6 +987,18 @@ function buildConfigSummary(raw, labels, itemDurationRounds) {
         value: game.i18n.localize("BOT.ui.summary.statusRemovedWithBuff")
       });
     }
+    if (raw.status.endBuffWhenRemoved) {
+      summary.push({
+        label: game.i18n.localize("BOT.ui.summary.statusEndBuffWhenRemoved"),
+        value: game.i18n.localize("BOT.ui.summary.statusEndsWhenRemoved")
+      });
+    }
+    if (raw.status.protectWhileBuffActive) {
+      summary.push({
+        label: game.i18n.localize("BOT.ui.summary.statusProtectWhileBuffActive"),
+        value: game.i18n.localize("BOT.ui.summary.statusProtectedWhileBuffActive")
+      });
+    }
   }
 
   const mechanicalSummary = buildMechanicalSummary(raw, labels);
@@ -1437,6 +1449,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       statusApplyConditionSaveFailure: raw.status?.applyCondition === "saveFailure",
       statusApplyConditionSaveSuccess: raw.status?.applyCondition === "saveSuccess",
       statusRemoveWhenBuffEnds: raw.status?.removeWhenBuffEnds === true,
+      statusEndBuffWhenRemoved: raw.status?.endBuffWhenRemoved === true,
+      statusProtectWhileBuffActive: raw.status?.protectWhileBuffActive === true,
       receivedAttackTypeAny: (raw.receivedAttackType ?? "any") === "any",
       receivedAttackTypeMelee: raw.receivedAttackType === "melee",
       receivedAttackTypeRanged: raw.receivedAttackType === "ranged",
@@ -1734,6 +1748,8 @@ function buildBuffConfigFromForm(form) {
       targetMode: readFormValue(form, "statusTargetMode", "triggerTarget"),
       applyCondition: readFormValue(form, "statusApplyCondition", "always"),
       removeWhenBuffEnds: !!readFormValue(form, "statusRemoveWhenBuffEnds"),
+      endBuffWhenRemoved: !!readFormValue(form, "statusEndBuffWhenRemoved"),
+      protectWhileBuffActive: !!readFormValue(form, "statusProtectWhileBuffActive"),
     } : null,
     healing: readFormValue(form, "healingEnabled") && healingFormula ? {
       formula: healingFormula,
@@ -1959,7 +1975,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "statusEndBuffWhenRemoved", "statusProtectWhileBuffActive", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt", "endConditionOnDamageTaken", "endConditionOnDamageTakenTypesList", "endConditionOnTemporaryHpLost",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
@@ -2086,6 +2102,8 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "statusTargetMode", flag.status?.targetMode ?? "triggerTarget");
   setFormValue(form, "statusApplyCondition", flag.status?.applyCondition ?? "always");
   setFormValue(form, "statusRemoveWhenBuffEnds", !!flag.status?.removeWhenBuffEnds);
+  setFormValue(form, "statusEndBuffWhenRemoved", !!flag.status?.endBuffWhenRemoved);
+  setFormValue(form, "statusProtectWhileBuffActive", !!flag.status?.protectWhileBuffActive);
 
   setFormValue(form, "healingEnabled", !!flag.healing?.formula);
   setFormValue(form, "healingFormula", flag.healing?.formula ?? "");
@@ -2645,6 +2663,10 @@ window.botUpdateEffectSectionsUI = function(form) {
   const statusTargetRow = form.querySelector('#bot-status-target-row');
   const statusApplyConditionRow = form.querySelector('#bot-status-apply-condition-row');
   const statusRemoveWhenBuffEndsRow = form.querySelector('#bot-status-remove-when-buff-ends-row');
+  const statusEndBuffWhenRemovedRow = form.querySelector('#bot-status-end-buff-when-removed-row');
+  const statusEndBuffWhenRemovedHelp = form.querySelector('#bot-status-end-buff-when-removed-help');
+  const statusProtectWhileBuffActiveRow = form.querySelector('#bot-status-protect-while-buff-active-row');
+  const statusProtectWhileBuffActiveHelp = form.querySelector('#bot-status-protect-while-buff-active-help');
   const statusSelect = form.querySelector('[name="statusIdsList"]');
   if (statusTimingRow && statusSelect) {
     statusTimingRow.style.display = statusSelect.value ? "" : "none";
@@ -2657,6 +2679,18 @@ window.botUpdateEffectSectionsUI = function(form) {
   }
   if (statusRemoveWhenBuffEndsRow && statusSelect) {
     statusRemoveWhenBuffEndsRow.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusEndBuffWhenRemovedRow && statusSelect) {
+    statusEndBuffWhenRemovedRow.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusEndBuffWhenRemovedHelp && statusSelect) {
+    statusEndBuffWhenRemovedHelp.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusProtectWhileBuffActiveRow && statusSelect) {
+    statusProtectWhileBuffActiveRow.style.display = statusSelect.value ? "" : "none";
+  }
+  if (statusProtectWhileBuffActiveHelp && statusSelect) {
+    statusProtectWhileBuffActiveHelp.style.display = statusSelect.value ? "" : "none";
   }
 
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
