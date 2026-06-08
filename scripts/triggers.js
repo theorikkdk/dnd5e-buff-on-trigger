@@ -7,8 +7,6 @@ const recentDamagedRepeatedSaves = new Map();
 const recentDamageTakenEndChecks = new Map();
 const temporaryHpBeforeActorUpdate = new Map();
 const pendingTemporaryHpEndConcentrationSkips = new Map();
-const TEMP_HP_END_DEBUG_PREFIX = `[${MODULE_ID}] TEMP HP END DEBUG`;
-const TEMP_HP_CONCENTRATION_DEBUG_PREFIX = `[${MODULE_ID}] TEMP HP CONCENTRATION DEBUG`;
 const TEMP_HP_CONCENTRATION_SKIP_TTL_MS = 2000;
 const SAVE_REPEAT_DAMAGE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
@@ -947,13 +945,13 @@ function getActorTemporaryHp(actor) {
 }
 
 function tempHpEndDebug(message, data = null) {
-  if (data === null || data === undefined) console.warn(`${TEMP_HP_END_DEBUG_PREFIX} ${message}`);
-  else console.warn(`${TEMP_HP_END_DEBUG_PREFIX} ${message}`, data);
+  if (data === null || data === undefined) debugLog(`[${MODULE_ID}] Fin PV temporaires : ${message}`);
+  else debugLog(`[${MODULE_ID}] Fin PV temporaires : ${message}`, data);
 }
 
 function tempHpConcentrationDebug(message, data = null) {
-  if (data === null || data === undefined) console.warn(`${TEMP_HP_CONCENTRATION_DEBUG_PREFIX} ${message}`);
-  else console.warn(`${TEMP_HP_CONCENTRATION_DEBUG_PREFIX} ${message}`, data);
+  if (data === null || data === undefined) debugLog(`[${MODULE_ID}] Concentration PV temporaires : ${message}`);
+  else debugLog(`[${MODULE_ID}] Concentration PV temporaires : ${message}`, data);
 }
 
 function readNestedValue(source, path) {
@@ -1156,25 +1154,7 @@ function getAutomaticEndReasonsForDamageTaken(activeBuff, actor, damageItem, wor
 function scheduleTemporaryHpLostEndCheck(actor, activeBuff, damageItem, workflow, damageTaken, preTempOverride = null) {
   if (activeBuff?.endConditions?.onTemporaryHpLost !== true) return false;
   const preTemp = preTempOverride ?? getPreDamageTemporaryHp(actor, damageItem, workflow);
-  tempHpEndDebug("scheduled", {
-    actor: actor?.name ?? null,
-    buff: activeBuff?.itemName ?? null,
-    type: activeBuff?.type ?? null,
-    temporaryHp: activeBuff?.temporaryHp ?? null,
-    requireBearerTemporaryHp: activeBuff?.requireBearerTemporaryHp ?? false,
-    preTemp: preTemp.value,
-    preTempSource: preTemp.source,
-    currentTempImmediate: getActorTemporaryHp(actor),
-    damageTaken,
-  });
   if (preTemp.value <= 0) {
-    tempHpEndDebug("ignored before delay: no preTemp", {
-      actor: actor?.name ?? null,
-      buff: activeBuff?.itemName ?? null,
-      preTemp: preTemp.value,
-      preTempSource: preTemp.source,
-      damageTaken,
-    });
     return false;
   }
 
@@ -1188,15 +1168,6 @@ function scheduleTemporaryHpLostEndCheck(actor, activeBuff, damageItem, workflow
       if (delayedBuff.endConditions?.onTemporaryHpLost !== true) return;
       const currentTemp = getActorTemporaryHp(delayedActor);
       const remove = currentTemp <= 0;
-      tempHpEndDebug(`check after ${delay}ms`, {
-        actor: delayedActor.name,
-        buff: delayedBuff.itemName ?? "buff",
-        preTemp: preTemp.value,
-        preTempSource: preTemp.source,
-        currentTemp,
-        damageTaken,
-        remove,
-      });
       if (!remove) return;
       tempHpEndDebug("calling endActiveBuff", {
         actor: delayedActor.name,
@@ -2056,17 +2027,6 @@ export function registerTriggers() {
       if (newTemp === null) return true;
       const activeBuff = actor?.getFlag?.(MODULE_ID, "activeBuff");
       const currentTemp = getActorTemporaryHp(actor);
-      tempHpEndDebug("preUpdateActor", {
-        actor: actor?.name ?? null,
-        newTemp,
-        currentTemp,
-        activeBuff: Boolean(activeBuff),
-        itemName: activeBuff?.itemName ?? null,
-        onTemporaryHpLost: activeBuff?.endConditions?.onTemporaryHpLost === true,
-        type: activeBuff?.type ?? null,
-        temporaryHp: activeBuff?.temporaryHp ?? null,
-        requireBearerTemporaryHp: activeBuff?.requireBearerTemporaryHp ?? false,
-      });
       if (activeBuff?.endConditions?.onTemporaryHpLost !== true) return true;
       temporaryHpBeforeActorUpdate.set(actor.uuid ?? actor.id, {
         value: currentTemp,
@@ -2074,20 +2034,11 @@ export function registerTriggers() {
         timestamp: Date.now(),
       });
       const willLoseTemporaryHp = currentTemp > 0 && newTemp <= 0;
-      tempHpConcentrationDebug("preUpdateActor evaluated", {
-        actor: actor?.name ?? null,
-        buff: activeBuff?.itemName ?? null,
-        userId,
-        preTemp: currentTemp,
-        predictedTemp: newTemp,
-        willLoseTemporaryHp,
-        concentrationEffects: getActorConcentrationEffects(actor).length,
-      });
       if (!willLoseTemporaryHp) return true;
       createTemporaryHpEndConcentrationSkip(actor, activeBuff, currentTemp, newTemp, "preUpdateActor");
       options.noConcentrationCheck = true;
       foundry.utils.setProperty(options, "dnd5e.concentrationCheck", false);
-      tempHpConcentrationDebug("preUpdateActor concentration options disabled", {
+      tempHpConcentrationDebug("concentration options disabled before temp HP cleanup", {
         actor: actor?.name ?? null,
         buff: activeBuff?.itemName ?? null,
         noConcentrationCheck: options.noConcentrationCheck,
@@ -2095,7 +2046,7 @@ export function registerTriggers() {
       });
       return true;
     } catch (error) {
-      console.error(`${TEMP_HP_END_DEBUG_PREFIX} preUpdateActor error`, error);
+      console.error(`[${MODULE_ID}] Erreur dans preUpdateActor PV temporaires :`, error);
       return true;
     }
   });
@@ -2108,23 +2059,10 @@ export function registerTriggers() {
       const preTemp = temporaryHpBeforeActorUpdate.get(key) ?? { value: 0, source: "preUpdateActor unavailable" };
       temporaryHpBeforeActorUpdate.delete(key);
       const activeBuff = actor?.getFlag?.(MODULE_ID, "activeBuff");
-      tempHpEndDebug("updateActor", {
-        actor: actor?.name ?? null,
-        changedTemp: newTemp,
-        currentTemp: getActorTemporaryHp(actor),
-        activeBuff: Boolean(activeBuff),
-        itemName: activeBuff?.itemName ?? null,
-        onTemporaryHpLost: activeBuff?.endConditions?.onTemporaryHpLost === true,
-        preTemp: preTemp.value,
-        preTempSource: preTemp.source,
-        type: activeBuff?.type ?? null,
-        temporaryHp: activeBuff?.temporaryHp ?? null,
-        requireBearerTemporaryHp: activeBuff?.requireBearerTemporaryHp ?? false,
-      });
       if (activeBuff?.endConditions?.onTemporaryHpLost !== true) return;
       scheduleTemporaryHpLostEndCheck(actor, activeBuff, null, null, null, preTemp);
     } catch (error) {
-      console.error(`${TEMP_HP_END_DEBUG_PREFIX} updateActor error`, error);
+      console.error(`[${MODULE_ID}] Erreur dans updateActor PV temporaires :`, error);
     }
   });
 
@@ -2388,17 +2326,6 @@ export function registerTriggers() {
       if (!actor) return;
       if (token.actor.id !== actor.id) return;
       const damageTaken = getDamageTakenAmount(damageItem, workflow);
-      tempHpEndDebug("midi-qol.isDamaged", {
-        actor: actor.name,
-        damageTaken,
-        currentTemp: getActorTemporaryHp(actor),
-        activeBuff: Boolean(actor.getFlag(MODULE_ID, "activeBuff")),
-        itemName: actor.getFlag(MODULE_ID, "activeBuff")?.itemName ?? null,
-        onTemporaryHpLost: actor.getFlag(MODULE_ID, "activeBuff")?.endConditions?.onTemporaryHpLost === true,
-        type: actor.getFlag(MODULE_ID, "activeBuff")?.type ?? null,
-        temporaryHp: actor.getFlag(MODULE_ID, "activeBuff")?.temporaryHp ?? null,
-        requireBearerTemporaryHp: actor.getFlag(MODULE_ID, "activeBuff")?.requireBearerTemporaryHp ?? false,
-      });
       if (damageTaken > 0 && shouldProcessDamagedRepeatedSave(actor, workflow, damageItem)) {
         const activeFlag = actor?.getFlag(MODULE_ID, "activeBuff");
         const repeatedSaveHandled = shouldRollRepeatedSave(activeFlag, "damaged");
@@ -2623,16 +2550,17 @@ export function registerTriggers() {
       if (!actor?.uuid) return true;
       const marker = getTemporaryHpEndConcentrationSkip(actor);
       const skipDecision = shouldSkipTemporaryHpEndConcentration(actor, marker);
-      tempHpConcentrationDebug("dnd5e.preRollConcentration called", {
-        actor: actor.name,
-        hasMarker: Boolean(marker),
-        markerBuff: marker?.itemName ?? null,
-        preTemp: marker?.preTemp ?? null,
-        predictedTemp: marker?.predictedTemp ?? null,
-        concentrationEffectCount: getActorConcentrationEffects(actor).length,
-        skip: skipDecision.ok,
-        reason: skipDecision.reason,
-      });
+      if (marker) {
+        tempHpConcentrationDebug("preRollConcentration marker evaluated", {
+          actor: actor.name,
+          markerBuff: marker.itemName ?? null,
+          preTemp: marker.preTemp ?? null,
+          predictedTemp: marker.predictedTemp ?? null,
+          concentrationEffectCount: getActorConcentrationEffects(actor).length,
+          skip: skipDecision.ok,
+          reason: skipDecision.reason,
+        });
+      }
       if (skipDecision.ok) {
         foundry.utils.setProperty(rollConfig, "workflowOptions.noConcentrationCheck", true);
         pendingTemporaryHpEndConcentrationSkips.delete(actor.uuid);
@@ -2660,7 +2588,7 @@ export function registerTriggers() {
       recentConcentrationRolls.set(key, now);
       return true;
     } catch (error) {
-      console.error(`${TEMP_HP_CONCENTRATION_DEBUG_PREFIX} preRollConcentration error`, error);
+      console.error(`[${MODULE_ID}] Erreur dans preRollConcentration PV temporaires :`, error);
       return true;
     }
   });
