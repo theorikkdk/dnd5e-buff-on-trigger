@@ -1708,27 +1708,29 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testOutgoingAttackAdvantage",
-    label: "BOT.presets.testOutgoingAttackAdvantage.label",
-    description: "BOT.presets.testOutgoingAttackAdvantage.description",
+    id: "testWeaponAttackAdvantage",
+    label: "BOT.presets.testWeaponAttackAdvantage.label",
+    description: "BOT.presets.testWeaponAttackAdvantage.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
         attackMode: "advantage",
+        attackModeAttackTypes: ["weapon"],
       },
       consumeOnTrigger: false,
     },
   },
   {
-    id: "testOutgoingAttackDisadvantage",
-    label: "BOT.presets.testOutgoingAttackDisadvantage.label",
-    description: "BOT.presets.testOutgoingAttackDisadvantage.description",
+    id: "testSpellAttackDisadvantage",
+    label: "BOT.presets.testSpellAttackDisadvantage.label",
+    description: "BOT.presets.testSpellAttackDisadvantage.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
         attackMode: "disadvantage",
+        attackModeAttackTypes: ["spell"],
       },
       consumeOnTrigger: false,
     },

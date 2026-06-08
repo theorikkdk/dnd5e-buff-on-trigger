@@ -7,6 +7,7 @@ const recentDamagedRepeatedSaves = new Map();
 const SAVE_REPEAT_DAMAGE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const INCOMING_ATTACK_CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
+const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", "rwak", "msak", "rsak"];
 const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
 const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
@@ -189,6 +190,11 @@ function normalizeCreatureTypeValue(value) {
 function normalizeIncomingAttackCreatureTypes(types = []) {
   return [...new Set((Array.isArray(types) ? types : [types])
     .flatMap((type) => normalizeCreatureTypeValue(type)))];
+}
+
+function normalizeAttackModeAttackTypes(types = []) {
+  const values = Array.isArray(types) ? types : [types];
+  return [...new Set(values.map((type) => String(type ?? "").trim()).filter((type) => ATTACK_MODE_ATTACK_TYPES.includes(type)))];
 }
 
 function flattenCreatureTypeValues(value) {
@@ -449,6 +455,113 @@ function applyIncomingAttackModeToRollConfig(rollConfig, mode) {
     roll.configureModifiers?.();
   }
   incomingFilterLog("applied to rollConfig", summarizeIncomingRollConfig(null, rollConfig));
+}
+
+function getAttackModeAttributionLabel(activeBuff) {
+  return activeBuff?.label
+    ?? activeBuff?.name
+    ?? activeBuff?.itemName
+    ?? activeBuff?.sourceName
+    ?? game.i18n?.localize?.("BOT.ui.combat.attackRolls")
+    ?? MODULE_ID;
+}
+
+function applyFilteredAttackModeToMidiWorkflow(workflow, mode, attributionLabel = MODULE_ID) {
+  const tracker = workflow?.attackRollModifierTracker;
+  const source = "bot.attackMode";
+  if (mode === "advantage") {
+    tracker?.advantage?.setOverride?.(source, attributionLabel);
+  } else {
+    tracker?.disadvantage?.setOverride?.(source, attributionLabel);
+  }
+}
+
+function applyFilteredAttackModeToRollConfig(rollConfig, mode) {
+  if (!rollConfig) return;
+  const advantageMode = mode === "advantage"
+    ? CONFIG?.Dice?.D20Roll?.ADV_MODE?.ADVANTAGE ?? 1
+    : CONFIG?.Dice?.D20Roll?.ADV_MODE?.DISADVANTAGE ?? -1;
+  const opposite = mode === "advantage" ? "disadvantage" : "advantage";
+  rollConfig.options ??= {};
+  rollConfig[mode] = true;
+  rollConfig[opposite] = false;
+  rollConfig.options[mode] = true;
+  rollConfig.options[opposite] = false;
+  rollConfig.options.advantageMode = advantageMode;
+  for (const roll of rollConfig.rolls ?? []) {
+    roll.options ??= {};
+    roll.options[mode] = true;
+    roll.options[opposite] = false;
+    roll.options.advantageMode = advantageMode;
+    roll.configureModifiers?.();
+  }
+}
+
+function getAttackActionCategories(actionType) {
+  const categories = new Set();
+  if (actionType === "mwak") {
+    categories.add("melee");
+    categories.add("weapon");
+    categories.add("mwak");
+  }
+  if (actionType === "rwak") {
+    categories.add("ranged");
+    categories.add("weapon");
+    categories.add("rwak");
+  }
+  if (actionType === "msak") {
+    categories.add("melee");
+    categories.add("spell");
+    categories.add("msak");
+  }
+  if (actionType === "rsak") {
+    categories.add("ranged");
+    categories.add("spell");
+    categories.add("rsak");
+  }
+  return categories;
+}
+
+function resolveAttackActionType(workflow = null, process = null, rollConfig = null) {
+  const activity = workflow?.activity ?? process?.activity ?? rollConfig?.activity ?? process?.subject ?? null;
+  const attackMode = workflow?.attackMode
+    ?? workflow?.rollConfig?.attackMode
+    ?? workflow?.attackRoll?.options?.attackMode
+    ?? rollConfig?.attackMode
+    ?? rollConfig?.options?.attackMode
+    ?? "";
+  const activityActionType = typeof activity?.getActionType === "function"
+    ? activity.getActionType(attackMode)
+    : null;
+  return activityActionType
+    ?? activity?.actionType
+    ?? workflow?.item?.system?.actionType
+    ?? process?.item?.system?.actionType
+    ?? process?.subject?.item?.system?.actionType
+    ?? activity?.item?.system?.actionType
+    ?? activity?.system?.actionType
+    ?? workflow?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType
+    ?? process?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType
+    ?? process?.subject?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType
+    ?? null;
+}
+
+function applyFilteredBearerAttackMode(workflow = null, rollConfig = null, process = null) {
+  const attacker = workflow?.actor ?? workflow?.item?.actor ?? resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
+  const activeBuff = attacker?.getFlag?.(MODULE_ID, "activeBuff");
+  const mode = activeBuff?.buffs?.attackMode;
+  const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackModeAttackTypes ?? []);
+  if (!["advantage", "disadvantage"].includes(mode) || !filters.length) return false;
+
+  const actionType = resolveAttackActionType(workflow, process, rollConfig);
+  const categories = getAttackActionCategories(actionType);
+  const match = filters.some((type) => categories.has(type));
+  debugLog(`[${MODULE_ID}] Filtre jets d'attaque : attacker=${attacker?.name ?? "inconnu"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, match=${match}, mode=${mode}`);
+  if (!match) return false;
+
+  if (workflow) applyFilteredAttackModeToMidiWorkflow(workflow, mode, getAttackModeAttributionLabel(activeBuff));
+  applyFilteredAttackModeToRollConfig(rollConfig, mode);
+  return true;
 }
 
 function getFilteredIncomingAttackMatches(attacker, targets) {
@@ -1974,9 +2087,11 @@ export function registerTriggers() {
   Hooks.on("midi-qol.preAttackRoll", async (workflow) => {
     try {
       incomingFilterLog("preAttackRoll called", summarizeIncomingWorkflow(workflow));
+      const bearerAttackApplied = applyFilteredBearerAttackMode(workflow);
       const applied = applyFilteredIncomingAttackMode(workflow);
       incomingFilterLog("preAttackRoll result", {
         applied,
+        bearerAttackApplied,
         workflowOptions: {
           advantage: workflow?.workflowOptions?.advantage,
           disadvantage: workflow?.workflowOptions?.disadvantage,
@@ -2011,9 +2126,11 @@ export function registerTriggers() {
     const attacker = resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
     const fallbackTargets = rollConfig?.targets ?? process?.targets ?? process?.config?.targets ?? game.user?.targets ?? new Set();
     const fallbackWorkflow = workflow ?? (attacker ? { actor: attacker, targets: fallbackTargets, rollOptions: rollConfig?.midiOptions ?? {}, midiOptions: rollConfig?.midiOptions ?? {} } : null);
+    const bearerAttackApplied = applyFilteredBearerAttackMode(fallbackWorkflow, rollConfig, process);
     const applied = fallbackWorkflow ? applyFilteredIncomingAttackMode(fallbackWorkflow, rollConfig) : false;
     incomingFilterLog("postBuildAttackRollConfig result", {
       applied,
+      bearerAttackApplied,
       rollConfig: summarizeIncomingRollConfig(process, rollConfig),
     });
     handleRollModifierBuildHook("dnd5e.postBuildAttackRollConfig", "attack", process, rollConfig);

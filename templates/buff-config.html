@@ -504,11 +504,23 @@
           <h4>{{localize "BOT.ui.buffs.generalAdvantages"}}</h4>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.attackRolls"}}</label>
-          <select name="buffAttackMode">
+          <select name="buffAttackMode" onchange="botUpdateAttackModeFilterUI(this.closest('form'))">
             <option value="none"         {{#if flag.buffAttackModeNone}}selected{{/if}}>{{localize "BOT.ui.common.normal"}}</option>
             <option value="advantage"    {{#if flag.buffAttackModeAdvantage}}selected{{/if}}>{{localize "BOT.ui.common.advantage"}}</option>
             <option value="disadvantage" {{#if flag.buffAttackModeDisadvantage}}selected{{/if}}>{{localize "BOT.ui.common.disadvantage"}}</option>
           </select>
+        </div>
+        <div class="form-group bot-picker-group" id="bot-attack-mode-attack-types-group" {{#unless flag.showBuffAttackModeAttackTypes}}style="display:none"{{/unless}}>
+          <label>{{localize "BOT.ui.combat.attackModeAttackTypes"}}</label>
+          <div class="bot-tag-picker">
+            <div class="bot-tags" id="tags-buffAttackModeAttackTypesList">
+              {{#each flag.attackModeAttackTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffAttackModeAttackTypesList')">&times;</span></span>{{/if}}{{/each}}
+            </div>
+            <select class="bot-tag-select" onchange="botAddTag(this,'buffAttackModeAttackTypesList')">
+              {{#each flag.attackModeAttackTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+            </select>
+            <input type="hidden" name="buffAttackModeAttackTypesList" id="hidden-buffAttackModeAttackTypesList" value="{{flag.buffAttackModeAttackTypesList}}" />
+          </div>
         </div>
         <div class="form-group">
           <label>{{localize "BOT.ui.combat.saveRolls"}}</label>
