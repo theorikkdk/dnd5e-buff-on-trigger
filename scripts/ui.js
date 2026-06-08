@@ -6,6 +6,24 @@ import { BUFF_PRESETS } from "./presets.js";
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", "rwak", "msak", "rsak"];
+const FORMULA_VARIABLES = [
+  "@spellLevel",
+  "@spell.mod",
+  "@prof",
+  "@str.mod",
+  "@dex.mod",
+  "@con.mod",
+  "@int.mod",
+  "@wis.mod",
+  "@cha.mod",
+  "@origin.prof",
+  "@origin.spell.mod",
+  "@owner.prof",
+  "@target.prof",
+  "@attacker.prof",
+  "@stored.prof",
+];
+const FORMULA_INPUT_SELECTOR = 'input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]';
 
 const getSkillLabels = () => ({
   acr: game.i18n.localize("BOT.skills.acr"),
@@ -1096,7 +1114,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const saveRepeatOnDamaged = this.element.querySelector?.('[name="saveRepeatOnDamaged"]');
     if (saveRepeatOnDamaged) saveRepeatOnDamaged.addEventListener("change", () => window.botUpdateSaveRepeatUI(form));
     if (form) window.botUpdateSaveRepeatUI(form);
-    const formulaInputs = this.element.querySelectorAll?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]') ?? [];
+    const formulaInputs = this.element.querySelectorAll?.(FORMULA_INPUT_SELECTOR) ?? [];
     for (const input of formulaInputs) {
       input.addEventListener("focus", () => {
         if (form) form.__botLastFormulaInput = input;
@@ -1104,6 +1122,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       input.addEventListener("click", () => {
         if (form) form.__botLastFormulaInput = input;
       });
+      setupFormulaAutocomplete(input, form);
     }
     const healingEnabled = this.element.querySelector?.('[name="healingEnabled"]');
     if (healingEnabled) healingEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
@@ -1480,6 +1499,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       ...await super._prepareContext(options),
       flag,
       presets,
+      formulaVariables: FORMULA_VARIABLES.map((value) => ({ value })),
     };
   }
 
@@ -2754,10 +2774,162 @@ window.botUpdateTargetModeOptions = function(form, triggerType) {
   }
 };
 
+function getFormulaAutocompleteMatch(input) {
+  const cursor = input.selectionStart ?? input.value.length;
+  const beforeCursor = input.value.slice(0, cursor);
+  const match = beforeCursor.match(/(^|[^\w.])(@[\w.]*)$/);
+  if (!match) return null;
+  const token = match[2];
+  return {
+    start: cursor - token.length,
+    end: cursor,
+    query: token,
+  };
+}
+
+function getFormulaVariableSuggestions(query) {
+  const normalized = String(query ?? "").replace(/^@/, "").toLowerCase();
+  const suggestions = FORMULA_VARIABLES.filter((variable) => {
+    if (!normalized) return true;
+    return variable.replace(/^@/, "").toLowerCase().includes(normalized);
+  });
+  return suggestions.sort((a, b) => {
+    const aSearch = a.replace(/^@/, "").toLowerCase();
+    const bSearch = b.replace(/^@/, "").toLowerCase();
+    const aStarts = normalized && aSearch.startsWith(normalized);
+    const bStarts = normalized && bSearch.startsWith(normalized);
+    if (aStarts !== bStarts) return aStarts ? -1 : 1;
+    return a.localeCompare(b);
+  });
+}
+
+function positionFormulaAutocomplete(input, panel) {
+  const parent = input.parentElement;
+  if (!parent) return;
+  parent.classList.add("bot-formula-autocomplete-anchor");
+  panel.style.left = `${input.offsetLeft}px`;
+  panel.style.top = `${input.offsetTop + input.offsetHeight + 2}px`;
+  panel.style.minWidth = `${Math.max(input.offsetWidth, 180)}px`;
+}
+
+function hideFormulaAutocomplete(input) {
+  const state = input.__botFormulaAutocomplete;
+  if (!state) return;
+  state.open = false;
+  state.activeIndex = 0;
+  state.match = null;
+  state.suggestions = [];
+  state.panel.style.display = "none";
+  state.panel.replaceChildren();
+}
+
+function insertFormulaAutocompleteSuggestion(input, variable) {
+  const state = input.__botFormulaAutocomplete;
+  const match = state?.match ?? getFormulaAutocompleteMatch(input);
+  if (!match || !variable) return;
+  input.value = `${input.value.slice(0, match.start)}${variable}${input.value.slice(match.end)}`;
+  const cursor = match.start + variable.length;
+  input.focus();
+  if (typeof input.setSelectionRange === "function") input.setSelectionRange(cursor, cursor);
+  const form = input.closest("form");
+  if (form) form.__botLastFormulaInput = input;
+  hideFormulaAutocomplete(input);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function renderFormulaAutocomplete(input) {
+  const state = input.__botFormulaAutocomplete;
+  if (!state) return;
+  const match = getFormulaAutocompleteMatch(input);
+  if (!match) {
+    hideFormulaAutocomplete(input);
+    return;
+  }
+
+  const suggestions = getFormulaVariableSuggestions(match.query);
+  if (!suggestions.length) {
+    hideFormulaAutocomplete(input);
+    return;
+  }
+
+  state.match = match;
+  state.suggestions = suggestions;
+  state.activeIndex = Math.min(state.activeIndex ?? 0, suggestions.length - 1);
+  positionFormulaAutocomplete(input, state.panel);
+  state.panel.replaceChildren(...suggestions.map((variable, index) => {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = `bot-formula-autocomplete-option${index === state.activeIndex ? " bot-active" : ""}`;
+    option.textContent = variable;
+    option.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      insertFormulaAutocompleteSuggestion(input, variable);
+    });
+    return option;
+  }));
+  state.open = true;
+  state.panel.style.display = "";
+}
+
+function moveFormulaAutocompleteSelection(input, delta) {
+  const state = input.__botFormulaAutocomplete;
+  if (!state?.open || !state.suggestions.length) return;
+  state.activeIndex = (state.activeIndex + delta + state.suggestions.length) % state.suggestions.length;
+  renderFormulaAutocomplete(input);
+}
+
+function setupFormulaAutocomplete(input, form) {
+  if (!input || input.__botFormulaAutocomplete) return;
+
+  const panel = document.createElement("div");
+  panel.className = "bot-formula-autocomplete";
+  panel.style.display = "none";
+  input.parentElement?.appendChild(panel);
+  input.__botFormulaAutocomplete = {
+    panel,
+    open: false,
+    activeIndex: 0,
+    suggestions: [],
+    match: null,
+  };
+
+  input.addEventListener("input", () => renderFormulaAutocomplete(input));
+  input.addEventListener("click", () => renderFormulaAutocomplete(input));
+  input.addEventListener("focus", () => renderFormulaAutocomplete(input));
+  input.addEventListener("blur", () => {
+    window.setTimeout(() => hideFormulaAutocomplete(input), 120);
+  });
+  input.addEventListener("keydown", (event) => {
+    const state = input.__botFormulaAutocomplete;
+    if (!state?.open) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      moveFormulaAutocompleteSelection(input, 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      moveFormulaAutocompleteSelection(input, -1);
+    } else if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      insertFormulaAutocompleteSuggestion(input, state.suggestions[state.activeIndex]);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      hideFormulaAutocomplete(input);
+    }
+  });
+
+  if (form) {
+    form.addEventListener("click", (event) => {
+      if (event.target === input || panel.contains(event.target)) return;
+      hideFormulaAutocomplete(input);
+    });
+  }
+}
+
 window.botInsertFormulaVariable = function(buttonEl, variableName) {
   const form = buttonEl.closest('form');
   const input = form?.__botLastFormulaInput
-    ?? form?.querySelector?.('input[name="damageFormula"], input[name="healingFormula"], input[name="temporaryHpFormula"], input[name="rollModifierFormula"]');
+    ?? form?.querySelector?.(FORMULA_INPUT_SELECTOR);
   if (!input) return;
 
   const start = input.selectionStart ?? input.value.length;

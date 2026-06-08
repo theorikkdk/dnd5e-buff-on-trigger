@@ -542,6 +542,43 @@
   background: var(--color-bg-btn-minor-hover, #ddd8c4);
 }
 
+.bot-formula-autocomplete-anchor {
+  position: relative;
+}
+
+.bot-formula-autocomplete {
+  position: absolute;
+  z-index: 100;
+  max-height: 170px;
+  overflow-y: auto;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-border-light-primary, #c9c7b8);
+  border-radius: 4px;
+  background: var(--color-bg-sheet, #f9f6ef);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+
+.bot-formula-autocomplete-option {
+  width: 100%;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-dark-primary, #191813);
+  font-family: var(--font-monospace, monospace);
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bot-formula-autocomplete-option:hover,
+.bot-formula-autocomplete-option.bot-active {
+  background: var(--color-bg-btn-minor-hover, #ddd8c4);
+}
+
 .bot-target-ability-grid {
   display: grid;
   gap: 6px;
