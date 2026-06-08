@@ -8,12 +8,21 @@
     <summary class="bot-collapsible-summary bot-preset-summary">{{localize "BOT.ui.presets.title"}}</summary>
     <div class="bot-preset-body">
     <p class="hint bot-preset-help">{{localize "BOT.ui.presets.help"}}</p>
+    <p class="hint bot-preset-status" id="bot-preset-status">{{flag.presetStatusText}}</p>
+    <input type="hidden" name="presetMetaPresetId" value="{{flag.presetMetaPresetId}}" />
+    <input type="hidden" name="presetMetaPresetType" value="{{flag.presetMetaPresetType}}" />
+    <input type="hidden" name="presetMetaPresetLabel" value="{{flag.presetMetaPresetLabel}}" />
+    <input type="hidden" name="presetMetaDirty" value="{{#if flag.presetMetaDirty}}1{{/if}}" />
+    <div class="bot-preset-select-row">
+      <label>{{localize "BOT.ui.presets.searchLabel"}}</label>
+      <input type="text" name="presetSearch" placeholder="{{localize "BOT.ui.presets.searchPlaceholder"}}" oninput="botFilterPresets(this)" />
+    </div>
     <div class="bot-preset-select-row">
       <label>{{localize "BOT.ui.presets.shortLabel"}}</label>
       <select name="presetId" onchange="botUpdatePresetDescription(this); botUpdatePresetActions(this)">
         <option value="">{{localize "BOT.ui.presets.none"}}</option>
         {{#each presets}}
-          <option value="{{id}}" data-description="{{description}}" data-source="{{source}}">{{label}}</option>
+          <option value="{{id}}" data-description="{{description}}" data-source="{{source}}" data-search="{{searchText}}" data-preset-type="{{presetType}}" {{#if selected}}selected{{/if}}>{{label}}</option>
         {{/each}}
       </select>
     </div>

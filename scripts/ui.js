@@ -1001,7 +1001,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       window.botUpdateAttackModeFilterUI(form);
     }
     const presetSelect = this.element.querySelector?.('[name="presetId"]');
-    if (presetSelect) window.botUpdatePresetActions(presetSelect);
+    if (presetSelect) {
+      window.botFilterPresets(this.element.querySelector?.('[name="presetSearch"]'));
+      window.botUpdatePresetDescription(presetSelect);
+      window.botUpdatePresetActions(presetSelect);
+    }
     this.element.querySelectorAll?.('[data-bot-preset-action]')?.forEach((button) => {
       button.addEventListener("click", (event) => {
         event.preventDefault();
@@ -1021,6 +1025,13 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (form) {
       window.botUpdateEffectSectionsUI(form);
       window.botUpdateRollModifierUI(form);
+      updatePresetStatus(form);
+      form.addEventListener("input", (event) => {
+        if (!shouldIgnorePresetDirtyEvent(event)) markPresetMetaDirty(form);
+      });
+      form.addEventListener("change", (event) => {
+        if (!shouldIgnorePresetDirtyEvent(event)) markPresetMetaDirty(form);
+      });
     }
   }
 
@@ -1040,7 +1051,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const configuredMovement = getConfiguredMovement(raw.buffs ?? {});
     const movementTypeOptions = getMovementTypeOptions(configuredMovement.types);
     const statusOptions = getStatusOptions(configuredStatusIds);
-    const presets = getPresetOptions();
+    const rawPresetMeta = raw.presetMeta ?? null;
+    const presets = getPresetOptions().map((preset) => ({
+      ...preset,
+      selected: preset.id === rawPresetMeta?.presetId,
+    }));
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const abilityLabels = getAbilityLabels();
     const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
@@ -1133,6 +1148,12 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       remindersTimingBuffEnd:    !!raw.reminders?.timing?.buffEnd,
       remindersVisibilityGM:     (raw.reminders?.visibility ?? "gm") === "gm",
       remindersVisibilityPublic: (raw.reminders?.visibility ?? "gm") === "public",
+      presetMeta: rawPresetMeta,
+      presetMetaPresetId: rawPresetMeta?.presetId ?? "",
+      presetMetaPresetType: rawPresetMeta?.presetType ?? "",
+      presetMetaPresetLabel: rawPresetMeta?.presetLabel ?? "",
+      presetMetaDirty: rawPresetMeta?.dirty === true,
+      presetStatusText: getPresetMetaStatusText(rawPresetMeta),
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffAttackModeAttackTypesList: normalizeAttackModeAttackTypes(raw.buffs?.attackModeAttackTypes ?? []).join(","),
@@ -1361,8 +1382,87 @@ function getPresetOptions() {
       label,
       description,
       source: preset.source,
+      presetType: getPresetType(preset),
+      searchText: [preset.id, label, description, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", label.startsWith("[TEST]") || String(preset.id).startsWith("test") ? "[TEST]" : ""].join(" ").toLowerCase(),
     };
   });
+}
+
+function getPresetType(preset) {
+  if (preset?.source === "custom") return "custom";
+  const id = String(preset?.id ?? "");
+  const label = preset?.source === "custom" ? String(preset.label ?? "") : game.i18n.localize(preset?.label ?? "");
+  return id.startsWith("test") || label.startsWith("[TEST]") ? "test" : "builtIn";
+}
+
+function getPresetDisplayLabel(presetOrMeta) {
+  if (!presetOrMeta) return "";
+  if (presetOrMeta.source === "custom" || presetOrMeta.presetType === "custom") {
+    return game.i18n.format("BOT.ui.presets.customPrefix", { label: presetOrMeta.label ?? presetOrMeta.presetLabel ?? "" });
+  }
+  if (presetOrMeta.label?.startsWith?.("BOT.")) return game.i18n.localize(presetOrMeta.label);
+  return presetOrMeta.label ?? presetOrMeta.presetLabel ?? "";
+}
+
+function buildPresetMeta(preset) {
+  if (!preset) return null;
+  return {
+    presetId: preset.id,
+    presetType: getPresetType(preset),
+    presetLabel: getPresetDisplayLabel(preset),
+    dirty: false,
+  };
+}
+
+function getPresetMetaStatusText(meta) {
+  if (!meta?.presetId) return game.i18n.localize("BOT.ui.presets.noActivePreset");
+  const label = meta.presetLabel || meta.presetId;
+  if (meta.dirty) {
+    return game.i18n.format("BOT.ui.presets.customBasedOn", { label });
+  }
+  return game.i18n.format("BOT.ui.presets.activePreset", { label });
+}
+
+function readPresetMetaFromForm(form) {
+  const presetId = readFormValue(form, "presetMetaPresetId", "");
+  if (!presetId) return null;
+  return {
+    presetId,
+    presetType: readFormValue(form, "presetMetaPresetType", "builtIn"),
+    presetLabel: readFormValue(form, "presetMetaPresetLabel", presetId),
+    dirty: !!readFormValue(form, "presetMetaDirty"),
+  };
+}
+
+function setPresetMetaOnForm(form, meta) {
+  form.__botSuppressPresetDirty = true;
+  setFormValue(form, "presetMetaPresetId", meta?.presetId ?? "");
+  setFormValue(form, "presetMetaPresetType", meta?.presetType ?? "");
+  setFormValue(form, "presetMetaPresetLabel", meta?.presetLabel ?? "");
+  setFormValue(form, "presetMetaDirty", meta?.dirty ? "1" : "");
+  form.__botSuppressPresetDirty = false;
+  updatePresetStatus(form);
+}
+
+function updatePresetStatus(form) {
+  const status = form?.querySelector?.("#bot-preset-status");
+  if (!status) return;
+  status.textContent = getPresetMetaStatusText(readPresetMetaFromForm(form));
+}
+
+function markPresetMetaDirty(form) {
+  if (!form || form.__botSuppressPresetDirty) return;
+  const meta = readPresetMetaFromForm(form);
+  if (!meta?.presetId || meta.dirty) return;
+  setPresetMetaOnForm(form, { ...meta, dirty: true });
+}
+
+function shouldIgnorePresetDirtyEvent(event) {
+  const name = event?.target?.name;
+  return !name
+    || name === "presetId"
+    || name === "presetSearch"
+    || name.startsWith("presetMeta");
 }
 
 function getUniqueCustomPresetId(baseLabel = "preset", existing = getCustomPresets()) {
@@ -1444,6 +1544,7 @@ function buildBuffConfigFromForm(form) {
     ),
     consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
     triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
+    presetMeta: readPresetMetaFromForm(form),
     endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt")) ? {
       onAttack: !!readFormValue(form, "endConditionOnAttack"),
       onSpellCast: !!readFormValue(form, "endConditionOnSpellCast"),
@@ -1549,6 +1650,7 @@ function buildBuffConfigFromForm(form) {
 function refreshPresetSelect(form, selectedId = "") {
   const select = form?.querySelector?.('[name="presetId"]');
   if (!select) return;
+  selectedId ||= select.value;
   select.replaceChildren();
   const empty = document.createElement("option");
   empty.value = "";
@@ -1559,10 +1661,13 @@ function refreshPresetSelect(form, selectedId = "") {
     option.value = preset.id;
     option.dataset.description = preset.description ?? "";
     option.dataset.source = preset.source ?? "builtIn";
+    option.dataset.search = preset.searchText ?? "";
+    option.dataset.presetType = preset.presetType ?? preset.source ?? "builtIn";
     option.textContent = preset.label;
     select.appendChild(option);
   }
   select.value = selectedId;
+  window.botFilterPresets(form?.querySelector?.('[name="presetSearch"]'));
   window.botUpdatePresetDescription(select);
   window.botUpdatePresetActions(select);
 }
@@ -1590,6 +1695,7 @@ function buildDefaultBuffConfig() {
     targetFilters: null,
     consumeOnTrigger: true,
     triggerFrequency: "none",
+    presetMeta: null,
     endConditions: null,
     reminders: null,
     charges: null,
@@ -1656,6 +1762,12 @@ function mergeBuffConfig(base, override) {
 
 function buildPresetConfig(preset) {
   return mergeBuffConfig(buildDefaultBuffConfig(), clonePresetFlag(preset));
+}
+
+function stripPresetMeta(flag) {
+  const clone = foundry.utils.deepClone(flag ?? {});
+  delete clone.presetMeta;
+  return clone;
 }
 
 function setFormValue(form, name, value) {
@@ -1770,6 +1882,7 @@ function updateSummaryFromFlag(form, flag) {
 }
 
 function applyPresetFlagToForm(form, flag) {
+  form.__botSuppressPresetDirty = true;
   flag = convertPresetMovementDistances(mergeBuffConfig(buildDefaultBuffConfig(), flag ?? {}), form?.__botApp?.item?.parent ?? null);
   const rollTypes = flag.rollModifier?.rollTypes ?? [];
 
@@ -1909,6 +2022,7 @@ function applyPresetFlagToForm(form, flag) {
   window.botUpdateRollModifierUI(form);
   window.botUpdateAttackModeFilterUI(form);
   updateSummaryFromFlag(form, flag);
+  form.__botSuppressPresetDirty = false;
 }
 
 window.botUpdatePresetDescription = function(selectEl) {
@@ -1917,6 +2031,21 @@ window.botUpdatePresetDescription = function(selectEl) {
     || game.i18n.localize("BOT.ui.presets.selectHint");
   const descriptionEl = form?.querySelector?.("#bot-preset-description");
   if (descriptionEl) descriptionEl.textContent = description;
+};
+
+window.botFilterPresets = function(inputEl) {
+  const form = inputEl?.closest?.("form");
+  const select = form?.querySelector?.('[name="presetId"]');
+  if (!select) return;
+  const query = String(inputEl?.value ?? "").trim().toLowerCase();
+  for (const option of select.options ?? []) {
+    if (!option.value) {
+      option.hidden = false;
+      continue;
+    }
+    const text = [option.textContent, option.dataset.description, option.dataset.search, option.dataset.source, option.dataset.presetType].join(" ").toLowerCase();
+    option.hidden = query ? !text.includes(query) : false;
+  }
 };
 
 window.botUpdatePresetActions = function(selectEl) {
@@ -1991,7 +2120,7 @@ window.botSaveCustomPreset = async function(buttonEl) {
       id,
       label: presetData.label,
       description: presetData.description,
-      flag: buildBuffConfigFromForm(form),
+      flag: stripPresetMeta(buildBuffConfigFromForm(form)),
       source: "custom",
     };
     await game.settings.set(MODULE_ID, "customPresets", customPresets);
@@ -2041,7 +2170,7 @@ function normalizeImportedPreset(preset, existing) {
     id,
     label: String(preset.label),
     description: String(preset.description ?? ""),
-    flag: mergeBuffConfig(buildDefaultBuffConfig(), preset.flag),
+    flag: stripPresetMeta(mergeBuffConfig(buildDefaultBuffConfig(), preset.flag)),
     source: "custom",
   };
 }
@@ -2128,6 +2257,10 @@ window.botApplyPreset = function(buttonEl) {
   }
 
   applyPresetFlagToForm(form, buildPresetConfig(preset));
+  setPresetMetaOnForm(form, buildPresetMeta(preset));
+  if (select) select.value = preset.id;
+  window.botUpdatePresetDescription(select);
+  window.botUpdatePresetActions(select);
   debugLog(`[${MODULE_ID}] Preset applied: ${preset.id}`);
 };
 
@@ -2139,6 +2272,7 @@ window.botResetBuffConfig = function(buttonEl) {
   if (!confirmed) return;
 
   applyPresetFlagToForm(form, buildDefaultBuffConfig());
+  setPresetMetaOnForm(form, null);
   const presetSelect = form.querySelector?.('[name="presetId"]');
   if (presetSelect) {
     presetSelect.value = "";
