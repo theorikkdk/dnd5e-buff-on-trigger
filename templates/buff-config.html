@@ -753,6 +753,19 @@
               <input type="hidden" name="buffIncomingAttackCreatureTypesList" id="hidden-buffIncomingAttackCreatureTypesList" value="{{flag.buffIncomingAttackCreatureTypesList}}" />
             </div>
           </div>
+          <div class="form-group bot-picker-group">
+            <label>{{localize "BOT.ui.defense.incomingAttackAttackTypes"}}</label>
+            <div class="bot-tag-picker">
+              <div class="bot-tags" id="tags-buffIncomingAttackAttackTypesList">
+                {{#each flag.incomingAttackAttackTypeOptions}}{{#if selected}}<span class="bot-tag" data-value="{{value}}">{{label}} <span class="bot-tag-remove" onclick="botRemoveTag(this,'buffIncomingAttackAttackTypesList')">&times;</span></span>{{/if}}{{/each}}
+              </div>
+              <select class="bot-tag-select" onchange="botAddTag(this,'buffIncomingAttackAttackTypesList')">
+                {{#each flag.incomingAttackAttackTypeOptions}}<option value="{{value}}">{{label}}</option>{{/each}}
+              </select>
+              <input type="hidden" name="buffIncomingAttackAttackTypesList" id="hidden-buffIncomingAttackAttackTypesList" value="{{flag.buffIncomingAttackAttackTypesList}}" />
+            </div>
+            <p class="hint">{{localize "BOT.ui.defense.incomingAttackAttackTypesHelp"}}</p>
+          </div>
           </div>
         </details>
         <details class="bot-collapsible-panel bot-buff-panel" {{#if flag.buffModuleDamageTraitsSummary}}open{{/if}}>

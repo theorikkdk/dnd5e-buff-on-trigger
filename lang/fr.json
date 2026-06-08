@@ -658,6 +658,8 @@
   "BOT.presets.protectionFromEvilAndGood.description": "La cible gagne une protection contre certains types de créatures : immunité Charmé/Effrayé et désavantage aux attaques de ces créatures. La possession reste à gérer manuellement.",
   "BOT.ui.defense.incomingAttackCreatureTypes": "Types d’attaquants concernés",
   "BOT.ui.defense.incomingAttackCreatureTypesSummary": "attaquants",
+  "BOT.ui.defense.incomingAttackAttackTypes": "Types d’attaques concernés",
+  "BOT.ui.defense.incomingAttackAttackTypesHelp": "Sans type sélectionné, l’avantage ou le désavantage s’applique à toutes les attaques contre le porteur. Sélectionnez un ou plusieurs types pour le limiter.",
   "BOT.creatureTypes.aberration": "Aberration",
   "BOT.creatureTypes.celestial": "Céleste",
   "BOT.creatureTypes.elemental": "Élémentaire",
@@ -736,10 +738,8 @@
   "BOT.ui.recurringEffect.status": "statut {statuses}",
   "BOT.presets.simpleRegeneration.label": "Régénération simple / Simple Regeneration",
   "BOT.presets.simpleRegeneration.description": "Au début du tour du porteur, il récupère 1d6 points de vie.",
-  "BOT.presets.testAllAttackAdvantage.label": "[TEST] Avantage à toutes les attaques",
-  "BOT.presets.testAllAttackAdvantage.description": "Preset temporaire de test. Le porteur a avantage à tous ses jets d’attaque.",
-  "BOT.presets.testWeaponAttackAdvantage.label": "[TEST] Avantage aux attaques d’arme",
-  "BOT.presets.testWeaponAttackAdvantage.description": "Preset temporaire de test. Le porteur a avantage aux jets d’attaque d’arme. Les attaques de sort restent normales.",
-  "BOT.presets.testSpellAttackDisadvantage.label": "[TEST] Désavantage aux attaques de sort",
-  "BOT.presets.testSpellAttackDisadvantage.description": "Preset temporaire de test. Le porteur a désavantage aux jets d’attaque de sort. Les attaques d’arme restent normales."
+  "BOT.presets.testIncomingRangedAttackDisadvantage.label": "[TEST] Désavantage aux attaques à distance contre le porteur",
+  "BOT.presets.testIncomingRangedAttackDisadvantage.description": "Preset temporaire de test. Les attaques à distance contre le porteur se font avec désavantage. Les attaques de mêlée restent normales.",
+  "BOT.presets.testIncomingSpellAttackAdvantage.label": "[TEST] Avantage aux attaques de sort contre le porteur",
+  "BOT.presets.testIncomingSpellAttackAdvantage.description": "Preset temporaire de test. Les attaques de sort contre le porteur se font avec avantage. Les attaques d’arme restent normales."
 }

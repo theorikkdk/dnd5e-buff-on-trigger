@@ -658,6 +658,8 @@
   "BOT.presets.protectionFromEvilAndGood.description": "The target gains protection against certain creature types: immunity to Charmed/Frightened and disadvantage on attacks from those creatures. Possession must still be handled manually.",
   "BOT.ui.defense.incomingAttackCreatureTypes": "Affected attacker types",
   "BOT.ui.defense.incomingAttackCreatureTypesSummary": "attackers",
+  "BOT.ui.defense.incomingAttackAttackTypes": "Affected attack types",
+  "BOT.ui.defense.incomingAttackAttackTypesHelp": "Without selected types, advantage or disadvantage applies to all attacks against the bearer. Select one or more types to limit it.",
   "BOT.creatureTypes.aberration": "Aberration",
   "BOT.creatureTypes.celestial": "Celestial",
   "BOT.creatureTypes.elemental": "Elemental",
@@ -736,10 +738,8 @@
   "BOT.ui.recurringEffect.status": "status {statuses}",
   "BOT.presets.simpleRegeneration.label": "Simple Regeneration",
   "BOT.presets.simpleRegeneration.description": "At the start of the bearer’s turn, they regain 1d6 hit points.",
-  "BOT.presets.testAllAttackAdvantage.label": "[TEST] Advantage on all attacks",
-  "BOT.presets.testAllAttackAdvantage.description": "Temporary test preset. The bearer has advantage on all attack rolls.",
-  "BOT.presets.testWeaponAttackAdvantage.label": "[TEST] Advantage on weapon attacks",
-  "BOT.presets.testWeaponAttackAdvantage.description": "Temporary test preset. The bearer has advantage on weapon attack rolls. Spell attacks remain normal.",
-  "BOT.presets.testSpellAttackDisadvantage.label": "[TEST] Disadvantage on spell attacks",
-  "BOT.presets.testSpellAttackDisadvantage.description": "Temporary test preset. The bearer has disadvantage on spell attack rolls. Weapon attacks remain normal."
+  "BOT.presets.testIncomingRangedAttackDisadvantage.label": "[TEST] Disadvantage on ranged attacks against bearer",
+  "BOT.presets.testIncomingRangedAttackDisadvantage.description": "Temporary test preset. Ranged attacks against the bearer are made with disadvantage. Melee attacks remain normal.",
+  "BOT.presets.testIncomingSpellAttackAdvantage.label": "[TEST] Advantage on spell attacks against bearer",
+  "BOT.presets.testIncomingSpellAttackAdvantage.description": "Temporary test preset. Spell attacks against the bearer are made with advantage. Weapon attacks remain normal."
 }

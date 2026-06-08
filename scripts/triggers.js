@@ -597,7 +597,7 @@ function applyFilteredAttackBonus(workflow = null, rollConfig = null, process = 
   return addAttackBonusFormulaToRollConfig(rollConfig, formula);
 }
 
-function getFilteredIncomingAttackMatches(attacker, targets) {
+function getFilteredIncomingAttackMatches(attacker, targets, workflow = null, rollConfig = null, process = null) {
   const midiTypeOrRace = globalThis.MidiQOL?.typeOrRace?.(attacker);
   const midiRaceOrType = globalThis.MidiQOL?.raceOrType?.(attacker);
   const attackerTypes = getActorCreatureTypeValues(attacker);
@@ -606,16 +606,23 @@ function getFilteredIncomingAttackMatches(attacker, targets) {
     const activeBuff = target.actor?.getFlag?.(MODULE_ID, "activeBuff");
     const mode = activeBuff?.buffs?.incomingAttackMode;
     const rawExpected = activeBuff?.buffs?.incomingAttackCreatureTypes;
+    const rawAttackTypes = activeBuff?.buffs?.incomingAttackAttackTypes;
     incomingFilterLog("target inspected", {
       target: summarizeIncomingTarget(target),
       activeBuff: Boolean(activeBuff),
       incomingAttackMode: mode ?? null,
       incomingAttackCreatureTypes: rawExpected ?? [],
+      incomingAttackAttackTypes: rawAttackTypes ?? [],
     });
     if (!["advantage", "disadvantage"].includes(mode)) continue;
     const expectedTypes = normalizeIncomingAttackCreatureTypes(rawExpected);
-    if (!expectedTypes.length) continue;
-    const match = attackerTypes.some((type) => expectedTypes.includes(type));
+    const expectedAttackTypes = normalizeAttackModeAttackTypes(rawAttackTypes);
+    if (!expectedTypes.length && !expectedAttackTypes.length) continue;
+    const actionType = resolveAttackActionType(workflow, process, rollConfig);
+    const attackCategories = getAttackActionCategories(actionType);
+    const creatureMatch = expectedTypes.length ? attackerTypes.some((type) => expectedTypes.includes(type)) : true;
+    const attackMatch = expectedAttackTypes.length ? expectedAttackTypes.some((type) => attackCategories.has(type)) : true;
+    const match = creatureMatch && attackMatch;
     incomingFilterLog("type evaluated", {
       attacker: attacker.name ?? null,
       midiTypeOrRace,
@@ -626,15 +633,20 @@ function getFilteredIncomingAttackMatches(attacker, targets) {
       detailsRace: attacker.system?.details?.race ?? null,
       detectedTypes: attackerTypes,
       expectedTypes,
+      actionType,
+      attackCategories: [...attackCategories],
+      expectedAttackTypes,
+      creatureMatch,
+      attackMatch,
       match,
       mode,
     });
-    if (match) matches.push({ mode, target, activeBuff, expectedTypes, attackerTypes });
+    if (match) matches.push({ mode, target, activeBuff, expectedTypes, attackerTypes, expectedAttackTypes, attackCategories: [...attackCategories] });
   }
   return matches;
 }
 
-function applyFilteredIncomingAttackMode(workflow, rollConfig = null) {
+function applyFilteredIncomingAttackMode(workflow, rollConfig = null, process = null) {
   const attacker = workflow?.actor ?? workflow?.item?.actor ?? null;
   if (!attacker) {
     incomingFilterLog("ignored: no attacker", summarizeIncomingWorkflow(workflow));
@@ -646,7 +658,7 @@ function applyFilteredIncomingAttackMode(workflow, rollConfig = null) {
     return false;
   }
   let applied = false;
-  for (const match of getFilteredIncomingAttackMatches(attacker, targets)) {
+  for (const match of getFilteredIncomingAttackMatches(attacker, targets, workflow, rollConfig, process)) {
     if (workflow) applyIncomingAttackModeToMidiWorkflow(workflow, match.mode, getIncomingAttackAttributionLabel(match));
     applyIncomingAttackModeToRollConfig(rollConfig, match.mode);
     incomingFilterLog("matched and applied", {
@@ -654,6 +666,8 @@ function applyFilteredIncomingAttackMode(workflow, rollConfig = null) {
       target: summarizeIncomingTarget(match.target),
       expectedTypes: match.expectedTypes,
       detectedTypes: match.attackerTypes,
+      expectedAttackTypes: match.expectedAttackTypes,
+      attackCategories: match.attackCategories,
       appliedToMidiWorkflow: Boolean(workflow),
       appliedToRollConfig: Boolean(rollConfig),
     });
@@ -2161,7 +2175,7 @@ export function registerTriggers() {
     const fallbackWorkflow = workflow ?? (attacker ? { actor: attacker, targets: fallbackTargets, rollOptions: rollConfig?.midiOptions ?? {}, midiOptions: rollConfig?.midiOptions ?? {} } : null);
     const bearerAttackApplied = applyFilteredBearerAttackMode(fallbackWorkflow, rollConfig, process);
     const attackBonusApplied = applyFilteredAttackBonus(fallbackWorkflow, rollConfig, process);
-    const applied = fallbackWorkflow ? applyFilteredIncomingAttackMode(fallbackWorkflow, rollConfig) : false;
+    const applied = fallbackWorkflow ? applyFilteredIncomingAttackMode(fallbackWorkflow, rollConfig, process) : false;
     incomingFilterLog("postBuildAttackRollConfig result", {
       applied,
       bearerAttackApplied,

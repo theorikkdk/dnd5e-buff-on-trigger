@@ -1708,43 +1708,29 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testAllAttackAdvantage",
-    label: "BOT.presets.testAllAttackAdvantage.label",
-    description: "BOT.presets.testAllAttackAdvantage.description",
+    id: "testIncomingRangedAttackDisadvantage",
+    label: "BOT.presets.testIncomingRangedAttackDisadvantage.label",
+    description: "BOT.presets.testIncomingRangedAttackDisadvantage.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
-        attackMode: "advantage",
-        attackModeAttackTypes: [],
+        incomingAttackMode: "disadvantage",
+        incomingAttackAttackTypes: ["ranged"],
       },
       consumeOnTrigger: false,
     },
   },
   {
-    id: "testWeaponAttackAdvantage",
-    label: "BOT.presets.testWeaponAttackAdvantage.label",
-    description: "BOT.presets.testWeaponAttackAdvantage.description",
+    id: "testIncomingSpellAttackAdvantage",
+    label: "BOT.presets.testIncomingSpellAttackAdvantage.label",
+    description: "BOT.presets.testIncomingSpellAttackAdvantage.description",
     flag: {
       targetMode: "self",
       type: "passive",
       buffs: {
-        attackMode: "advantage",
-        attackModeAttackTypes: ["weapon"],
-      },
-      consumeOnTrigger: false,
-    },
-  },
-  {
-    id: "testSpellAttackDisadvantage",
-    label: "BOT.presets.testSpellAttackDisadvantage.label",
-    description: "BOT.presets.testSpellAttackDisadvantage.description",
-    flag: {
-      targetMode: "self",
-      type: "passive",
-      buffs: {
-        attackMode: "disadvantage",
-        attackModeAttackTypes: ["spell"],
+        incomingAttackMode: "advantage",
+        incomingAttackAttackTypes: ["spell"],
       },
       consumeOnTrigger: false,
     },

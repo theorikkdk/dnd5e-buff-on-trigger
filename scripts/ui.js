@@ -646,6 +646,7 @@ function hasMechanicalChanges(buffs = {}) {
     buffs.saveMode,
     buffs.incomingAttackMode,
     buffs.incomingAttackCreatureTypes?.length ? buffs.incomingAttackCreatureTypes.join(",") : null,
+    buffs.incomingAttackAttackTypes?.length ? buffs.incomingAttackAttackTypes.join(",") : null,
     buffs.skillMode,
     buffs.skillBonus,
     buffs.skillBonusAll,
@@ -694,10 +695,12 @@ function buildMechanicalSummary(raw, labels) {
   if (isFilled(buffs.incomingAttackMode)) {
     const modeLabel = game.i18n.localize(`BOT.ui.common.${buffs.incomingAttackMode}`);
     const creatureTypes = buffs.incomingAttackCreatureTypes ?? [];
+    const attackTypes = normalizeAttackModeAttackTypes(buffs.incomingAttackAttackTypes);
     const creatureFilter = creatureTypes.length
       ? `, ${game.i18n.localize("BOT.ui.defense.incomingAttackCreatureTypesSummary")} : ${listSelectedLabels(creatureTypes, labels.creatureTypes)}`
       : "";
-    addEntry(`${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${modeLabel}${creatureFilter}`);
+    const attackFilter = attackTypes.length ? `, ${listSelectedLabels(attackTypes, labels.attackTypes)}` : "";
+    addEntry(`${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${modeLabel}${creatureFilter}${attackFilter}`);
   }
   if (isFilled(buffs.skillMode)) addEntry(`${game.i18n.localize("BOT.ui.combat.abilityRolls")} : ${game.i18n.localize(`BOT.ui.common.${buffs.skillMode}`)}`);
   if ((buffs.abilityCheckAdvantages ?? []).length) addEntry(`${game.i18n.localize("BOT.ui.abilities.checkAdvantage")} : ${listSelectedLabels(buffs.abilityCheckAdvantages, labels.abilities)}`);
@@ -807,10 +810,12 @@ function buildMechanicalModuleSummaries(raw, labels) {
     : "";
   if (isFilled(buffs.incomingAttackMode)) {
     const creatureTypes = buffs.incomingAttackCreatureTypes ?? [];
+    const attackTypes = normalizeAttackModeAttackTypes(buffs.incomingAttackAttackTypes);
     const creatureFilter = creatureTypes.length
       ? `, ${game.i18n.localize("BOT.ui.defense.incomingAttackCreatureTypesSummary")} : ${listSelectedLabels(creatureTypes, labels.creatureTypes)}`
       : "";
-    summaries.incomingAttacks = `${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${modeLabel(buffs.incomingAttackMode)}${creatureFilter}`;
+    const attackFilter = attackTypes.length ? `, ${listSelectedLabels(attackTypes, labels.attackTypes)}` : "";
+    summaries.incomingAttacks = `${game.i18n.localize("BOT.ui.defense.incomingAttackMode")} : ${modeLabel(buffs.incomingAttackMode)}${creatureFilter}${attackFilter}`;
   } else {
     summaries.incomingAttacks = "";
   }
@@ -1163,6 +1168,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const attackModeAttackTypeOptions = getAttackModeAttackTypeOptions(raw.buffs?.attackModeAttackTypes ?? []);
     const attackBonusAttackTypeOptions = getAttackModeAttackTypeOptions(raw.buffs?.attackBonusAttackTypes ?? []);
     const incomingAttackCreatureTypeOptions = getCreatureTypeOptions(raw.buffs?.incomingAttackCreatureTypes ?? []);
+    const incomingAttackAttackTypeOptions = getAttackModeAttackTypeOptions(raw.buffs?.incomingAttackAttackTypes ?? []);
     const damageTargetCreatureTypeOptions = getCreatureTypeOptions(raw.damage?.targetCreatureTypes ?? []);
     const targetFilterCreatureTypeOptions = getCreatureTypeOptions(raw.targetFilters?.creatureTypes ?? []);
     const excludedTargetFilterCreatureTypeOptions = getCreatureTypeOptions(raw.targetFilters?.excludedCreatureTypes ?? []);
@@ -1266,6 +1272,8 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       buffIncomingAttackMode:    raw.buffs?.incomingAttackMode ?? "none",
       buffIncomingAttackCreatureTypesList: (raw.buffs?.incomingAttackCreatureTypes ?? []).join(","),
       incomingAttackCreatureTypeOptions,
+      buffIncomingAttackAttackTypesList: normalizeAttackModeAttackTypes(raw.buffs?.incomingAttackAttackTypes ?? []).join(","),
+      incomingAttackAttackTypeOptions,
       damageTargetCreatureTypesList: (raw.damage?.targetCreatureTypes ?? []).join(","),
       damageTargetCreatureTypeOptions,
       targetFilterCreatureTypesList: (raw.targetFilters?.creatureTypes ?? []).join(","),
@@ -1733,6 +1741,7 @@ function buildBuffConfigFromForm(form) {
       saveMode: readFormValue(form, "buffSaveMode", "none") !== "none" ? readFormValue(form, "buffSaveMode") : null,
       incomingAttackMode: readFormValue(form, "buffIncomingAttackMode", "none") !== "none" ? readFormValue(form, "buffIncomingAttackMode") : null,
       incomingAttackCreatureTypes: readCsvFormValue(form, "buffIncomingAttackCreatureTypesList"),
+      incomingAttackAttackTypes: readFormValue(form, "buffIncomingAttackMode", "none") !== "none" ? readCsvFormValue(form, "buffIncomingAttackAttackTypesList") : [],
       skillMode: readFormValue(form, "buffSkillMode", "none") !== "none" ? readFormValue(form, "buffSkillMode") : null,
       abilityCheckAdvantages: readCsvFormValue(form, "buffAbilityCheckAdvantageList"),
       abilityCheckDisadvantages: readCsvFormValue(form, "buffAbilityCheckDisadvantageList"),
@@ -1831,6 +1840,7 @@ function buildDefaultBuffConfig() {
       saveMode: null,
       incomingAttackMode: null,
       incomingAttackCreatureTypes: [],
+      incomingAttackAttackTypes: [],
       skillMode: null,
       abilityCheckAdvantages: [],
       abilityCheckDisadvantages: [],
@@ -1940,6 +1950,7 @@ function formHasDraftConfiguration(form) {
     "buffAttackModeAttackTypesList",
     "buffAttackBonusAttackTypesList",
     "buffIncomingAttackCreatureTypesList",
+    "buffIncomingAttackAttackTypesList",
     "buffAC", "buffAttackBonus", "buffSaveBonus", "buffSkillBonus", "buffSkillBonusAll", "buffMovementEnabled", "buffMovementValue", "buffMovementTypesList", "buffSpeed",
     "buffDarkvision", "buffBlindSight", "buffTremorSense", "buffTrueSight", "buffSensesSpecial", "buffPassivePerception",
     ...ABILITY_IDS.flatMap((ability) => [abilityFieldName("targetFilterAbilityMin", ability), abilityFieldName("targetFilterAbilityMax", ability)]),
@@ -1953,7 +1964,7 @@ function formHasDraftConfiguration(form) {
   }) || [
     "receivedDamageTypesList", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageTargetCreatureTypesList", "buffAbilityCheckAdvantageList", "buffAbilityCheckDisadvantageList", "buffSavingThrowAdvantageList", "buffSavingThrowDisadvantageList", "buffSkillAdvantageList", "buffSkillBonusList", "buffResistancesList",
     "buffAttackModeAttackTypesList", "buffAttackBonusAttackTypesList",
-    "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
+    "buffVulnsList", "buffImmunitiesList", "buffConditionImmunitiesList", "buffIncomingAttackCreatureTypesList", "buffIncomingAttackAttackTypesList", "buffWeaponProfsList", "buffArmorProfsList", "buffLanguagesList",
   ].some((name) => String(form?.querySelector?.(`[name="${name}"]`)?.value ?? "").trim() !== "");
 }
 
@@ -2088,6 +2099,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "buffSaveMode", flag.buffs?.saveMode ?? "none");
   setFormValue(form, "buffIncomingAttackMode", flag.buffs?.incomingAttackMode ?? "none");
   setTagList(form, "buffIncomingAttackCreatureTypesList", flag.buffs?.incomingAttackCreatureTypes ?? []);
+  setTagList(form, "buffIncomingAttackAttackTypesList", flag.buffs?.incomingAttackAttackTypes ?? []);
   setFormValue(form, "buffSkillMode", flag.buffs?.skillMode ?? "none");
   setFormValue(form, "buffAC", flag.buffs?.ac ?? "");
   setFormValue(form, "buffAttackBonus", flag.buffs?.attackBonus ?? "");
