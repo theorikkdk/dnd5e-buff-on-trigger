@@ -770,8 +770,6 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testEndWhenStatusRemoved.label": "[TEST] Fin si statut retiré",
-  "BOT.presets.testEndWhenStatusRemoved.description": "Preset temporaire de test. Applique Effrayé. Si le statut Effrayé lié est retiré manuellement, le buff prend fin.",
-  "BOT.presets.testStatusRemovedWithoutEndingBuff.label": "[TEST] Statut retiré sans fin du buff",
-  "BOT.presets.testStatusRemovedWithoutEndingBuff.description": "Preset temporaire de test. Applique Effrayé. Si le statut Effrayé lié est retiré manuellement, le buff reste actif."
+  "BOT.presets.testSlotScalingTempHpDamage.label": "[TEST] Scaling slot PV temp + dégâts",
+  "BOT.presets.testSlotScalingTempHpDamage.description": "Preset temporaire de test. Les PV temporaires et les dégâts augmentent selon le niveau d’emplacement utilisé."
 }

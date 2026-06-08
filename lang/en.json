@@ -770,8 +770,6 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testEndWhenStatusRemoved.label": "[TEST] End if status is removed",
-  "BOT.presets.testEndWhenStatusRemoved.description": "Temporary test preset. Applies Frightened. If the linked Frightened status is manually removed, the buff ends.",
-  "BOT.presets.testStatusRemovedWithoutEndingBuff.label": "[TEST] Status removed without ending buff",
-  "BOT.presets.testStatusRemovedWithoutEndingBuff.description": "Temporary test preset. Applies Frightened. If the linked Frightened status is manually removed, the buff remains active."
+  "BOT.presets.testSlotScalingTempHpDamage.label": "[TEST] Slot scaling temp HP + damage",
+  "BOT.presets.testSlotScalingTempHpDamage.description": "Temporary test preset. Temporary HP and damage increase with the spell slot level used."
 }
