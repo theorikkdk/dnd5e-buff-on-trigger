@@ -3,8 +3,10 @@ import { getFlagDurationInRounds } from "./duration.js";
 import {
   upsertActiveBuff,
   removeActiveBuff,
+  getActiveBuff,
   getActiveBuffs,
   pruneStaleActiveBuffs,
+  compareBuffDominance,
   getStackingKey,
   getDominantBuffForStack,
   isDominantBuff,
@@ -74,6 +76,8 @@ const CREATURE_TYPE_ALIASES = {
   "artificiel": "construct",
 };
 const allowedLinkedStatusDeletions = new Set();
+const allowedActiveBuffIndicatorDeletions = new Set();
+const allowedConcentrationDeletions = new Set();
 let linkedStatusProtectionRegistered = false;
 
 function localize(key) {
@@ -152,10 +156,22 @@ function hasConfiguredCharges(flag) {
   return Number.isFinite(charges) && charges > 0;
 }
 
-const finalizedRollModifierRolls = new WeakSet();
 const finalizedRollModifierMetadata = new WeakSet();
 const finalizedRollModifierKeys = new Map();
 const recentRollModifierConsumptions = new Map();
+const recentConsumableRollStacks = new Map();
+const recentFinalizedRollModifierStacks = new Map();
+const CONSUMABLE_ROLL_STACK_TTL_MS = 2000;
+const ROLL_MODIFIER_STACK_FINALIZATION_TTL_MS = 2000;
+const ROLL_MODIFIER_DEBUG_PREFIX = "Roll modifier";
+
+function rollModifierDebug(message, data = {}) {
+  try {
+    debugLog(`[${MODULE_ID}] ${ROLL_MODIFIER_DEBUG_PREFIX} ${message} ${JSON.stringify(data)}`);
+  } catch (error) {
+    debugLog(`[${MODULE_ID}] ${ROLL_MODIFIER_DEBUG_PREFIX} ${message}`);
+  }
+}
 
 function pruneFinalizedRollModifierKeys(now = Date.now()) {
   for (const [key, timestamp] of finalizedRollModifierKeys.entries()) {
@@ -166,6 +182,19 @@ function pruneFinalizedRollModifierKeys(now = Date.now()) {
 function pruneRecentRollModifierConsumptions(now = Date.now()) {
   for (const [key, timestamp] of recentRollModifierConsumptions.entries()) {
     if (now - timestamp > 500) recentRollModifierConsumptions.delete(key);
+  }
+}
+
+function pruneRecentConsumableRollStacks(now = Date.now()) {
+  for (const [key, entry] of recentConsumableRollStacks.entries()) {
+    const timestamp = typeof entry === "object" ? entry.timestamp : entry;
+    if (now - timestamp > CONSUMABLE_ROLL_STACK_TTL_MS) recentConsumableRollStacks.delete(key);
+  }
+}
+
+function pruneRecentFinalizedRollModifierStacks(now = Date.now()) {
+  for (const [key, timestamp] of recentFinalizedRollModifierStacks.entries()) {
+    if (now - timestamp > ROLL_MODIFIER_STACK_FINALIZATION_TTL_MS) recentFinalizedRollModifierStacks.delete(key);
   }
 }
 
@@ -191,6 +220,34 @@ function consumeAllowedLinkedStatusDeletion(document) {
   return true;
 }
 
+function allowActiveBuffIndicatorDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key) return;
+  allowedActiveBuffIndicatorDeletions.add(key);
+  setTimeout(() => allowedActiveBuffIndicatorDeletions.delete(key), 5000);
+}
+
+export function consumeAllowedActiveBuffIndicatorDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key || !allowedActiveBuffIndicatorDeletions.has(key)) return false;
+  allowedActiveBuffIndicatorDeletions.delete(key);
+  return true;
+}
+
+export function allowConcentrationDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key) return;
+  allowedConcentrationDeletions.add(key);
+  setTimeout(() => allowedConcentrationDeletions.delete(key), 5000);
+}
+
+export function consumeAllowedConcentrationDeletion(document) {
+  const key = getDocumentDeletionKey(document);
+  if (!key || !allowedConcentrationDeletions.has(key)) return false;
+  allowedConcentrationDeletions.delete(key);
+  return true;
+}
+
 function isSameActiveBuff(currentFlag, expectedFlag) {
   if (!currentFlag || !expectedFlag) return false;
   return currentFlag.originActorUuid === expectedFlag.originActorUuid
@@ -204,7 +261,7 @@ function getRollModifierFinalizationKey(actor, metadata, rolls) {
     .join("|");
   return [
     actor?.uuid ?? "actor",
-    metadata?.rollType ?? "rollType",
+    metadata?.stackingKey ?? "stack",
     metadata?.formula ?? "formula",
     formulas,
   ].join("::");
@@ -213,11 +270,91 @@ function getRollModifierFinalizationKey(actor, metadata, rolls) {
 function getRollModifierConsumptionKey(actor, flag, metadata) {
   return [
     actor?.uuid ?? "actor",
+    metadata?.buffId ?? flag?.buffId ?? "buff",
+    metadata?.stackingKey ?? getStackingKey(flag) ?? "stack",
     flag?.originActorUuid ?? "origin",
     getBuffItemUuid(flag) ?? "item",
     flag?.itemName ?? "buff",
     metadata?.formula ?? flag?.rollModifier?.formula ?? "formula",
   ].join("::");
+}
+
+function getRollModifierStackFinalizationKey(actor, metadata) {
+  return [
+    actor?.uuid ?? "actor",
+    metadata?.stackingKey ?? "stack",
+    metadata?.formula ?? "formula",
+  ].join("::");
+}
+
+function getConsumableRollStackDebug(actor, metadata) {
+  const key = getRollModifierStackFinalizationKey(actor, metadata);
+  const lock = getRecentConsumableRollStack(actor, metadata);
+  return {
+    key,
+    allowedBuffId: lock?.allowedBuffId ?? null,
+    token: lock?.token ?? null,
+    remainingMs: lock?.timestamp ? Math.max(0, CONSUMABLE_ROLL_STACK_TTL_MS - (Date.now() - lock.timestamp)) : 0,
+  };
+}
+
+function shouldUseRollModifierStackApplicationLock(flag) {
+  return hasConfiguredCharges(flag)
+    || flag?.chargesRemaining != null
+    || flag?.consumeOnTrigger !== false;
+}
+
+function createConsumableRollStackToken() {
+  return `roll-stack-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getRecentConsumableRollStack(actor, metadata) {
+  const now = Date.now();
+  pruneRecentConsumableRollStacks(now);
+  const key = getRollModifierStackFinalizationKey(actor, metadata);
+  const previous = recentConsumableRollStacks.get(key);
+  if (!previous) return null;
+  const timestamp = typeof previous === "object" ? previous.timestamp : previous;
+  if (now - timestamp > CONSUMABLE_ROLL_STACK_TTL_MS) {
+    recentConsumableRollStacks.delete(key);
+    return null;
+  }
+  return typeof previous === "object" ? previous : { token: null, timestamp };
+}
+
+function hasRecentConsumableRollStack(actor, metadata, token = metadata?.consumableStackToken ?? null) {
+  const previous = getRecentConsumableRollStack(actor, metadata);
+  return !!previous && (!token || previous.token !== token);
+}
+
+function markRecentConsumableRollStack(actor, metadata, token = metadata?.consumableStackToken ?? null) {
+  const stackToken = token || createConsumableRollStackToken();
+  pruneRecentConsumableRollStacks();
+  const key = getRollModifierStackFinalizationKey(actor, metadata);
+  recentConsumableRollStacks.set(key, {
+    token: stackToken,
+    timestamp: Date.now(),
+  });
+  rollModifierDebug("stack locked", {
+    actor: actor?.name ?? null,
+    actorUuid: actor?.uuid ?? null,
+    key,
+    stackingKey: metadata?.stackingKey ?? null,
+    formula: metadata?.formula ?? null,
+    allowedBuffId: metadata?.buffId ?? null,
+    token: stackToken,
+  });
+  return stackToken;
+}
+
+function reserveRollModifierStackFinalization(actor, metadata) {
+  const now = Date.now();
+  pruneRecentFinalizedRollModifierStacks(now);
+  const key = getRollModifierStackFinalizationKey(actor, metadata);
+  const previous = recentFinalizedRollModifierStacks.get(key);
+  if (previous && now - previous <= ROLL_MODIFIER_STACK_FINALIZATION_TTL_MS) return false;
+  recentFinalizedRollModifierStacks.set(key, now);
+  return true;
 }
 
 function reserveRollModifierConsumption(actor, flag, metadata) {
@@ -234,10 +371,17 @@ async function deleteDocumentIfExists(document, context = "document") {
   if (!document || document.deleted) return false;
   try {
     if (document.flags?.[MODULE_ID]?.linkedStatus === true) allowLinkedStatusDeletion(document);
+    if (document.flags?.[MODULE_ID]?.indicator === true || document.statuses?.has?.("bot-active") === true) {
+      allowActiveBuffIndicatorDeletion(document);
+    }
+    if (document.statuses?.has?.("concentrating") || document.statuses?.has?.("concentration")) {
+      allowConcentrationDeletion(document);
+    }
     await document.delete({
       [MODULE_ID]: {
         allowLinkedStatusDeletion: true,
         allowActiveBuffIndicatorDeletion: true,
+        allowConcentrationDeletion: true,
       },
     });
     return true;
@@ -254,7 +398,6 @@ async function deleteDocumentIfExists(document, context = "document") {
 function hasFinalizedRollModifier(actor, metadata, rolls) {
   const rollList = Array.isArray(rolls) ? rolls : [];
   if (metadata && finalizedRollModifierMetadata.has(metadata)) return true;
-  if (rollList.some((roll) => roll && typeof roll === "object" && finalizedRollModifierRolls.has(roll))) return true;
 
   const now = Date.now();
   pruneFinalizedRollModifierKeys(now);
@@ -265,9 +408,6 @@ function hasFinalizedRollModifier(actor, metadata, rolls) {
 function markFinalizedRollModifier(actor, metadata, rolls) {
   const rollList = Array.isArray(rolls) ? rolls : [];
   if (metadata && typeof metadata === "object") finalizedRollModifierMetadata.add(metadata);
-  for (const roll of rollList) {
-    if (roll && typeof roll === "object") finalizedRollModifierRolls.add(roll);
-  }
   finalizedRollModifierKeys.set(getRollModifierFinalizationKey(actor, metadata, rollList), Date.now());
 }
 function getRemainingCharges(flag) {
@@ -1330,11 +1470,11 @@ export function shouldBlockTriggerFrequency(actor, flag) {
   return false;
 }
 
-export async function markTriggerFrequencyUsage(actor) {
+export async function markTriggerFrequencyUsage(actor, flag = null) {
   const currentUsage = getCurrentTriggerUsage();
   if (!currentUsage || !actor?.setFlag) return;
 
-  const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+  const activeBuff = flag ?? actor.getFlag(MODULE_ID, "activeBuff");
   if (!activeBuff) return;
 
   await upsertActiveBuff(actor, {
@@ -1343,7 +1483,7 @@ export async function markTriggerFrequencyUsage(actor) {
       ...(activeBuff.runtime ?? {}),
       lastTrigger: currentUsage,
     },
-  });
+  }, { writeLegacy: !flag });
 }
 
 function getLinkedStatusOriginItemUuid(flag) {
@@ -1560,9 +1700,13 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
         return activeBuffId ? effectBuffId === activeBuffId : effect.name === getActiveBuffIndicatorName(activeBuff);
       });
       if (existingActiveIndicator && !indicatorsToRemove.includes(existingActiveIndicator)) {
-        await deleteDocumentIfExists(existingActiveIndicator, "indicateur actif");
+        const desiredName = getActiveBuffIndicatorName(activeBuff);
+        if (existingActiveIndicator.name !== desiredName) {
+          await existingActiveIndicator.update({ name: desiredName });
+        }
+      } else {
+        await createActiveBuffIndicator(actor, activeBuff, extraChanges);
       }
-      await createActiveBuffIndicator(actor, activeBuff, extraChanges);
     }
 
     await refreshStoredTargetIndicator(actor, previousFlag);
@@ -1859,19 +2003,49 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
   try {
     if (flag.chargesRemaining !== null) {
       const actor = workflow.actor;
-      const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
+      rollModifierDebug("consume enter: charges branch", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        receivedBuffId: flag?.buffId ?? null,
+        receivedStackingKey: getStackingKey(flag) ?? null,
+        itemName: flag?.itemName ?? null,
+        charges: flag?.charges ?? null,
+        chargesRemaining: flag?.chargesRemaining ?? null,
+        consumeOnTrigger: flag?.consumeOnTrigger ?? null,
+      });
+      const currentFlag = flag?.buffId
+        ? getActiveBuff(actor, flag.buffId)
+        : actor?.getFlag?.(MODULE_ID, "activeBuff");
       if (!isSameActiveBuff(currentFlag, flag)) {
-        debugLog(`[${MODULE_ID}] Consommation ignoree : buff actif deja modifie ou supprime`);
+        rollModifierDebug("consume ignored: current flag mismatch", {
+          actor: actor?.name ?? null,
+          receivedBuffId: flag?.buffId ?? null,
+          currentBuffId: currentFlag?.buffId ?? null,
+          receivedItem: flag?.itemName ?? null,
+          currentItem: currentFlag?.itemName ?? null,
+        });
         return;
       }
       const currentCharges = Number(currentFlag.chargesRemaining);
       if (!Number.isFinite(currentCharges) || currentCharges <= 0) {
-        debugLog(`[${MODULE_ID}] Consommation ignoree : charges deja consommees`);
+        rollModifierDebug("consume ignored: charges already spent", {
+          actor: actor?.name ?? null,
+          buffId: currentFlag?.buffId ?? null,
+          chargesRemaining: currentFlag?.chargesRemaining ?? null,
+        });
         return;
       }
       const newCharges = currentCharges - 1;
       await createChargeConsumptionMessage(actor, currentFlag, newCharges);
-      debugLog(`[${MODULE_ID}] Charges restantes : ${newCharges}`);
+      rollModifierDebug("consume charges updated", {
+        actor: actor?.name ?? null,
+        buffId: currentFlag?.buffId ?? null,
+        stackingKey: getStackingKey(currentFlag) ?? null,
+        itemName: currentFlag?.itemName ?? null,
+        before: currentCharges,
+        after: newCharges,
+        willRemove: newCharges <= 0,
+      });
       if (newCharges <= 0) {
         if (shouldRetainBuffForRepeatedSave(currentFlag)) {
           const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
@@ -1883,10 +2057,23 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           return;
         }
         const stackingKey = getStackingKey(currentFlag);
+        rollModifierDebug("consume removing exhausted buff", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          buffId: currentFlag?.buffId ?? null,
+          stackingKey,
+          itemName: currentFlag?.itemName ?? null,
+          activeBuffIdsBefore: Object.keys(getActiveBuffs(actor)),
+        });
         await showBuffReminder(actor, currentFlag, "buffEnd");
         await removeActiveBuff(actor, currentFlag);
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-        debugLog(`[${MODULE_ID}] Buff epuise a toutes les charges consommees`);
+        rollModifierDebug("consume exhausted buff removed", {
+          actor: actor?.name ?? null,
+          buffId: currentFlag?.buffId ?? null,
+          stackingKey,
+          activeBuffIdsAfterRemoveActiveBuff: Object.keys(getActiveBuffs(actor)),
+        });
         const concentrationEffect = actor?.effects.find(
           (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
         );
@@ -1900,16 +2087,39 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
         }
       } else {
-        const updatedFlag = { ...currentFlag, chargesRemaining: newCharges };
+      const updatedFlag = { ...currentFlag, chargesRemaining: newCharges };
         await upsertActiveBuff(workflow.actor, updatedFlag);
         await updateActiveBuffIndicatorName(workflow.actor, updatedFlag);
-        debugLog(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
+        rollModifierDebug("consume retained buff with remaining charges", {
+          actor: workflow.actor?.name ?? null,
+          buffId: updatedFlag?.buffId ?? null,
+          stackingKey: getStackingKey(updatedFlag) ?? null,
+          chargesRemaining: newCharges,
+        });
       }
     } else if ((options.forceConsume || workflow.item !== null) && flag.consumeOnTrigger !== false) {
       const actor = workflow.actor;
-      const currentFlag = actor?.getFlag?.(MODULE_ID, "activeBuff");
+      rollModifierDebug("consume enter: consumeOnTrigger branch", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        receivedBuffId: flag?.buffId ?? null,
+        receivedStackingKey: getStackingKey(flag) ?? null,
+        itemName: flag?.itemName ?? null,
+        charges: flag?.charges ?? null,
+        chargesRemaining: flag?.chargesRemaining ?? null,
+        consumeOnTrigger: flag?.consumeOnTrigger ?? null,
+      });
+      const currentFlag = flag?.buffId
+        ? getActiveBuff(actor, flag.buffId)
+        : actor?.getFlag?.(MODULE_ID, "activeBuff");
       if (!isSameActiveBuff(currentFlag, flag)) {
-        debugLog(`[${MODULE_ID}] Consommation ignoree : buff actif deja modifie ou supprime`);
+        rollModifierDebug("consume ignored: current flag mismatch", {
+          actor: actor?.name ?? null,
+          receivedBuffId: flag?.buffId ?? null,
+          currentBuffId: currentFlag?.buffId ?? null,
+          receivedItem: flag?.itemName ?? null,
+          currentItem: currentFlag?.itemName ?? null,
+        });
         return;
       }
       if (shouldRetainBuffForRepeatedSave(currentFlag)) {
@@ -1922,10 +2132,23 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         return;
       }
       const stackingKey = getStackingKey(currentFlag);
+      rollModifierDebug("consume removing consumeOnTrigger buff", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        buffId: currentFlag?.buffId ?? null,
+        stackingKey,
+        itemName: currentFlag?.itemName ?? null,
+        activeBuffIdsBefore: Object.keys(getActiveBuffs(actor)),
+      });
       await showBuffReminder(actor, currentFlag, "buffEnd");
       await removeActiveBuff(actor, currentFlag);
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      debugLog(`[${MODULE_ID}] Buff consomme sur ${actor?.name}`);
+      rollModifierDebug("consumeOnTrigger buff removed", {
+        actor: actor?.name ?? null,
+        buffId: currentFlag?.buffId ?? null,
+        stackingKey,
+        activeBuffIdsAfterRemoveActiveBuff: Object.keys(getActiveBuffs(actor)),
+      });
       const concentrationEffect = actor?.effects.find(
         (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
       );
@@ -1973,39 +2196,165 @@ function getRollModifierTargets(actor, flag) {
   return targets;
 }
 
+export function getRollModifierCandidates(actor, rollType) {
+  if (!actor?.getFlag) return [];
+  return Object.entries(getActiveBuffs(actor))
+    .map(([buffId, activeFlag]) => ({ buffId: activeFlag?.buffId ?? buffId, activeFlag }))
+    .filter(({ activeFlag }) => {
+      const rollModifier = activeFlag?.rollModifier;
+      if (!rollModifier?.enabled || !rollModifier.formula) return false;
+      const rollTypes = Array.isArray(rollModifier.rollTypes) ? rollModifier.rollTypes : [];
+      if (!rollTypes.includes(rollType)) return false;
+      if (shouldBlockTriggerFrequency(actor, activeFlag)) return false;
+      return true;
+    })
+    .map(({ buffId, activeFlag }) => ({
+      activeFlag,
+      buffId,
+      stackingKey: getStackingKey(activeFlag) || buffId,
+      formula: activeFlag.rollModifier.formula,
+      rollType,
+    }))
+    .filter((candidate) => {
+      const consumable = shouldUseRollModifierStackApplicationLock(candidate.activeFlag);
+      const lock = consumable ? getConsumableRollStackDebug(actor, candidate) : null;
+      const blocked = consumable && hasRecentConsumableRollStack(actor, candidate);
+      rollModifierDebug("candidate inspected", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        rollType,
+        itemName: candidate.activeFlag?.itemName ?? null,
+        buffId: candidate.buffId,
+        stackingKey: candidate.stackingKey,
+        formula: candidate.formula,
+        charges: candidate.activeFlag?.charges ?? null,
+        chargesRemaining: candidate.activeFlag?.chargesRemaining ?? null,
+        consumeOnTrigger: candidate.activeFlag?.consumeOnTrigger ?? null,
+        consumable,
+        blocked,
+        lock,
+      });
+      if (!consumable) return true;
+      if (blocked) {
+        rollModifierDebug("candidate ignored by consumable stack lock", {
+          actor: actor?.name ?? null,
+          rollType,
+          buffId: candidate.buffId,
+          stackingKey: candidate.stackingKey,
+          formula: candidate.formula,
+          lock,
+        });
+      }
+      return !blocked;
+    });
+}
+
+export function getDominantRollModifiers(actor, rollType) {
+  const candidates = getRollModifierCandidates(actor, rollType);
+  const groups = new Map();
+  for (const candidate of candidates) {
+    const groupKey = candidate.activeFlag?.stackingMode === "alwaysStack"
+      ? `${candidate.stackingKey}:${candidate.buffId}`
+      : candidate.stackingKey;
+    const current = groups.get(groupKey);
+    if (!current || compareBuffDominance(current.activeFlag, candidate.activeFlag) <= 0) {
+      groups.set(groupKey, candidate);
+    }
+  }
+  for (const [stackingKey, dominant] of groups.entries()) {
+    const groupCandidates = candidates.filter((candidate) => {
+      const groupKey = candidate.activeFlag?.stackingMode === "alwaysStack"
+        ? `${candidate.stackingKey}:${candidate.buffId}`
+        : candidate.stackingKey;
+      return groupKey === stackingKey;
+    });
+    rollModifierDebug("dominant selected", {
+      actor: actor?.name ?? null,
+      actorUuid: actor?.uuid ?? null,
+      rollType,
+      stackingKey,
+      dominantBuffId: dominant?.buffId ?? null,
+      candidates: groupCandidates.map((candidate) => ({
+        buffId: candidate.buffId,
+        itemName: candidate.activeFlag?.itemName ?? null,
+        appliedAt: candidate.activeFlag?.appliedAt ?? null,
+        originSpellLevel: candidate.activeFlag?.originSpellLevel ?? null,
+      })),
+      nonDominantBuffIds: groupCandidates.map((candidate) => candidate.buffId).filter((buffId) => buffId !== dominant?.buffId),
+    });
+  }
+  return [...groups.values()];
+}
+
 export function applyRollModifierToConfig(actor, rollType, config, options = {}) {
   try {
     if (!actor?.getFlag) return false;
-    const flag = actor.getFlag(MODULE_ID, "activeBuff");
-    const rollModifier = flag?.rollModifier;
-    if (!rollModifier?.enabled || !rollModifier.formula) return false;
+    const candidates = getDominantRollModifiers(actor, rollType);
+    if (!candidates.length) return false;
 
-    const rollTypes = Array.isArray(rollModifier.rollTypes) ? rollModifier.rollTypes : [];
-    if (!rollTypes.includes(rollType)) {
-      debugLog(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : type non compatible`);
-      return false;
+    const appliedModifiers = [];
+    for (const candidate of candidates) {
+      if (shouldUseRollModifierStackApplicationLock(candidate.activeFlag)
+        && hasRecentConsumableRollStack(actor, candidate)) {
+        rollModifierDebug("apply ignored by consumable stack lock", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType,
+          buffId: candidate.buffId,
+          stackingKey: candidate.stackingKey,
+          formula: candidate.formula,
+          lock: getConsumableRollStackDebug(actor, candidate),
+        });
+        continue;
+      }
+      const safeData = buildSafeRollModifierData(actor, candidate.activeFlag);
+      if (!appendRollModifierPart(config, candidate.formula, safeData)) {
+        console.warn(`[${MODULE_ID}] Modificateur de jet non applique : configuration dnd5e incompatible`);
+        continue;
+      }
+      const consumableStackToken = shouldUseRollModifierStackApplicationLock(candidate.activeFlag)
+        ? markRecentConsumableRollStack(actor, candidate)
+        : null;
+      if (shouldUseRollModifierStackApplicationLock(candidate.activeFlag)) {
+        rollModifierDebug("apply consumable stack marked", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType,
+          buffId: candidate.buffId,
+          stackingKey: candidate.stackingKey,
+          formula: candidate.formula,
+          consumableStackToken,
+          lock: getConsumableRollStackDebug(actor, candidate),
+        });
+      }
+      rollModifierDebug("modifier added to config", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        rollType,
+        buffId: candidate.buffId,
+        stackingKey: candidate.stackingKey,
+        formula: candidate.formula,
+      });
+      appliedModifiers.push({
+        actorUuid: actor.uuid,
+        rollType,
+        formula: candidate.formula,
+        buffId: candidate.buffId,
+        stackingKey: candidate.stackingKey,
+        consumableStackToken,
+      });
     }
+    if (!appliedModifiers.length) return false;
 
-    if (shouldBlockTriggerFrequency(actor, flag)) {
-      debugLog(`[${MODULE_ID}] Modificateur de jet ignor\u00e9 : fr\u00e9quence d\u00e9j\u00e0 utilis\u00e9e`);
-      return false;
-    }
-
-    const workflow = {
-      actor,
-      item: null,
-      token: actor.getActiveTokens?.()[0] ?? null,
-      targets: new Set(),
-      hitTargets: new Set(),
-      missedTargets: new Set(),
-    };
-    const safeData = buildSafeRollModifierData(actor, flag);
-    if (!appendRollModifierPart(config, rollModifier.formula, safeData)) {
-      console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible`);
-      return false;
-    }
-
-    config._botRollModifier = { actorUuid: actor.uuid, rollType, formula: rollModifier.formula };
+    config._botRollModifier = appliedModifiers.length === 1
+      ? appliedModifiers[0]
+      : { actorUuid: actor.uuid, rollType, formula: appliedModifiers.map((modifier) => modifier.formula).join(","), modifiers: appliedModifiers };
+    rollModifierDebug("config metadata stored", {
+      actor: actor?.name ?? null,
+      actorUuid: actor?.uuid ?? null,
+      rollType,
+      metadata: config._botRollModifier,
+    });
     if (options.consume !== false) {
       finalizeRollModifierApplication(actor, rollType, config._botRollModifier, [config]);
     }
@@ -2030,40 +2379,117 @@ function rollContainsModifierFormula(roll, formula) {
 
 export async function finalizeRollModifierApplication(actor, rollType, metadata, rolls = []) {
   try {
-    if (!actor?.getFlag || !metadata?.formula || metadata.consumed) return false;
+    if (!actor?.getFlag || !metadata || metadata.consumed) return false;
     const rollList = Array.isArray(rolls) ? rolls : [];
-    if (hasFinalizedRollModifier(actor, metadata, rollList)) {
-      metadata.consumed = true;
-      debugLog(`[${MODULE_ID}] Consommation roll modifier ignoree : deja traitee`);
-      return false;
-    }
-    if (!rollList.some((roll) => rollContainsModifierFormula(roll, metadata.formula))) {
-      console.warn(`[${MODULE_ID}] Modificateur de jet non appliqu\u00e9 : configuration dnd5e incompatible`);
-      return false;
+    const modifiers = Array.isArray(metadata.modifiers) ? metadata.modifiers : [metadata];
+    let applied = false;
+    rollModifierDebug("finalize received", {
+      actor: actor?.name ?? null,
+      actorUuid: actor?.uuid ?? null,
+      rollType,
+      metadata,
+      rolls: rollList.map((roll) => ({
+        id: roll?.id ?? roll?._id ?? null,
+        formula: roll?.formula ?? roll?._formula ?? null,
+        total: roll?.total ?? null,
+      })),
+    });
+
+    for (const modifier of modifiers) {
+      if (!modifier?.formula || modifier.consumed) continue;
+      if (hasFinalizedRollModifier(actor, modifier, rollList)) {
+        modifier.consumed = true;
+        rollModifierDebug("finalize ignored: already finalized", {
+          actor: actor?.name ?? null,
+          rollType,
+          buffId: modifier.buffId ?? null,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+        });
+        continue;
+      }
+      if (!rollList.some((roll) => rollContainsModifierFormula(roll, modifier.formula))) {
+        console.warn(`[${MODULE_ID}] Modificateur de jet non applique : configuration dnd5e incompatible`);
+        rollModifierDebug("finalize ignored: formula not found in roll", {
+          actor: actor?.name ?? null,
+          rollType,
+          buffId: modifier.buffId ?? null,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+        });
+        continue;
+      }
+
+      markFinalizedRollModifier(actor, modifier, rollList);
+      modifier.consumed = true;
+
+      const flag = modifier.buffId
+        ? getActiveBuff(actor, modifier.buffId)
+        : actor.getFlag(MODULE_ID, "activeBuff");
+      if (!flag?.rollModifier?.enabled) continue;
+      if (shouldUseRollModifierStackApplicationLock(flag)
+        && hasRecentConsumableRollStack(actor, modifier, modifier.consumableStackToken ?? null)) {
+        rollModifierDebug("finalize ignored: buffId not allowed by consumable stack lock", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType,
+          buffId: modifier.buffId ?? null,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+          token: modifier.consumableStackToken ?? null,
+          lock: getConsumableRollStackDebug(actor, modifier),
+        });
+        continue;
+      }
+      if (!reserveRollModifierStackFinalization(actor, modifier)) {
+        rollModifierDebug("finalize ignored: stack already finalized", {
+          actor: actor?.name ?? null,
+          rollType,
+          buffId: modifier.buffId ?? null,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+          lock: getConsumableRollStackDebug(actor, modifier),
+        });
+        continue;
+      }
+      if (!reserveRollModifierConsumption(actor, flag, modifier)) {
+        rollModifierDebug("finalize ignored: consumption already reserved", {
+          actor: actor?.name ?? null,
+          rollType,
+          buffId: modifier.buffId ?? null,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+        });
+        continue;
+      }
+
+      rollModifierDebug("finalize consuming modifier", {
+        actor: actor?.name ?? null,
+        actorUuid: actor?.uuid ?? null,
+        rollType,
+        buffId: modifier.buffId ?? null,
+        stackingKey: modifier.stackingKey ?? null,
+        formula: modifier.formula ?? null,
+        charges: flag?.charges ?? null,
+        chargesRemaining: flag?.chargesRemaining ?? null,
+        consumeOnTrigger: flag?.consumeOnTrigger ?? null,
+      });
+      const workflow = {
+        actor,
+        item: null,
+        token: actor.getActiveTokens?.()[0] ?? null,
+        targets: new Set(),
+        hitTargets: new Set(),
+        missedTargets: new Set(),
+      };
+      await markTriggerFrequencyUsage(actor, flag);
+      await consumeOrDecrementCharges(workflow, flag, getRollModifierTargets(actor, flag), { forceConsume: true });
+      debugLog(`[${MODULE_ID}] Modificateur de jet applique : ${modifier.formula} sur ${rollType}`);
+      applied = true;
     }
 
-    markFinalizedRollModifier(actor, metadata, rollList);
     metadata.consumed = true;
-
-    const flag = actor.getFlag(MODULE_ID, "activeBuff");
-    if (!flag?.rollModifier?.enabled) return false;
-    if (!reserveRollModifierConsumption(actor, flag, metadata)) {
-      debugLog(`[${MODULE_ID}] Consommation roll modifier ignoree : deja traitee`);
-      return false;
-    }
-
-    const workflow = {
-      actor,
-      item: null,
-      token: actor.getActiveTokens?.()[0] ?? null,
-      targets: new Set(),
-      hitTargets: new Set(),
-      missedTargets: new Set(),
-    };
-    await markTriggerFrequencyUsage(actor);
-    await consumeOrDecrementCharges(workflow, flag, getRollModifierTargets(actor, flag), { forceConsume: true });
-    debugLog(`[${MODULE_ID}] Modificateur de jet appliqu\u00e9 : ${metadata.formula} sur ${rollType}`);
-    return true;
+    return applied;
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans finalizeRollModifierApplication :`, error);
     return false;

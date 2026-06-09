@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder } from "./effects.js";
+import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
 import { getActiveBuff, getActiveBuffs, getStackingKey, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 
 const recentConcentrationRolls = new Map();
@@ -1346,7 +1346,10 @@ function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
 
 function findExistingBuffInstances(newFlag) {
   return collectBuffCarrierEntries()
-    .map(({ actor }) => ({ actor, activeBuff: actor.getFlag(MODULE_ID, "activeBuff") }))
+    .flatMap(({ actor }) =>
+      Object.entries(getActiveBuffs(actor))
+        .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
+    )
     .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
 }
 
@@ -1496,7 +1499,10 @@ async function endActiveBuff(actor, activeBuff) {
   const concentrationEffect = actor.effects?.find(
     (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
   );
-  if (concentrationEffect) await concentrationEffect.delete();
+  if (concentrationEffect) {
+    allowConcentrationDeletion(concentrationEffect);
+    await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });
+  }
   await refreshBuffIndicator(actor, itemName, [], activeBuff);
   await refreshStackAfterBuffRemoval(actor, activeBuff);
 }
@@ -2698,7 +2704,7 @@ export function registerTriggers() {
       if (await maybeEndBuffWhenLinkedStatusRemoved(effect, options)) return;
 
       if (isActiveBuffIndicatorEffect(effect)) {
-        if (options?.[MODULE_ID]?.allowActiveBuffIndicatorDeletion === true) return;
+        if (options?.[MODULE_ID]?.allowActiveBuffIndicatorDeletion === true || consumeAllowedActiveBuffIndicatorDeletion(effect)) return;
         const actor = effect.parent;
         if (!actor) return;
         const { activeBuff, buffId } = resolveActiveBuffFromIndicatorEffect(actor, effect);
@@ -2718,7 +2724,8 @@ export function registerTriggers() {
             (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
           );
           if (concentrationEffect) {
-            await concentrationEffect.delete();
+            allowConcentrationDeletion(concentrationEffect);
+            await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });
             debugLog(`[${MODULE_ID}] Concentration retirée sur ${actor.name}`);
           }
         }
@@ -2726,6 +2733,7 @@ export function registerTriggers() {
       }
 
       if (effect.statuses?.has("concentrating") || effect.statuses?.has("concentration")) {
+        if (options?.[MODULE_ID]?.allowConcentrationDeletion === true || consumeAllowedConcentrationDeletion(effect)) return;
         const actor = effect.parent;
         if (!actor) return;
         await clearConcentrationLinkedBuffs(actor);

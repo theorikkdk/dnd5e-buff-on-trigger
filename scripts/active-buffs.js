@@ -11,7 +11,7 @@ function generateBuffId() {
   return `bot-${random}`;
 }
 
-const ACTIVE_BUFF_REMOVAL_TTL_MS = 3000;
+const ACTIVE_BUFF_REMOVAL_TTL_MS = 10000;
 const pendingActiveBuffRemovals = new Map();
 
 function getActorRemovalKey(actor) {
@@ -32,17 +32,28 @@ export function markActiveBuffRemoval(actor, activeFlagOrId, { ttlMs = ACTIVE_BU
   const buffId = getActiveBuffId(activeFlagOrId);
   if (!actor || !buffId) return null;
   const key = getPendingRemovalKey(actor, buffId);
-  const existing = pendingActiveBuffRemovals.get(key);
-  if (existing?.timeoutId) clearTimeout(existing.timeoutId);
-  const timeoutId = setTimeout(() => pendingActiveBuffRemovals.delete(key), ttlMs);
-  pendingActiveBuffRemovals.set(key, { buffId, actorKey: getActorRemovalKey(actor), timeoutId, createdAt: Date.now() });
+  pendingActiveBuffRemovals.set(key, {
+    buffId,
+    actorKey: getActorRemovalKey(actor),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + ttlMs,
+  });
   debugLog(`[${MODULE_ID}] Buff marque en suppression : ${buffId}`);
   return buffId;
 }
 
 export function isActiveBuffRemovalPending(actor, buffId) {
   if (!actor || !buffId) return false;
-  return pendingActiveBuffRemovals.has(getPendingRemovalKey(actor, buffId));
+  const key = getPendingRemovalKey(actor, buffId);
+  const entry = pendingActiveBuffRemovals.get(key);
+  if (!entry) return false;
+
+  const rawActiveBuffs = getRawActiveBuffs(actor);
+  if (rawActiveBuffs?.[buffId]) return true;
+
+  if (Date.now() <= entry.expiresAt) return true;
+  pendingActiveBuffRemovals.delete(key);
+  return false;
 }
 
 function normalizeStackingKeyValue(value) {
@@ -229,7 +240,13 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true }
   if (!actor?.setFlag || !activeFlag) return null;
   const flagWithId = ensureActiveBuffId(activeFlag);
   if (isActiveBuffRemovalPending(actor, flagWithId.buffId)) {
-    debugLog(`[${MODULE_ID}] Upsert ignore : buff en suppression ${flagWithId.buffId}`);
+    debugLog(`[${MODULE_ID}] Upsert ignore : buff en suppression ${JSON.stringify({
+      actor: actor?.name ?? null,
+      actorUuid: actor?.uuid ?? null,
+      buffId: flagWithId.buffId,
+      stackingKey: getStackingKey(flagWithId) ?? null,
+      itemName: flagWithId.itemName ?? null,
+    })}`);
     return null;
   }
   const activeBuffs = clone(await pruneStaleActiveBuffs(actor));
@@ -245,6 +262,9 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true }
 export async function removeActiveBuff(actor, activeFlagOrId, { clearLegacy = true } = {}) {
   if (!actor?.unsetFlag) return;
   const buffId = markActiveBuffRemoval(actor, activeFlagOrId);
+  const previousFlag = typeof activeFlagOrId === "string"
+    ? getRawActiveBuffs(actor)?.[activeFlagOrId]
+    : activeFlagOrId;
   const legacy = getLegacyActiveBuff(actor);
   const legacyBuffId = legacy?.buffId ?? (legacy ? "legacy-activeBuff" : null);
   let remainingActiveBuffs = clone(getRawActiveBuffs(actor));
