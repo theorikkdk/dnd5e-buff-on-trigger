@@ -1655,11 +1655,45 @@ function buildRepeatedSaveSupportBuffId(ownerActor, flag, statusId = null) {
 }
 
 function activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag) {
-  if (!activeBuff || !linkedFlag?.buffId) return false;
+  if (!activeBuff || !linkedFlag?.linkedStatus) return false;
+  const statusIds = Array.isArray(activeBuff?.status?.ids)
+    ? activeBuff.status.ids.filter(Boolean)
+    : [activeBuff?.status?.id].filter(Boolean);
+  if (!statusIds.includes(linkedFlag.statusId)) return false;
+  if (activeBuff?.originActorUuid && linkedFlag.originActorUuid && linkedFlag.originActorUuid !== activeBuff.originActorUuid) return false;
+  const originItemUuid = activeBuff?.originItemUuid ?? activeBuff?.itemUuid ?? null;
+  if (originItemUuid && linkedFlag.originItemUuid && linkedFlag.originItemUuid !== originItemUuid) return false;
+  if (!linkedFlag.buffId) return true;
   if (activeBuff.buffId && linkedFlag.buffId === activeBuff.buffId) return true;
   const groupedBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff);
   const legacyBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff, linkedFlag.statusId ?? null);
   return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId;
+}
+
+function resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag) {
+  if (!ownerActor?.getFlag || !linkedFlag?.linkedStatus) return null;
+  if (linkedFlag.buffId) {
+    const activeBuff = getActiveBuff(ownerActor, linkedFlag.buffId);
+    if (activeBuff) return activeBuff;
+  }
+
+  const activeBuffs = Object.values(getActiveBuffs(ownerActor));
+  const matchingBuff = activeBuffs.find((activeBuff) => {
+    const statusIds = Array.isArray(activeBuff?.status?.ids)
+      ? activeBuff.status.ids.filter(Boolean)
+      : [activeBuff?.status?.id].filter(Boolean);
+    if (!statusIds.includes(linkedFlag.statusId)) return false;
+    if (activeBuff?.originActorUuid && linkedFlag.originActorUuid && linkedFlag.originActorUuid !== activeBuff.originActorUuid) return false;
+    const originItemUuid = activeBuff?.originItemUuid ?? activeBuff?.itemUuid ?? null;
+    if (originItemUuid && linkedFlag.originItemUuid && linkedFlag.originItemUuid !== originItemUuid) return false;
+    const groupedBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff);
+    const legacyBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff, linkedFlag.statusId ?? null);
+    return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId || !linkedFlag.buffId;
+  }) ?? null;
+  if (matchingBuff) return matchingBuff;
+
+  const legacyActiveBuff = ownerActor.getFlag(MODULE_ID, "activeBuff") ?? null;
+  return activeBuffMatchesLinkedStatus(legacyActiveBuff, ownerActor, linkedFlag) ? legacyActiveBuff : null;
 }
 
 function isAllowedLinkedStatusDeletion(options = {}) {
@@ -1673,7 +1707,7 @@ async function maybeEndBuffWhenLinkedStatusRemoved(effect, options = {}) {
 
   const ownerActor = resolveActorUuid(linkedFlag.ownerActorUuid);
   if (!ownerActor?.getFlag) return false;
-  const activeBuff = ownerActor.getFlag(MODULE_ID, "activeBuff");
+  const activeBuff = resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag);
   if (activeBuff?.status?.endBuffWhenRemoved !== true) return false;
   if (!activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag)) return false;
 
@@ -1775,7 +1809,7 @@ async function handleRepeatedSave(actor, flag, timing) {
 async function cleanupLinkedStatusSupportBuff(linkedFlag) {
   const ownerActor = resolveActorUuid(linkedFlag?.ownerActorUuid);
   if (!ownerActor?.getFlag) return;
-  const activeBuff = ownerActor.getFlag(MODULE_ID, "activeBuff");
+  const activeBuff = resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag);
   if (!activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag)) return;
   await endActiveBuff(ownerActor, activeBuff);
 }

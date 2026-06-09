@@ -783,5 +783,11 @@
   "BOT.presets.testTempHpSourceB.label": "[TEST] Temp HP - Source B",
   "BOT.presets.testTempHpSourceB.description": "Preset temporaire de test. Le porteur gagne 8 PV temporaires. Ce buff ne prend pas fin automatiquement quand les PV temporaires sont perdus.",
   "BOT.presets.testTempHpLostEnd.label": "[TEST] Temp HP Lost - End",
-  "BOT.presets.testTempHpLostEnd.description": "Preset temporaire de test. Le porteur gagne 5 PV temporaires, et ce buff prend fin quand les PV temporaires tombent à 0."
+  "BOT.presets.testTempHpLostEnd.description": "Preset temporaire de test. Le porteur gagne 5 PV temporaires, et ce buff prend fin quand les PV temporaires tombent à 0.",
+  "BOT.presets.testLinkedStatusFrightened.label": "[TEST] Linked Status - Effrayé",
+  "BOT.presets.testLinkedStatusFrightened.description": "Preset temporaire de test. Applique Effrayé comme statut lié. Si ce statut est retiré manuellement, seul ce buff prend fin.",
+  "BOT.presets.testLinkedStatusPoisoned.label": "[TEST] Linked Status - Empoisonné",
+  "BOT.presets.testLinkedStatusPoisoned.description": "Preset temporaire de test. Applique Empoisonné comme statut lié. Si ce statut est retiré manuellement, seul ce buff prend fin.",
+  "BOT.presets.testLinkedStatusEndsWithStatus.label": "[TEST] Linked Status - Fin si statut retiré",
+  "BOT.presets.testLinkedStatusEndsWithStatus.description": "Preset temporaire de test. Applique Entravé comme statut lié. Si ce statut est retiré manuellement, le buff lié prend fin."
 }

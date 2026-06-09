@@ -1554,7 +1554,7 @@ function shouldBlockLinkedStatusDeletion(effect, options = {}) {
   if (consumeAllowedLinkedStatusDeletion(effect)) return false;
 
   const ownerActor = resolveLinkedStatusOwnerActor(linkedFlag, effect.parent);
-  const activeBuff = ownerActor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
+  const activeBuff = resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag);
   if (!activeBuff?.status?.removeWhenBuffEnds) return false;
   if (!linkedStatusMatchesBuff(effect, ownerActor, activeBuff)) return false;
   if (activeBuff.status?.endBuffWhenRemoved === true) return false;
@@ -1587,9 +1587,36 @@ function linkedStatusMatchesBuff(effect, ownerActor, flag) {
   if (expectedOriginActorUuid && effectFlag.originActorUuid !== expectedOriginActorUuid) return false;
   if (expectedOriginItemUuid && effectFlag.originItemUuid !== expectedOriginItemUuid) return false;
   if (expectedOwnerActorUuid && effectFlag.ownerActorUuid !== expectedOwnerActorUuid) return false;
-  if (expectedBuffId && effectFlag.buffId !== expectedBuffId && effectFlag.buffId !== legacyBuffId) return false;
+  if (expectedBuffId && effectFlag.buffId && effectFlag.buffId !== expectedBuffId && effectFlag.buffId !== legacyBuffId) return false;
 
   return true;
+}
+
+function resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag) {
+  if (!ownerActor?.getFlag || !linkedFlag?.linkedStatus) return null;
+  if (linkedFlag.buffId) {
+    const activeBuff = getActiveBuff(ownerActor, linkedFlag.buffId);
+    if (activeBuff) return activeBuff;
+  }
+
+  const activeBuffs = Object.values(getActiveBuffs(ownerActor));
+  const matchingBuff = activeBuffs.find((activeBuff) => {
+    const statusIds = getConfiguredStatusIds(activeBuff);
+    if (!statusIds.includes(linkedFlag.statusId)) return false;
+    const originActorUuid = activeBuff?.originActorUuid ?? null;
+    const originItemUuid = getLinkedStatusOriginItemUuid(activeBuff);
+    if (originActorUuid && linkedFlag.originActorUuid && linkedFlag.originActorUuid !== originActorUuid) return false;
+    if (originItemUuid && linkedFlag.originItemUuid && linkedFlag.originItemUuid !== originItemUuid) return false;
+    const groupedBuffId = buildLinkedStatusBuffId(ownerActor, activeBuff);
+    const legacyBuffId = buildLinkedStatusBuffId(ownerActor, activeBuff, linkedFlag.statusId);
+    return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId || !linkedFlag.buffId;
+  }) ?? null;
+  if (matchingBuff) return matchingBuff;
+
+  const legacyActiveBuff = ownerActor.getFlag(MODULE_ID, "activeBuff") ?? null;
+  return legacyActiveBuff && linkedStatusMatchesBuff({ flags: { [MODULE_ID]: linkedFlag } }, ownerActor, legacyActiveBuff)
+    ? legacyActiveBuff
+    : null;
 }
 
 async function cleanupLinkedStatusEffects(ownerActor, flag) {
@@ -1640,14 +1667,8 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
     const actor = actorOrToken?.actor ?? actorOrToken;
     if (!actor?.getFlag || !actor?.toggleStatusEffect) return;
 
-    const currentActiveBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    const activeBuff = flag ?? currentActiveBuff;
-    if (!currentActiveBuff || !activeBuff) return;
-    if (flag) {
-      const currentOriginItemUuid = getLinkedStatusOriginItemUuid(currentActiveBuff);
-      const activeOriginItemUuid = getLinkedStatusOriginItemUuid(activeBuff);
-      if (currentOriginItemUuid && activeOriginItemUuid && currentOriginItemUuid !== activeOriginItemUuid) return;
-    }
+    const activeBuff = flag ?? actor.getFlag(MODULE_ID, "activeBuff");
+    if (!activeBuff) return;
     if (activeBuff.status?.removeWhenBuffEnds !== true || activeBuff.status?.protectWhileBuffActive !== true) return;
 
     const statusIds = getConfiguredStatusIds(activeBuff);

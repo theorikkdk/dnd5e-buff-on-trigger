@@ -783,5 +783,11 @@
   "BOT.presets.testTempHpSourceB.label": "[TEST] Temp HP - Source B",
   "BOT.presets.testTempHpSourceB.description": "Temporary test preset. The bearer gains 8 temporary HP. This buff does not automatically end when temporary HP are lost.",
   "BOT.presets.testTempHpLostEnd.label": "[TEST] Temp HP Lost - End",
-  "BOT.presets.testTempHpLostEnd.description": "Temporary test preset. The bearer gains 5 temporary HP, and this buff ends when temporary HP drop to 0."
+  "BOT.presets.testTempHpLostEnd.description": "Temporary test preset. The bearer gains 5 temporary HP, and this buff ends when temporary HP drop to 0.",
+  "BOT.presets.testLinkedStatusFrightened.label": "[TEST] Linked Status - Frightened",
+  "BOT.presets.testLinkedStatusFrightened.description": "Temporary test preset. Applies Frightened as a linked status. If that status is manually removed, only this buff ends.",
+  "BOT.presets.testLinkedStatusPoisoned.label": "[TEST] Linked Status - Poisoned",
+  "BOT.presets.testLinkedStatusPoisoned.description": "Temporary test preset. Applies Poisoned as a linked status. If that status is manually removed, only this buff ends.",
+  "BOT.presets.testLinkedStatusEndsWithStatus.label": "[TEST] Linked Status - Ends with status",
+  "BOT.presets.testLinkedStatusEndsWithStatus.description": "Temporary test preset. Applies Restrained as a linked status. If that status is manually removed, the linked buff ends."
 }
