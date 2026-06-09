@@ -1795,4 +1795,58 @@ export const BUFF_PRESETS = [
       triggerFrequency: "round",
     },
   },
+  {
+    id: "testTempHpSourceA",
+    label: "BOT.presets.testTempHpSourceA.label",
+    description: "BOT.presets.testTempHpSourceA.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      temporaryHp: {
+        formula: "5",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testTempHpSourceB",
+    label: "BOT.presets.testTempHpSourceB.label",
+    description: "BOT.presets.testTempHpSourceB.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      temporaryHp: {
+        formula: "8",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testTempHpLostEnd",
+    label: "BOT.presets.testTempHpLostEnd.label",
+    description: "BOT.presets.testTempHpLostEnd.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      temporaryHp: {
+        formula: "5",
+        timing: "activation",
+        targetMode: "self",
+        mode: "keepHighest",
+      },
+      endConditions: {
+        onTemporaryHpLost: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];

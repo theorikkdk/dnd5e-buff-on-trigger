@@ -777,5 +777,11 @@
   "BOT.presets.testHealedSecondaryStatus.label": "[TEST] Healed - Secondary effect",
   "BOT.presets.testHealedSecondaryStatus.description": "Temporary test preset. When the bearer receives healing, the Frightened status is applied to them.",
   "BOT.presets.testHealedFrequency.label": "[TEST] Healed - Frequency",
-  "BOT.presets.testHealedFrequency.description": "Temporary test preset. When the bearer receives healing, they regain 1 additional hit point, at most once per round."
+  "BOT.presets.testHealedFrequency.description": "Temporary test preset. When the bearer receives healing, they regain 1 additional hit point, at most once per round.",
+  "BOT.presets.testTempHpSourceA.label": "[TEST] Temp HP - Source A",
+  "BOT.presets.testTempHpSourceA.description": "Temporary test preset. The bearer gains 5 temporary HP. This buff does not automatically end when temporary HP are lost.",
+  "BOT.presets.testTempHpSourceB.label": "[TEST] Temp HP - Source B",
+  "BOT.presets.testTempHpSourceB.description": "Temporary test preset. The bearer gains 8 temporary HP. This buff does not automatically end when temporary HP are lost.",
+  "BOT.presets.testTempHpLostEnd.label": "[TEST] Temp HP Lost - End",
+  "BOT.presets.testTempHpLostEnd.description": "Temporary test preset. The bearer gains 5 temporary HP, and this buff ends when temporary HP drop to 0."
 }

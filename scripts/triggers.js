@@ -1053,17 +1053,28 @@ function getChangedTemporaryHp(changed) {
   return normalizeTemporaryHpCandidate(value);
 }
 
+function getTemporaryHpLostEndBuffs(actor) {
+  return getActiveBuffsForTrigger(actor, (activeBuff) => activeBuff.endConditions?.onTemporaryHpLost === true);
+}
+
 function actorHasTemporaryHpLostEndCondition(actor) {
-  return actor?.getFlag?.(MODULE_ID, "activeBuff")?.endConditions?.onTemporaryHpLost === true;
+  return getTemporaryHpLostEndBuffs(actor).length > 0;
 }
 
 function sameActiveBuff(original, current) {
   if (!original || !current) return false;
+  if (original.buffId && current.buffId) return original.buffId === current.buffId;
   const originalItem = original.originItemUuid ?? original.itemUuid ?? null;
   const currentItem = current.originItemUuid ?? current.itemUuid ?? null;
   return originalItem === currentItem
     && (original.originActorUuid ?? null) === (current.originActorUuid ?? null)
     && (original.itemName ?? null) === (current.itemName ?? null);
+}
+
+function getTemporaryHpEndMarkerKey(actorOrUuid, activeBuffOrId) {
+  const actorUuid = typeof actorOrUuid === "string" ? actorOrUuid : actorOrUuid?.uuid;
+  const buffId = typeof activeBuffOrId === "string" ? activeBuffOrId : activeBuffOrId?.buffId;
+  return actorUuid && buffId ? `${actorUuid}|${buffId}` : actorUuid ?? null;
 }
 
 function prunePendingTemporaryHpEndConcentrationSkips(now = Date.now()) {
@@ -1101,13 +1112,34 @@ function concentrationEffectMatchesMarker(effect, marker) {
   return itemCandidates.includes(markerItemUuid);
 }
 
+function findConcentrationEffectForBuff(actor, activeBuff) {
+  if (activeBuff?.duration?.concentration !== true) return null;
+  const concentrationEffects = getActorConcentrationEffects(actor);
+  if (!concentrationEffects.length) return null;
+
+  const marker = {
+    originItemUuid: activeBuff.originItemUuid ?? activeBuff.itemUuid ?? null,
+  };
+  const matchingEffect = concentrationEffects.find((effect) => concentrationEffectMatchesMarker(effect, marker) === true);
+  if (matchingEffect) return matchingEffect;
+
+  const remainingConcentrationBuffs = Object.values(getActiveBuffs(actor))
+    .filter((flag) => flag?.duration?.concentration === true && !sameActiveBuff(activeBuff, flag));
+  if (concentrationEffects.length === 1 && !remainingConcentrationBuffs.length) return concentrationEffects[0];
+
+  debugLog(`[${MODULE_ID}] Concentration non supprimée : aucun effet ciblé trouvé pour ${activeBuff.itemName ?? "buff"}`);
+  return null;
+}
+
 function createTemporaryHpEndConcentrationSkip(actor, activeBuff, preTemp, predictedTemp, source = "unknown") {
   if (!actor?.uuid || activeBuff?.endConditions?.onTemporaryHpLost !== true) return null;
   const now = Date.now();
   prunePendingTemporaryHpEndConcentrationSkips(now);
   const concentrationEffects = getActorConcentrationEffects(actor);
+  const buffId = activeBuff.buffId ?? null;
   const marker = {
     actorUuid: actor.uuid,
+    buffId,
     itemName: activeBuff.itemName ?? null,
     originItemUuid: activeBuff.originItemUuid ?? activeBuff.itemUuid ?? null,
     originActorUuid: activeBuff.originActorUuid ?? null,
@@ -1118,10 +1150,13 @@ function createTemporaryHpEndConcentrationSkip(actor, activeBuff, preTemp, predi
     buffSnapshot: foundry.utils.deepClone(activeBuff),
     concentrationEffectCount: concentrationEffects.length,
   };
-  pendingTemporaryHpEndConcentrationSkips.set(actor.uuid, marker);
+  const markerKey = getTemporaryHpEndMarkerKey(actor, activeBuff);
+  if (!markerKey) return null;
+  pendingTemporaryHpEndConcentrationSkips.set(markerKey, marker);
   tempHpConcentrationDebug("pending marker created", {
     actor: actor.name,
     buff: marker.itemName,
+    buffId,
     preTemp,
     predictedTemp,
     source,
@@ -1130,22 +1165,24 @@ function createTemporaryHpEndConcentrationSkip(actor, activeBuff, preTemp, predi
   return marker;
 }
 
-function getTemporaryHpEndConcentrationSkip(actor) {
+function getTemporaryHpEndConcentrationSkips(actor) {
   if (!actor?.uuid) return null;
   const now = Date.now();
   prunePendingTemporaryHpEndConcentrationSkips(now);
-  const marker = pendingTemporaryHpEndConcentrationSkips.get(actor.uuid);
-  if (!marker) return null;
-  if (now - (marker.timestamp ?? 0) > TEMP_HP_CONCENTRATION_SKIP_TTL_MS) {
-    pendingTemporaryHpEndConcentrationSkips.delete(actor.uuid);
-    return null;
-  }
-  return marker;
+  return [...pendingTemporaryHpEndConcentrationSkips.entries()]
+    .filter(([, marker]) => marker?.actorUuid === actor.uuid)
+    .map(([, marker]) => marker);
+}
+
+function getTemporaryHpEndConcentrationSkip(actor) {
+  return getTemporaryHpEndConcentrationSkips(actor)?.[0] ?? null;
 }
 
 function shouldSkipTemporaryHpEndConcentration(actor, marker) {
   if (!actor?.getFlag || !marker) return { ok: false, reason: "missing actor or marker" };
-  const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+  const activeBuff = marker.buffId
+    ? getActiveBuff(actor, marker.buffId)
+    : getTemporaryHpLostEndBuffs(actor).find((flag) => sameActiveBuff(marker.buffSnapshot, flag));
   if (!activeBuff) return { ok: false, reason: "no active buff" };
   if (activeBuff.endConditions?.onTemporaryHpLost !== true) return { ok: false, reason: "active buff has no onTemporaryHpLost" };
   if (!sameActiveBuff(marker.buffSnapshot, activeBuff)) return { ok: false, reason: "active buff no longer matches marker" };
@@ -1184,11 +1221,15 @@ function scheduleTemporaryHpLostEndCheck(actor, activeBuff, damageItem, workflow
 
   const actorUuid = actor.uuid;
   const buffSnapshot = foundry.utils.deepClone(activeBuff);
+  const buffId = activeBuff.buffId ?? null;
   const check = async (delay) => {
     try {
       const delayedActor = fromUuidSync(actorUuid);
-      const delayedBuff = delayedActor?.getFlag?.(MODULE_ID, "activeBuff");
-      if (!delayedActor || !delayedBuff || !sameActiveBuff(buffSnapshot, delayedBuff)) return;
+      if (!delayedActor?.getFlag) return;
+      const delayedBuff = buffId
+        ? getActiveBuff(delayedActor, buffId)
+        : getTemporaryHpLostEndBuffs(delayedActor).find((flag) => sameActiveBuff(buffSnapshot, flag));
+      if (!delayedBuff || !sameActiveBuff(buffSnapshot, delayedBuff)) return;
       if (delayedBuff.endConditions?.onTemporaryHpLost !== true) return;
       const currentTemp = getActorTemporaryHp(delayedActor);
       const remove = currentTemp <= 0;
@@ -1196,8 +1237,10 @@ function scheduleTemporaryHpLostEndCheck(actor, activeBuff, damageItem, workflow
       tempHpEndDebug("calling endActiveBuff", {
         actor: delayedActor.name,
         buff: delayedBuff.itemName ?? "buff",
+        buffId: delayedBuff.buffId ?? null,
       });
-      pendingTemporaryHpEndConcentrationSkips.delete(actorUuid);
+      const markerKey = getTemporaryHpEndMarkerKey(actorUuid, delayedBuff);
+      if (markerKey) pendingTemporaryHpEndConcentrationSkips.delete(markerKey);
       await endActiveBuff(delayedActor, delayedBuff);
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans la fin automatique PV temporaires :`, error);
@@ -1377,6 +1420,7 @@ function findExistingBuffInstances(newFlag) {
 }
 
 function getActiveBuffsForTrigger(actor, predicate = null) {
+  if (!actor?.getFlag) return [];
   return Object.entries(getActiveBuffs(actor))
     .filter(([, activeBuff]) => !!activeBuff)
     .map(([buffId, activeBuff]) => ({
@@ -1529,9 +1573,7 @@ async function endActiveBuff(actor, activeBuff) {
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-  const concentrationEffect = actor.effects?.find(
-    (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
-  );
+  const concentrationEffect = findConcentrationEffectForBuff(actor, activeBuff);
   if (concentrationEffect) {
     allowConcentrationDeletion(concentrationEffect);
     await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });
@@ -2154,9 +2196,9 @@ export function registerTriggers() {
     try {
       const newTemp = getChangedTemporaryHp(changed);
       if (newTemp === null) return true;
-      const activeBuff = actor?.getFlag?.(MODULE_ID, "activeBuff");
+      const tempHpEndBuffs = getTemporaryHpLostEndBuffs(actor);
       const currentTemp = getActorTemporaryHp(actor);
-      if (activeBuff?.endConditions?.onTemporaryHpLost !== true) return true;
+      if (!tempHpEndBuffs.length) return true;
       temporaryHpBeforeActorUpdate.set(actor.uuid ?? actor.id, {
         value: currentTemp,
         source: "preUpdateActor actor.system.attributes.hp.temp",
@@ -2164,12 +2206,17 @@ export function registerTriggers() {
       });
       const willLoseTemporaryHp = currentTemp > 0 && newTemp <= 0;
       if (!willLoseTemporaryHp) return true;
-      createTemporaryHpEndConcentrationSkip(actor, activeBuff, currentTemp, newTemp, "preUpdateActor");
+      for (const activeBuff of tempHpEndBuffs) {
+        createTemporaryHpEndConcentrationSkip(actor, activeBuff, currentTemp, newTemp, "preUpdateActor");
+      }
       options.noConcentrationCheck = true;
       foundry.utils.setProperty(options, "dnd5e.concentrationCheck", false);
       tempHpConcentrationDebug("concentration options disabled before temp HP cleanup", {
         actor: actor?.name ?? null,
-        buff: activeBuff?.itemName ?? null,
+        buffs: tempHpEndBuffs.map((activeBuff) => ({
+          itemName: activeBuff?.itemName ?? null,
+          buffId: activeBuff?.buffId ?? null,
+        })),
         noConcentrationCheck: options.noConcentrationCheck,
         dnd5eConcentrationCheck: options.dnd5e?.concentrationCheck,
       });
@@ -2187,9 +2234,9 @@ export function registerTriggers() {
       const key = actor.uuid ?? actor.id;
       const preTemp = temporaryHpBeforeActorUpdate.get(key) ?? { value: 0, source: "preUpdateActor unavailable" };
       temporaryHpBeforeActorUpdate.delete(key);
-      const activeBuff = actor?.getFlag?.(MODULE_ID, "activeBuff");
-      if (activeBuff?.endConditions?.onTemporaryHpLost !== true) return;
-      scheduleTemporaryHpLostEndCheck(actor, activeBuff, null, null, null, preTemp);
+      for (const activeBuff of getTemporaryHpLostEndBuffs(actor)) {
+        scheduleTemporaryHpLostEndCheck(actor, activeBuff, null, null, null, preTemp);
+      }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans updateActor PV temporaires :`, error);
     }
@@ -2698,27 +2745,37 @@ export function registerTriggers() {
     try {
       const actor = rollConfig?.subject ?? null;
       if (!actor?.uuid) return true;
-      const marker = getTemporaryHpEndConcentrationSkip(actor);
-      const skipDecision = shouldSkipTemporaryHpEndConcentration(actor, marker);
-      if (marker) {
+      const markers = getTemporaryHpEndConcentrationSkips(actor);
+      let skipDecision = { ok: false, reason: "no marker" };
+      let skipMarker = null;
+      for (const marker of markers) {
+        const markerDecision = shouldSkipTemporaryHpEndConcentration(actor, marker);
         tempHpConcentrationDebug("preRollConcentration marker evaluated", {
           actor: actor.name,
           markerBuff: marker.itemName ?? null,
+          markerBuffId: marker.buffId ?? null,
           preTemp: marker.preTemp ?? null,
           predictedTemp: marker.predictedTemp ?? null,
           concentrationEffectCount: getActorConcentrationEffects(actor).length,
-          skip: skipDecision.ok,
-          reason: skipDecision.reason,
+          skip: markerDecision.ok,
+          reason: markerDecision.reason,
         });
+        if (markerDecision.ok) {
+          skipDecision = markerDecision;
+          skipMarker = marker;
+          break;
+        }
       }
       if (skipDecision.ok) {
         foundry.utils.setProperty(rollConfig, "workflowOptions.noConcentrationCheck", true);
-        pendingTemporaryHpEndConcentrationSkips.delete(actor.uuid);
+        const markerKey = getTemporaryHpEndMarkerKey(actor, skipMarker?.buffId ?? skipDecision.activeBuff?.buffId);
+        if (markerKey) pendingTemporaryHpEndConcentrationSkips.delete(markerKey);
         tempHpConcentrationDebug("concentration roll blocked", {
           actor: actor.name,
-          buff: marker?.itemName ?? skipDecision.activeBuff?.itemName ?? null,
-          preTemp: marker?.preTemp ?? null,
-          predictedTemp: marker?.predictedTemp ?? null,
+          buff: skipMarker?.itemName ?? skipDecision.activeBuff?.itemName ?? null,
+          buffId: skipMarker?.buffId ?? skipDecision.activeBuff?.buffId ?? null,
+          preTemp: skipMarker?.preTemp ?? null,
+          predictedTemp: skipMarker?.predictedTemp ?? null,
         });
         return false;
       }
@@ -2764,9 +2821,7 @@ export function registerTriggers() {
         await refreshStackAfterBuffRemoval(actor, activeBuff);
         debugLog(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
         if (activeBuff?.duration?.concentration) {
-          const concentrationEffect = actor.effects.find(
-            (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
-          );
+          const concentrationEffect = findConcentrationEffectForBuff(actor, activeBuff);
           if (concentrationEffect) {
             allowConcentrationDeletion(concentrationEffect);
             await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });

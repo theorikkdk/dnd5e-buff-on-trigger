@@ -777,5 +777,11 @@
   "BOT.presets.testHealedSecondaryStatus.label": "[TEST] Healed - Effet secondaire",
   "BOT.presets.testHealedSecondaryStatus.description": "Preset temporaire de test. Quand le porteur reçoit un soin, le statut Effrayé lui est appliqué.",
   "BOT.presets.testHealedFrequency.label": "[TEST] Healed - Fréquence",
-  "BOT.presets.testHealedFrequency.description": "Preset temporaire de test. Quand le porteur reçoit un soin, il récupère 1 point de vie supplémentaire, au maximum une fois par round."
+  "BOT.presets.testHealedFrequency.description": "Preset temporaire de test. Quand le porteur reçoit un soin, il récupère 1 point de vie supplémentaire, au maximum une fois par round.",
+  "BOT.presets.testTempHpSourceA.label": "[TEST] Temp HP - Source A",
+  "BOT.presets.testTempHpSourceA.description": "Preset temporaire de test. Le porteur gagne 5 PV temporaires. Ce buff ne prend pas fin automatiquement quand les PV temporaires sont perdus.",
+  "BOT.presets.testTempHpSourceB.label": "[TEST] Temp HP - Source B",
+  "BOT.presets.testTempHpSourceB.description": "Preset temporaire de test. Le porteur gagne 8 PV temporaires. Ce buff ne prend pas fin automatiquement quand les PV temporaires sont perdus.",
+  "BOT.presets.testTempHpLostEnd.label": "[TEST] Temp HP Lost - End",
+  "BOT.presets.testTempHpLostEnd.description": "Preset temporaire de test. Le porteur gagne 5 PV temporaires, et ce buff prend fin quand les PV temporaires tombent à 0."
 }
