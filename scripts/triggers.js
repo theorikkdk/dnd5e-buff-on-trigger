@@ -2161,6 +2161,11 @@ export function registerTriggers() {
           itemImg: workflow.item?.img,
           itemUuid: workflow.item?.uuid ?? null,
           originItemUuid: workflow.item?.uuid ?? null,
+          originItemIdentifier: workflow.item?.system?.identifier
+            ?? workflow.item?.system?.source?.identifier
+            ?? workflow.item?.system?.slug
+            ?? workflow.item?.identifier
+            ?? null,
           originActorUuid: workflow.actor?.uuid ?? null,
           originSpellLevel: workflow.castData?.castLevel
             ?? workflow.castData?.level

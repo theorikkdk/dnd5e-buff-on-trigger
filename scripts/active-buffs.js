@@ -11,10 +11,94 @@ function generateBuffId() {
   return `bot-${random}`;
 }
 
+function normalizeStackingKeyValue(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._:-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function getConfiguredStackingKey(activeFlag) {
+  const explicit = normalizeStackingKeyValue(activeFlag?.stackingKey);
+  if (explicit) return explicit;
+
+  const presetId = normalizeStackingKeyValue(activeFlag?.presetMeta?.presetId);
+  if (presetId) return presetId;
+
+  const itemIdentifier = normalizeStackingKeyValue(
+    activeFlag?.originItemIdentifier
+      ?? activeFlag?.itemIdentifier
+      ?? activeFlag?.itemSystemIdentifier
+  );
+  if (itemIdentifier) return itemIdentifier;
+
+  const itemName = normalizeStackingKeyValue(activeFlag?.itemName);
+  if (itemName) return itemName;
+
+  return normalizeStackingKeyValue(activeFlag?.originItemUuid ?? activeFlag?.itemUuid);
+}
+
+export function getStackingKey(activeFlag) {
+  return getConfiguredStackingKey(activeFlag);
+}
+
+export function getStackingMode(activeFlag) {
+  const mode = String(activeFlag?.stackingMode ?? "").trim();
+  return ["normal", "sameEffect", "noStack", "alwaysStack"].includes(mode) ? mode : "normal";
+}
+
+export function getBuffAppliedAt(activeFlag) {
+  const appliedAt = Number(activeFlag?.appliedAt);
+  return Number.isFinite(appliedAt) ? appliedAt : 0;
+}
+
+export function compareBuffDominance(a, b) {
+  const aLevel = Number(a?.originSpellLevel ?? 0);
+  const bLevel = Number(b?.originSpellLevel ?? 0);
+  if (Number.isFinite(aLevel) && Number.isFinite(bLevel) && aLevel !== bLevel) return aLevel - bLevel;
+  return getBuffAppliedAt(a) - getBuffAppliedAt(b);
+}
+
+export function getDominantBuffForStack(actor, stackingKey) {
+  const key = normalizeStackingKeyValue(stackingKey);
+  if (!key) return null;
+  return Object.values(getActiveBuffs(actor))
+    .filter((activeBuff) => getStackingKey(activeBuff) === key)
+    .sort(compareBuffDominance)
+    .at(-1) ?? null;
+}
+
+export function isDominantBuff(actor, activeFlag) {
+  const key = getStackingKey(activeFlag);
+  if (!key) return true;
+  const dominant = getDominantBuffForStack(actor, key);
+  if (!dominant) return true;
+  if (activeFlag?.buffId && dominant.buffId) return activeFlag.buffId === dominant.buffId;
+  return dominant === activeFlag;
+}
+
+export function getBuffStackingFlags(activeFlag) {
+  return {
+    stackingKey: getStackingKey(activeFlag) || null,
+    stackingMode: getStackingMode(activeFlag),
+    appliedAt: getBuffAppliedAt(activeFlag) || null,
+  };
+}
+
 export function ensureActiveBuffId(activeFlag) {
   if (!activeFlag) return null;
-  if (activeFlag.buffId) return activeFlag;
-  return { ...activeFlag, buffId: generateBuffId() };
+  return {
+    ...activeFlag,
+    buffId: activeFlag.buffId ?? generateBuffId(),
+    stackingKey: getStackingKey(activeFlag) || null,
+    stackingMode: getStackingMode(activeFlag),
+    appliedAt: getBuffAppliedAt(activeFlag) || Date.now(),
+  };
 }
 
 export function getLegacyActiveBuff(actor) {

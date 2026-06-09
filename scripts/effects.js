@@ -1,6 +1,6 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, ABILITY_IDS, SKILL_IDS, debugLog } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
-import { upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { upsertActiveBuff, removeActiveBuff, getBuffStackingFlags } from "./active-buffs.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -427,6 +427,7 @@ function getStoredTargetIndicatorMetadata(ownerActor, flag) {
     effectFlags: {
       storedTargetIndicator: true,
       buffId: flag?.buffId ?? null,
+      ...getBuffStackingFlags(flag),
       storedTargetIndicatorKey: buildStoredTargetIndicatorKey(ownerActor, flag),
       originActorUuid: flag?.originActorUuid ?? null,
       ownerActorUuid: ownerActor?.uuid ?? null,
@@ -1316,6 +1317,9 @@ async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
     [`flags.${MODULE_ID}.statusBearerActorUuid`]: targetActor.uuid ?? null,
     [`flags.${MODULE_ID}.statusId`]: statusId,
     [`flags.${MODULE_ID}.buffId`]: flag?.buffId ?? buildLinkedStatusBuffId(ownerActor, flag),
+    [`flags.${MODULE_ID}.stackingKey`]: getBuffStackingFlags(flag).stackingKey,
+    [`flags.${MODULE_ID}.stackingMode`]: getBuffStackingFlags(flag).stackingMode,
+    [`flags.${MODULE_ID}.appliedAt`]: getBuffStackingFlags(flag).appliedAt,
     [`flags.${MODULE_ID}.saveAbility`]: flag?.save?.ability ?? null,
     [`flags.${MODULE_ID}.saveDcSource`]: flag?.save?.dcSource ?? "fixed",
     [`flags.${MODULE_ID}.saveDc`]: flag?.save?.dc ?? null,
@@ -1396,7 +1400,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
         statuses: ["bot-active"],
         changes: extraChanges,
         duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
-        flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null } },
+        flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null, ...getBuffStackingFlags(activeBuff) } },
       }]);
     }
 
@@ -1418,7 +1422,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     name: itemName,
     img: itemImg,
     statuses: ["bot-target-" + (flag.itemName ?? "buff").slugify()],
-    flags: { [MODULE_ID]: { targetIndicator: true, buffId: flag?.buffId ?? null } },
+    flags: { [MODULE_ID]: { targetIndicator: true, buffId: flag?.buffId ?? null, ...getBuffStackingFlags(flag) } },
     duration: {},
   }]);
   debugLog(`[${MODULE_ID}] Indicateur pose sur ${targetActor.name}`);
@@ -2114,7 +2118,7 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
       img: flag.itemImg ?? BUFF_ICON,
       changes,
       duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
-      flags: { [MODULE_ID]: { mechanicalBuff: true, buffId: flag.buffId ?? null } },
+      flags: { [MODULE_ID]: { mechanicalBuff: true, buffId: flag.buffId ?? null, ...getBuffStackingFlags(flag) } },
     }]);
     debugLog(`[${MODULE_ID}] Buffs mecaniques appliques sur ${actor.name}`);
   } catch (error) {
