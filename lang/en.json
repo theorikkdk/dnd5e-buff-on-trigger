@@ -771,5 +771,11 @@
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
   "BOT.presets.testSlotScalingTempHpDamage.label": "[TEST] Slot scaling temp HP + damage",
-  "BOT.presets.testSlotScalingTempHpDamage.description": "Temporary test preset. Temporary HP and damage increase with the spell slot level used."
+  "BOT.presets.testSlotScalingTempHpDamage.description": "Temporary test preset. Temporary HP and damage increase with the spell slot level used.",
+  "BOT.presets.testHealedBonusHealing.label": "[TEST] Healed - Healing bonus",
+  "BOT.presets.testHealedBonusHealing.description": "Temporary test preset. When the bearer receives healing, they regain 1d4 additional hit points.",
+  "BOT.presets.testHealedSecondaryStatus.label": "[TEST] Healed - Secondary effect",
+  "BOT.presets.testHealedSecondaryStatus.description": "Temporary test preset. When the bearer receives healing, the Frightened status is applied to them.",
+  "BOT.presets.testHealedFrequency.label": "[TEST] Healed - Frequency",
+  "BOT.presets.testHealedFrequency.description": "Temporary test preset. When the bearer receives healing, they regain 1 additional hit point, at most once per round."
 }

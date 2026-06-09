@@ -1744,4 +1744,55 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "testHealedBonusHealing",
+    label: "BOT.presets.testHealedBonusHealing.label",
+    description: "BOT.presets.testHealedBonusHealing.description",
+    flag: {
+      targetMode: "self",
+      type: "healed",
+      condition: "always",
+      healing: {
+        formula: "1d4",
+        targetMode: "self",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testHealedSecondaryStatus",
+    label: "BOT.presets.testHealedSecondaryStatus.label",
+    description: "BOT.presets.testHealedSecondaryStatus.description",
+    flag: {
+      targetMode: "self",
+      type: "healed",
+      condition: "always",
+      status: {
+        ids: ["frightened"],
+        timing: "trigger",
+        targetMode: "self",
+        applyCondition: "always",
+        removeWhenBuffEnds: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testHealedFrequency",
+    label: "BOT.presets.testHealedFrequency.label",
+    description: "BOT.presets.testHealedFrequency.description",
+    flag: {
+      targetMode: "self",
+      type: "healed",
+      condition: "always",
+      healing: {
+        formula: "1",
+        targetMode: "self",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "round",
+    },
+  },
 ];

@@ -2566,18 +2566,21 @@ export function registerTriggers() {
   Hooks.on("midi-qol.isHealed", async (token, { item, workflow, damageItem }) => {
     try {
       const actor = token.actor;
-      const flag = actor?.getFlag(MODULE_ID, "activeBuff");
-      if (!flag || flag.type !== "healed") return;
-      debugLog(`[${MODULE_ID}] Déclencheur healed sur ${actor.name}`);
-      const fakeWorkflow = {
-        actor,
-        item: item ?? null,
-        targets: new Set(),
-        hitTargets: new Set([token]),
-        missedTargets: new Set(),
-        damageItem,
-      };
-      handleAttackTrigger(fakeWorkflow, flag);
+      if (!actor) return;
+      const healedFlags = getActiveBuffsForTrigger(actor, (activeFlag) => activeFlag.type === "healed");
+      if (!healedFlags.length) return;
+      for (const flag of healedFlags) {
+        debugLog(`[${MODULE_ID}] Déclencheur healed sur ${actor.name} (${flag.itemName ?? flag.buffId ?? "buff"})`);
+        const fakeWorkflow = {
+          actor,
+          item: item ?? null,
+          targets: new Set(),
+          hitTargets: new Set([token]),
+          missedTargets: new Set(),
+          damageItem,
+        };
+        handleAttackTrigger(fakeWorkflow, flag);
+      }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans midi-qol.isHealed :`, error);
     }

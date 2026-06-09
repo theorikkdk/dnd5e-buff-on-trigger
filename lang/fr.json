@@ -771,5 +771,11 @@
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
   "BOT.presets.testSlotScalingTempHpDamage.label": "[TEST] Scaling slot PV temp + dégâts",
-  "BOT.presets.testSlotScalingTempHpDamage.description": "Preset temporaire de test. Les PV temporaires et les dégâts augmentent selon le niveau d’emplacement utilisé."
+  "BOT.presets.testSlotScalingTempHpDamage.description": "Preset temporaire de test. Les PV temporaires et les dégâts augmentent selon le niveau d’emplacement utilisé.",
+  "BOT.presets.testHealedBonusHealing.label": "[TEST] Healed - Bonus soin",
+  "BOT.presets.testHealedBonusHealing.description": "Preset temporaire de test. Quand le porteur reçoit un soin, il récupère 1d4 points de vie supplémentaires.",
+  "BOT.presets.testHealedSecondaryStatus.label": "[TEST] Healed - Effet secondaire",
+  "BOT.presets.testHealedSecondaryStatus.description": "Preset temporaire de test. Quand le porteur reçoit un soin, le statut Effrayé lui est appliqué.",
+  "BOT.presets.testHealedFrequency.label": "[TEST] Healed - Fréquence",
+  "BOT.presets.testHealedFrequency.description": "Preset temporaire de test. Quand le porteur reçoit un soin, il récupère 1 point de vie supplémentaire, au maximum une fois par round."
 }
