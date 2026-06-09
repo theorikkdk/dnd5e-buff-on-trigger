@@ -1,6 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder } from "./effects.js";
+import { getActiveBuff, getActiveBuffs, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
@@ -1358,6 +1359,34 @@ function getStoredTargetName(flag) {
   return token?.name ?? actor?.name ?? game.i18n.localize("BOT.ui.summary.notConfigured");
 }
 
+function indicatorNameMatchesBuff(effectName, activeBuff) {
+  const itemName = String(activeBuff?.itemName ?? "").trim();
+  const visibleName = String(effectName ?? "").trim();
+  if (!itemName || !visibleName) return false;
+  return visibleName === itemName
+    || visibleName.startsWith(`${itemName} `)
+    || visibleName.startsWith(`${itemName} -`);
+}
+
+function resolveActiveBuffFromIndicatorEffect(actor, effect) {
+  const effectBuffId = effect?.flags?.[MODULE_ID]?.buffId ?? null;
+  if (effectBuffId) {
+    const byId = getActiveBuff(actor, effectBuffId);
+    if (byId) return { activeBuff: byId, buffId: effectBuffId };
+  }
+
+  const activeBuffs = getActiveBuffs(actor);
+  const matched = Object.entries(activeBuffs).find(([, activeBuff]) => indicatorNameMatchesBuff(effect?.name, activeBuff));
+  if (matched) return { activeBuff: matched[1], buffId: matched[0] };
+
+  const legacy = actor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
+  if (legacy && indicatorNameMatchesBuff(effect?.name, legacy)) {
+    return { activeBuff: legacy, buffId: legacy.buffId ?? null };
+  }
+
+  return { activeBuff: null, buffId: effectBuffId };
+}
+
 function getControlledToken() {
   const controlled = canvas?.tokens?.controlled ?? [];
   if (!controlled.length) {
@@ -1440,7 +1469,7 @@ async function clearExistingBuffInstance(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");
-  await actor.unsetFlag(MODULE_ID, "activeBuff");
+  await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
   const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
   for (const effect of mechEffects) await effect.delete();
@@ -1451,7 +1480,7 @@ async function endActiveBuff(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");
-  await actor.unsetFlag(MODULE_ID, "activeBuff");
+  await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
   const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
   for (const effect of mechEffects) await effect.delete();
@@ -1536,6 +1565,7 @@ function buildRepeatedSaveSupportBuffId(ownerActor, flag, statusId = null) {
 
 function activeBuffMatchesLinkedStatus(activeBuff, ownerActor, linkedFlag) {
   if (!activeBuff || !linkedFlag?.buffId) return false;
+  if (activeBuff.buffId && linkedFlag.buffId === activeBuff.buffId) return true;
   const groupedBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff);
   const legacyBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff, linkedFlag.statusId ?? null);
   return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId;
@@ -1583,6 +1613,7 @@ function buildRepeatedSaveFlagFromLinkedStatus(linkedFlag, linkedEffects = []) {
     .filter(Boolean);
   const uniqueStatusIds = [...new Set(statusIds.length ? statusIds : [linkedFlag.statusId].filter(Boolean))];
   return {
+    buffId: linkedFlag.buffId ?? null,
     itemUuid: linkedFlag.originItemUuid ?? null,
     originItemUuid: linkedFlag.originItemUuid ?? null,
     originActorUuid: linkedFlag.originActorUuid ?? null,
@@ -1738,7 +1769,7 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
     storedTargetActorUuid: newTargetToken.actor.uuid ?? null,
   };
 
-  await actor.setFlag(MODULE_ID, "activeBuff", updatedFlag);
+  await upsertActiveBuff(actor, updatedFlag);
   const nextFlag = actor.getFlag(MODULE_ID, "activeBuff") ?? updatedFlag;
   await refreshStoredTargetIndicator(actor, previousFlag);
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
@@ -1822,22 +1853,25 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
 
   let removedCount = 0;
   for (const { actor } of carrierEntries.values()) {
-    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    if (!activeBuff) continue;
+    const activeBuffEntries = Object.entries(getActiveBuffs(actor));
+    if (!activeBuffEntries.length) continue;
 
-    debugLog(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
+    for (const [buffId, activeBuff] of activeBuffEntries) {
+      if (!activeBuff) continue;
+      debugLog(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — buffId=${buffId}, originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
 
-    const matchesOrigin = (sourceActorUuid && activeBuff.originActorUuid === sourceActorUuid)
-      || (!activeBuff.originActorUuid && sourceActorId && actor.id === sourceActorId);
-    if (!matchesOrigin) continue;
+      const matchesOrigin = (sourceActorUuid && activeBuff.originActorUuid === sourceActorUuid)
+        || (!activeBuff.originActorUuid && sourceActorId && actor.id === sourceActorId);
+      if (!matchesOrigin) continue;
 
-    const itemName = activeBuff.itemName;
-    await showBuffReminder(actor, activeBuff, "buffEnd");
-    await actor.unsetFlag(MODULE_ID, "activeBuff");
-    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-    await refreshBuffIndicator(actor, itemName, [], activeBuff);
-    removedCount += 1;
-    debugLog(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
+      const itemName = activeBuff.itemName;
+      await showBuffReminder(actor, activeBuff, "buffEnd");
+      await removeActiveBuff(actor, buffId);
+      await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+      await refreshBuffIndicator(actor, itemName, [], activeBuff);
+      removedCount += 1;
+      debugLog(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
+    }
   }
 
   debugLog(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
@@ -2044,7 +2078,7 @@ function buildActivationTargetFlag(baseFlag, targetToken) {
 
 async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, workflow, activationSave, hasMechBuffs, sourceActorName) {
   if (!targetActor?.setFlag) return false;
-  await targetActor.setFlag(MODULE_ID, "activeBuff", activeFlag);
+  activeFlag = await upsertActiveBuff(targetActor, activeFlag);
   debugLog(`[${MODULE_ID}] Buff active sur ${targetActor.name} via ${workflow.item?.name ?? activeFlag.itemName}, origine : ${sourceActorName}`);
   if (hasMechBuffs) {
     const changes = buildMechanicalChanges(activeFlag, targetActor);
@@ -2055,7 +2089,7 @@ async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, 
   await applyActivationTemporaryHp(targetActor, targetToken, activeFlag, workflow);
   await applyActivationStatus(targetActor, targetToken, activeFlag, workflow, activationSave?.saveResults ?? null);
   await showBuffReminder(targetActor, activeFlag, "activation");
-  return true;
+  return activeFlag;
 }
 
 export function registerTriggers() {
@@ -2231,7 +2265,7 @@ export function registerTriggers() {
 
         for (const application of pendingApplications) {
           try {
-            const applied = await applyActivatedBuffInstance(
+            const appliedFlag = await applyActivatedBuffInstance(
               application.targetActor,
               application.carrierToken,
               application.targetFlag,
@@ -2240,7 +2274,8 @@ export function registerTriggers() {
               hasMechBuffs,
               sourceActorName
             );
-            activationResults.push({ status: applied ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
+            if (appliedFlag) application.targetFlag = appliedFlag;
+            activationResults.push({ status: appliedFlag ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
           } catch (error) {
             activationResults.push({ status: "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
             console.error(`[${MODULE_ID}] Erreur application multi-cible :`, error);
@@ -2639,12 +2674,18 @@ export function registerTriggers() {
       if (await maybeEndBuffWhenLinkedStatusRemoved(effect, options)) return;
 
       if (effect.statuses?.has("bot-active")) {
+        if (options?.[MODULE_ID]?.allowActiveBuffIndicatorDeletion === true) return;
         const actor = effect.parent;
         if (!actor) return;
-        const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+        const { activeBuff, buffId } = resolveActiveBuffFromIndicatorEffect(actor, effect);
+        if (!activeBuff) {
+          debugLog(`[${MODULE_ID}] Suppression manuelle ignoree : buff actif introuvable pour ${effect.name}`);
+          if (buffId) await removeActiveBuff(actor, buffId, { clearLegacy: false });
+          return;
+        }
         const itemName = effect.name;
         await showBuffReminder(actor, activeBuff, "buffEnd");
-        await actor.unsetFlag(MODULE_ID, "activeBuff");
+        await removeActiveBuff(actor, buffId ?? activeBuff);
         await refreshBuffIndicator(actor, itemName, [], activeBuff);
         debugLog(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
         if (activeBuff?.duration?.concentration) {
@@ -2706,7 +2747,7 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   const applied = await applyEffect(workflow, flag);
   if (applied && flag.consumeOnTrigger === true) {
     await showBuffReminder(actor, flag, "buffEnd");
-    await actor.unsetFlag(MODULE_ID, "activeBuff");
+    await removeActiveBuff(actor, flag);
     await refreshBuffIndicator(actor, flag.itemName, [], flag);
   }
 }

@@ -1,5 +1,6 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, ABILITY_IDS, SKILL_IDS, debugLog } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
+import { upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -220,7 +221,12 @@ async function deleteDocumentIfExists(document, context = "document") {
   if (!document || document.deleted) return false;
   try {
     if (document.flags?.[MODULE_ID]?.linkedStatus === true) allowLinkedStatusDeletion(document);
-    await document.delete({ [MODULE_ID]: { allowLinkedStatusDeletion: true } });
+    await document.delete({
+      [MODULE_ID]: {
+        allowLinkedStatusDeletion: true,
+        allowActiveBuffIndicatorDeletion: true,
+      },
+    });
     return true;
   } catch (error) {
     const message = String(error?.message ?? error ?? "");
@@ -387,6 +393,7 @@ function resolveOriginActor(flag, ownerActor = null) {
 
 function buildStoredTargetIndicatorKey(ownerActor, flag) {
   return [
+    flag?.buffId ?? "",
     flag?.originActorUuid ?? "",
     ownerActor?.uuid ?? "",
     flag?.itemUuid ?? flag?.originItemUuid ?? "",
@@ -419,6 +426,7 @@ function getStoredTargetIndicatorMetadata(ownerActor, flag) {
     effectImg,
     effectFlags: {
       storedTargetIndicator: true,
+      buffId: flag?.buffId ?? null,
       storedTargetIndicatorKey: buildStoredTargetIndicatorKey(ownerActor, flag),
       originActorUuid: flag?.originActorUuid ?? null,
       ownerActorUuid: ownerActor?.uuid ?? null,
@@ -1160,7 +1168,7 @@ export async function markTriggerFrequencyUsage(actor) {
   const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
   if (!activeBuff) return;
 
-  await actor.setFlag(MODULE_ID, "activeBuff", {
+  await upsertActiveBuff(actor, {
     ...activeBuff,
     runtime: {
       ...(activeBuff.runtime ?? {}),
@@ -1264,7 +1272,7 @@ function linkedStatusMatchesBuff(effect, ownerActor, flag) {
   const expectedOriginActorUuid = flag?.originActorUuid ?? null;
   const expectedOriginItemUuid = getLinkedStatusOriginItemUuid(flag);
   const expectedOwnerActorUuid = ownerActor?.uuid ?? null;
-  const expectedBuffId = buildLinkedStatusBuffId(ownerActor, flag);
+  const expectedBuffId = flag?.buffId ?? buildLinkedStatusBuffId(ownerActor, flag);
   const legacyBuffId = buildLinkedStatusBuffId(ownerActor, flag, effectFlag.statusId);
 
   if (expectedOriginActorUuid && effectFlag.originActorUuid !== expectedOriginActorUuid) return false;
@@ -1307,7 +1315,7 @@ async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
     [`flags.${MODULE_ID}.ownerActorUuid`]: ownerActorUuid,
     [`flags.${MODULE_ID}.statusBearerActorUuid`]: targetActor.uuid ?? null,
     [`flags.${MODULE_ID}.statusId`]: statusId,
-    [`flags.${MODULE_ID}.buffId`]: buildLinkedStatusBuffId(ownerActor, flag),
+    [`flags.${MODULE_ID}.buffId`]: flag?.buffId ?? buildLinkedStatusBuffId(ownerActor, flag),
     [`flags.${MODULE_ID}.saveAbility`]: flag?.save?.ability ?? null,
     [`flags.${MODULE_ID}.saveDcSource`]: flag?.save?.dcSource ?? "fixed",
     [`flags.${MODULE_ID}.saveDc`]: flag?.save?.dc ?? null,
@@ -1349,10 +1357,20 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = [], previousFlag = null) {
   try {
-    const existing = actor.effects.find((e) => e.statuses?.has("bot-active"));
     const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    const indicatorEffects = actor.effects.filter((e) => e.statuses?.has("bot-active")) ?? [];
 
-    if (existing) await deleteDocumentIfExists(existing, "indicateur actif");
+    const previousBuffId = previousFlag?.buffId ?? null;
+    const indicatorsToRemove = previousFlag
+      ? indicatorEffects.filter((effect) => {
+          const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+          if (previousBuffId) return effectBuffId === previousBuffId;
+          return effect.name === previousFlag.itemName || effect.name === getActiveBuffIndicatorName(previousFlag);
+        })
+      : [];
+    for (const existing of indicatorsToRemove) {
+      await deleteDocumentIfExists(existing, "indicateur actif");
+    }
 
     await cleanupLinkedStatusEffects(actor, previousFlag);
 
@@ -1363,6 +1381,14 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
     }
 
     if (activeBuff) {
+      const activeBuffId = activeBuff.buffId ?? null;
+      const existingActiveIndicator = indicatorEffects.find((effect) => {
+        const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+        return activeBuffId ? effectBuffId === activeBuffId : effect.name === getActiveBuffIndicatorName(activeBuff);
+      });
+      if (existingActiveIndicator && !indicatorsToRemove.includes(existingActiveIndicator)) {
+        await deleteDocumentIfExists(existingActiveIndicator, "indicateur actif");
+      }
       const durationRounds = getFlagDurationInRounds(activeBuff);
       await actor.createEmbeddedDocuments("ActiveEffect", [{
         name: getActiveBuffIndicatorName(activeBuff),
@@ -1370,7 +1396,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
         statuses: ["bot-active"],
         changes: extraChanges,
         duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
-        flags: { [MODULE_ID]: { indicator: true } },
+        flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null } },
       }]);
     }
 
@@ -1392,7 +1418,7 @@ export async function applyTargetIndicator(targetActor, flag) {
     name: itemName,
     img: itemImg,
     statuses: ["bot-target-" + (flag.itemName ?? "buff").slugify()],
-    flags: { [MODULE_ID]: { targetIndicator: true } },
+    flags: { [MODULE_ID]: { targetIndicator: true, buffId: flag?.buffId ?? null } },
     duration: {},
   }]);
   debugLog(`[${MODULE_ID}] Indicateur pose sur ${targetActor.name}`);
@@ -1684,14 +1710,14 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       if (newCharges <= 0) {
         if (shouldRetainBuffForRepeatedSave(currentFlag)) {
           const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
-          await actor?.setFlag(MODULE_ID, "activeBuff", retainedFlag);
+          await upsertActiveBuff(actor, retainedFlag);
           await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
           await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
           debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
           return;
         }
         await showBuffReminder(actor, currentFlag, "buffEnd");
-        await actor?.unsetFlag(MODULE_ID, "activeBuff");
+        await removeActiveBuff(actor, currentFlag);
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         debugLog(`[${MODULE_ID}] Buff epuise a toutes les charges consommees`);
         const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
@@ -1709,7 +1735,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         }
       } else {
         const updatedFlag = { ...currentFlag, chargesRemaining: newCharges };
-        await workflow.actor?.setFlag(MODULE_ID, "activeBuff", updatedFlag);
+        await upsertActiveBuff(workflow.actor, updatedFlag);
         await updateActiveBuffIndicatorName(workflow.actor, updatedFlag);
         debugLog(`[${MODULE_ID}] ${newCharges} charge(s) restante(s) sur ${workflow.actor.name}`);
       }
@@ -1722,14 +1748,14 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       }
       if (shouldRetainBuffForRepeatedSave(currentFlag)) {
         const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
-        await actor?.setFlag(MODULE_ID, "activeBuff", retainedFlag);
+        await upsertActiveBuff(actor, retainedFlag);
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
         debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
         return;
       }
       await showBuffReminder(actor, currentFlag, "buffEnd");
-      await actor?.unsetFlag(MODULE_ID, "activeBuff");
+      await removeActiveBuff(actor, currentFlag);
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
       debugLog(`[${MODULE_ID}] Buff consomme sur ${actor?.name}`);
       const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
@@ -2088,7 +2114,7 @@ export async function applyMechanicalBuffs(actor, flag, durationRounds) {
       img: flag.itemImg ?? BUFF_ICON,
       changes,
       duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
-      flags: { [MODULE_ID]: { mechanicalBuff: true } },
+      flags: { [MODULE_ID]: { mechanicalBuff: true, buffId: flag.buffId ?? null } },
     }]);
     debugLog(`[${MODULE_ID}] Buffs mecaniques appliques sur ${actor.name}`);
   } catch (error) {
