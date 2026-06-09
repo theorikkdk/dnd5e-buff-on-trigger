@@ -3103,7 +3103,7 @@ export async function applyEffect(workflow, flag) {
     }
   }
 
-  await markTriggerFrequencyUsage(workflow.actor);
+  await markTriggerFrequencyUsage(workflow.actor, flag);
   workflow._botSaveResults = null;
 
   const shouldResolveSaveBeforeEffects = !!flag.save?.ability

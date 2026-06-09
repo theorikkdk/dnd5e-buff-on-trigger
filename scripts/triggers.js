@@ -888,6 +888,29 @@ function shouldProcessDamageTakenEndCondition(actor, workflow, damageItem) {
   return true;
 }
 
+function getDamagedTriggerKey(flag) {
+  return flag?.buffId ?? flag?.itemUuid ?? flag?.originItemUuid ?? "legacy";
+}
+
+function getLastDamagedTriggerTimestamp(actor, flag) {
+  const value = actor?.getFlag?.(MODULE_ID, "_lastDamagedTrigger");
+  const key = getDamagedTriggerKey(flag);
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return Number(value[key] ?? 0) || 0;
+  }
+  return Number(value ?? 0) || 0;
+}
+
+async function markDamagedTriggerTimestamp(actor, flag, timestamp) {
+  if (!actor?.setFlag) return;
+  const value = actor.getFlag(MODULE_ID, "_lastDamagedTrigger");
+  const timestamps = value && typeof value === "object" && !Array.isArray(value)
+    ? { ...value }
+    : {};
+  timestamps[getDamagedTriggerKey(flag)] = timestamp;
+  await actor.setFlag(MODULE_ID, "_lastDamagedTrigger", timestamps);
+}
+
 function normalizeDamageTypeFilter(types = []) {
   const values = Array.isArray(types) ? types : [types];
   return [...new Set(values
@@ -1351,6 +1374,16 @@ function findExistingBuffInstances(newFlag) {
         .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
     )
     .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
+}
+
+function getActiveBuffsForTrigger(actor, predicate = null) {
+  return Object.entries(getActiveBuffs(actor))
+    .filter(([, activeBuff]) => !!activeBuff)
+    .map(([buffId, activeBuff]) => ({
+      ...(activeBuff ?? {}),
+      buffId: activeBuff?.buffId ?? buffId,
+    }))
+    .filter((activeBuff) => !predicate || predicate(activeBuff));
 }
 
 function getStoredTargetName(flag) {
@@ -2432,91 +2465,99 @@ export function registerTriggers() {
       if (!actor) return;
       if (token.actor.id !== actor.id) return;
       const damageTaken = getDamageTakenAmount(damageItem, workflow);
+      const initialActiveFlags = getActiveBuffsForTrigger(actor);
       if (damageTaken > 0 && shouldProcessDamagedRepeatedSave(actor, workflow, damageItem)) {
-        const activeFlag = actor?.getFlag(MODULE_ID, "activeBuff");
-        const repeatedSaveHandled = shouldRollRepeatedSave(activeFlag, "damaged");
-        const endedByRepeatedSave = await handleRepeatedSave(actor, activeFlag, "damaged");
+        const repeatedSaveFlags = initialActiveFlags.filter((activeFlag) => shouldRollRepeatedSave(activeFlag, "damaged"));
+        const repeatedSaveHandled = repeatedSaveFlags.length > 0;
+        let endedByRepeatedSave = false;
+        for (const activeFlag of repeatedSaveFlags) {
+          endedByRepeatedSave = await handleRepeatedSave(actor, activeFlag, "damaged") || endedByRepeatedSave;
+        }
         if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(actor, "damaged");
-        if (endedByRepeatedSave) return;
+        if (endedByRepeatedSave) debugLog(`[${MODULE_ID}] Sauvegarde répétée sur dégâts traitée pour ${actor.name}`);
       }
 
-      const flag = actor?.getFlag(MODULE_ID, "activeBuff");
-      if (flag && damageTaken > 0 && shouldProcessDamageTakenEndCondition(actor, workflow, damageItem)) {
-        scheduleTemporaryHpLostEndCheck(actor, flag, damageItem, workflow, damageTaken);
-        const endedByDamageCondition = await maybeEndActiveBuffForDamageTaken(actor, flag, damageItem, workflow);
-        if (endedByDamageCondition) return;
+      if (damageTaken > 0 && shouldProcessDamageTakenEndCondition(actor, workflow, damageItem)) {
+        for (const flag of getActiveBuffsForTrigger(actor)) {
+          scheduleTemporaryHpLostEndCheck(actor, flag, damageItem, workflow, damageTaken);
+          await maybeEndActiveBuffForDamageTaken(actor, flag, damageItem, workflow);
+        }
       }
-      if (!flag) {
+
+      const damagedFlags = getActiveBuffsForTrigger(actor, (activeFlag) => activeFlag.type === "damaged");
+      if (!damagedFlags.length) {
         debugLog(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);
         return;
       }
-      if (flag.type !== "damaged") {
-        debugLog(`[${MODULE_ID}] midi-qol.isDamaged : buff actif trouvé mais type différent de damaged (${flag.type})`);
-        return;
-      }
 
-      debugLog(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name}`);
-
-      const expectedAttackType = typeof flag.receivedAttackType === "string" ? flag.receivedAttackType : "any";
-      if (expectedAttackType !== "any") {
-        const receivedAttackTypes = getReceivedAttackCategories(workflow, item);
-        if (!receivedAttackTypes.has(expectedAttackType)) {
-          debugLog(`[${MODULE_ID}] damaged bloqué par type d’attaque`);
-          return;
-        }
-      }
-
-      const expectedDamageTypes = Array.isArray(flag.receivedDamageTypes) ? flag.receivedDamageTypes.filter(Boolean) : [];
-      if (expectedDamageTypes.length > 0) {
-        const receivedDamageTypes = getReceivedDamageTypes(damageItem, workflow);
-        if (!receivedDamageTypes.length) {
-          debugLog(`[${MODULE_ID}] Types de dégâts reçus indisponibles pour le filtre damaged`);
-        } else if (!receivedDamageTypes.some(type => expectedDamageTypes.includes(type))) {
-          debugLog(`[${MODULE_ID}] damaged bloqué par type de dégâts`);
-          return;
-        }
-      }
-
-      debugLog(`[${MODULE_ID}] damaged autorisé`);
-
-      const now = Date.now();
-      const lastTriggered = actor.getFlag(MODULE_ID, "_lastDamagedTrigger") ?? 0;
-      if (now - lastTriggered < 1000) return;
-      await actor.setFlag(MODULE_ID, "_lastDamagedTrigger", now);
       const actorUuid = actor.uuid;
       const attackerTokenUuid = workflow?.token?.document?.uuid
         ?? workflow?.attackingToken?.document?.uuid
         ?? null;
       const itemUuid = item?.uuid ?? null;
-      debugLog(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
-      window.setTimeout(async () => {
-        try {
-          const delayedActor = fromUuidSync(actorUuid);
-          if (!delayedActor?.getFlag) return;
-          const delayedFlag = delayedActor.getFlag(MODULE_ID, "activeBuff");
-          if (!delayedFlag || delayedFlag.type !== "damaged") return;
-          const attackerToken = attackerTokenUuid
-            ? (fromUuidSync(attackerTokenUuid)?.object ?? null)
-            : null;
-          const delayedItem = itemUuid ? fromUuidSync(itemUuid) : null;
-          const fakeWorkflow = {
-            actor: delayedActor,
-            item: delayedItem ?? null,
-            attackerToken: attackerToken ?? null,
-            attackerTokenUuid: attackerTokenUuid,
-            targets: attackerToken ? new Set([attackerToken]) : new Set(),
-            hitTargets: attackerToken ? new Set([attackerToken]) : new Set(),
-            missedTargets: new Set(),
-            damageItem,
-            damageList: workflow?.damageList ?? null,
-            _botOriginalWorkflow: workflow ?? null,
-            _botOriginalDamageItem: damageItem ?? null,
-          };
-          handleAttackTrigger(fakeWorkflow, delayedFlag);
-        } catch (error) {
-          console.error(`[${MODULE_ID}] Erreur dans midi-qol.isDamaged (différé) :`, error);
+      const now = Date.now();
+
+      for (const flag of damagedFlags) {
+        debugLog(`[${MODULE_ID}] Déclencheur damaged sur ${actor.name} (${flag.itemName ?? flag.buffId ?? "buff"})`);
+
+        const expectedAttackType = typeof flag.receivedAttackType === "string" ? flag.receivedAttackType : "any";
+        if (expectedAttackType !== "any") {
+          const receivedAttackTypes = getReceivedAttackCategories(workflow, item);
+          if (!receivedAttackTypes.has(expectedAttackType)) {
+            debugLog(`[${MODULE_ID}] damaged bloqué par type d’attaque`);
+            continue;
+          }
         }
-      }, 100);
+
+        const expectedDamageTypes = Array.isArray(flag.receivedDamageTypes) ? flag.receivedDamageTypes.filter(Boolean) : [];
+        if (expectedDamageTypes.length > 0) {
+          const receivedDamageTypes = getReceivedDamageTypes(damageItem, workflow);
+          if (!receivedDamageTypes.length) {
+            debugLog(`[${MODULE_ID}] Types de dégâts reçus indisponibles pour le filtre damaged`);
+          } else if (!receivedDamageTypes.some(type => expectedDamageTypes.includes(type))) {
+            debugLog(`[${MODULE_ID}] damaged bloqué par type de dégâts`);
+            continue;
+          }
+        }
+
+        debugLog(`[${MODULE_ID}] damaged autorisé`);
+
+        const lastTriggered = getLastDamagedTriggerTimestamp(actor, flag);
+        if (now - lastTriggered < 1000) continue;
+        await markDamagedTriggerTimestamp(actor, flag, now);
+        const buffId = flag.buffId ?? null;
+        debugLog(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
+        window.setTimeout(async () => {
+          try {
+            const delayedActor = fromUuidSync(actorUuid);
+            if (!delayedActor?.getFlag) return;
+            const delayedFlag = buffId
+              ? getActiveBuff(delayedActor, buffId)
+              : delayedActor.getFlag(MODULE_ID, "activeBuff");
+            if (!delayedFlag || delayedFlag.type !== "damaged") return;
+            const attackerToken = attackerTokenUuid
+              ? (fromUuidSync(attackerTokenUuid)?.object ?? null)
+              : null;
+            const delayedItem = itemUuid ? fromUuidSync(itemUuid) : null;
+            const fakeWorkflow = {
+              actor: delayedActor,
+              item: delayedItem ?? null,
+              attackerToken: attackerToken ?? null,
+              attackerTokenUuid: attackerTokenUuid,
+              targets: attackerToken ? new Set([attackerToken]) : new Set(),
+              hitTargets: attackerToken ? new Set([attackerToken]) : new Set(),
+              missedTargets: new Set(),
+              damageItem,
+              damageList: workflow?.damageList ?? null,
+              _botOriginalWorkflow: workflow ?? null,
+              _botOriginalDamageItem: damageItem ?? null,
+            };
+            handleAttackTrigger(fakeWorkflow, delayedFlag);
+          } catch (error) {
+            console.error(`[${MODULE_ID}] Erreur dans midi-qol.isDamaged (différé) :`, error);
+          }
+        }, 100);
+      }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans midi-qol.isDamaged :`, error);
     }
