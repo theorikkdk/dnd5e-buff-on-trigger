@@ -1,6 +1,16 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, ABILITY_IDS, SKILL_IDS, debugLog } from "./constants.js";
 import { getFlagDurationInRounds } from "./duration.js";
-import { upsertActiveBuff, removeActiveBuff, getBuffStackingFlags } from "./active-buffs.js";
+import {
+  upsertActiveBuff,
+  removeActiveBuff,
+  getActiveBuffs,
+  pruneStaleActiveBuffs,
+  getStackingKey,
+  getDominantBuffForStack,
+  isDominantBuff,
+  isActiveBuffRemovalPending,
+  getBuffStackingFlags
+} from "./active-buffs.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -17,6 +27,9 @@ const DAMAGE_LABEL_KEYS = {
   slashing: "BOT.damageTypes.slashing",
   thunder: "BOT.damageTypes.thunder"
 };
+
+const stackingMechanicalRefreshQueues = new Map();
+const stackingMechanicalRefreshVersions = new Map();
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
@@ -268,14 +281,29 @@ function getChargeCountLabel(count) {
 }
 
 function getActiveBuffIndicatorName(activeBuff) {
-  const baseName = activeBuff.itemName ?? localize("BOT.fallback.effectName");
+  const baseName = getBuffDisplayName(activeBuff);
   const remaining = getRemainingCharges(activeBuff);
   if (remaining !== null) return `${baseName} - ${getChargeCountLabel(remaining)}`;
   return `${baseName} \u26A1`;
 }
 
+function getBuffSourceName(flag) {
+  const sourceName = String(flag?.originTokenName ?? flag?.sourceTokenName ?? "").trim();
+  if (sourceName) return sourceName;
+  const originActor = flag?.originActorUuid && typeof fromUuidSync === "function"
+    ? fromUuidSync(flag.originActorUuid)
+    : null;
+  return String(originActor?.name ?? "").trim();
+}
+
+function getBuffDisplayName(flag) {
+  const baseName = flag?.itemName ?? localize("BOT.fallback.effectName");
+  const sourceName = getBuffSourceName(flag);
+  return sourceName ? `${baseName} [${sourceName}]` : baseName;
+}
+
 async function updateActiveBuffIndicatorName(actor, activeBuff) {
-  const existing = actor?.effects?.find?.((e) => e.statuses?.has("bot-active"));
+  const existing = actor?.effects?.find?.((e) => isActiveBuffIndicator(e));
   if (!existing || existing.deleted) return;
   try {
     await existing.update({ name: getActiveBuffIndicatorName(activeBuff) });
@@ -485,6 +513,146 @@ export async function refreshStoredTargetIndicator(ownerActor, previousFlag = nu
     duration: {},
   }]);
   debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+}
+
+function getActiveBuffStackEntries(actor, stackingKey) {
+  const key = getStackingKey({ stackingKey });
+  if (!key) return [];
+  return Object.entries(getActiveBuffs(actor))
+    .filter(([, activeBuff]) => getStackingKey(activeBuff) === key);
+}
+
+function activeEffectMatchesStack(effect, stackingKey, buffIds = new Set(), relatedFlags = []) {
+  const effectFlag = effect?.flags?.[MODULE_ID] ?? {};
+  if (stackingKey && getStackingKey(effectFlag) === stackingKey) return true;
+  if (effectFlag.buffId && buffIds.has(effectFlag.buffId)) return true;
+
+  const effectName = String(effect?.name ?? "").trim();
+  return relatedFlags.some((flag) => {
+    if (!flag) return false;
+    const displayName = getBuffDisplayName(flag);
+    const itemName = String(flag.itemName ?? "").trim();
+    return effectName === displayName
+      || (!!itemName && effectName === itemName);
+  });
+}
+
+function isActiveBuffIndicator(effect) {
+  return effect?.flags?.[MODULE_ID]?.indicator === true
+    || effect?.statuses?.has?.("bot-active") === true;
+}
+
+async function createActiveBuffIndicator(actor, activeBuff, changes = []) {
+  if (isActiveBuffRemovalPending(actor, activeBuff?.buffId)) {
+    debugLog(`[${MODULE_ID}] Indicateur ignore : buff en suppression ${activeBuff?.buffId ?? "sans-id"}`);
+    return;
+  }
+  const durationRounds = getFlagDurationInRounds(activeBuff);
+  await actor.createEmbeddedDocuments("ActiveEffect", [{
+    name: getActiveBuffIndicatorName(activeBuff),
+    img: activeBuff.itemImg ?? BUFF_ICON,
+    statuses: ["bot-active"],
+    changes,
+    duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
+    flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null, ...getBuffStackingFlags(activeBuff) } },
+  }]);
+}
+
+export async function removeMechanicalEffectsForStack(actor, stackingKey) {
+  const key = getStackingKey({ stackingKey });
+  if (!actor?.effects || !key) return;
+  const stackEntries = getActiveBuffStackEntries(actor, key);
+  const buffIds = new Set(stackEntries.map(([buffId, activeBuff]) => activeBuff?.buffId ?? buffId).filter(Boolean));
+  const relatedFlags = stackEntries.map(([, activeBuff]) => activeBuff).filter(Boolean);
+  const effects = actor.effects.filter((effect) =>
+    effect.flags?.[MODULE_ID]?.mechanicalBuff === true
+    && activeEffectMatchesStack(effect, key, buffIds, relatedFlags)
+  );
+  for (const effect of effects) await deleteDocumentIfExists(effect, "effet mecanique");
+}
+
+async function updateStackingIndicatorStates(actor, stackingKey, dominant, buffIds = new Set()) {
+  const key = getStackingKey({ stackingKey });
+  if (!actor?.effects || !key || !dominant?.buffId) return;
+  const indicatorEffects = actor.effects.filter((effect) =>
+    isActiveBuffIndicator(effect)
+    && activeEffectMatchesStack(effect, key, buffIds)
+  );
+  for (const effect of indicatorEffects) {
+    const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+    if (!effectBuffId) continue;
+    if (isActiveBuffRemovalPending(actor, effectBuffId)) continue;
+    const shouldDisable = effectBuffId !== dominant.buffId;
+    if (effect.disabled === shouldDisable) continue;
+    await effect.update({ disabled: shouldDisable });
+  }
+}
+
+function getStackRefreshQueueKey(actor, stackingKey) {
+  const actorKey = actor?.uuid ?? actor?.id ?? "unknown-actor";
+  return `${actorKey}:${stackingKey}`;
+}
+
+async function runStackingMechanicalRefresh(actor, stackingKey, previousFlag = null, queueKey = null, refreshVersion = 0) {
+  try {
+    const key = getStackingKey({ stackingKey });
+    if (!actor?.effects || !key) return;
+
+    await pruneStaleActiveBuffs(actor);
+    const stackEntries = getActiveBuffStackEntries(actor, key);
+    const buffIds = new Set(stackEntries.map(([buffId, activeBuff]) => activeBuff?.buffId ?? buffId).filter(Boolean));
+    if (previousFlag?.buffId) buffIds.add(previousFlag.buffId);
+    const relatedFlags = stackEntries.map(([, activeBuff]) => activeBuff).filter(Boolean);
+    if (previousFlag) relatedFlags.push(previousFlag);
+
+    const effectsToRemove = actor.effects.filter((effect) =>
+      effect.flags?.[MODULE_ID]?.mechanicalBuff === true
+      && activeEffectMatchesStack(effect, key, buffIds, relatedFlags)
+    );
+    for (const effect of effectsToRemove) await deleteDocumentIfExists(effect, "effet mecanique de cumul");
+
+    if (queueKey && stackingMechanicalRefreshVersions.get(queueKey) !== refreshVersion) {
+      debugLog(`[${MODULE_ID}] Refresh mecanique obsolete abandonne : stackingKey=${key}`);
+      return;
+    }
+
+    if (!stackEntries.length) return;
+
+    const dominant = getDominantBuffForStack(actor, key);
+    if (!dominant) return;
+    const changes = buildMechanicalChanges(dominant, actor);
+    if (changes.length) await applyMechanicalBuffs(actor, dominant);
+    await updateStackingIndicatorStates(actor, key, dominant, buffIds);
+
+    debugLog(`[${MODULE_ID}] Effets mecaniques rafraichis pour stackingKey=${key}, dominant=${dominant?.buffId ?? "aucun"}`);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans refreshStackingMechanicalEffects :`, error);
+  }
+}
+
+export async function refreshStackingMechanicalEffects(actor, stackingKey, previousFlag = null) {
+  const key = getStackingKey({ stackingKey });
+  if (!actor?.effects || !key) return;
+
+  const queueKey = getStackRefreshQueueKey(actor, key);
+  const refreshVersion = (stackingMechanicalRefreshVersions.get(queueKey) ?? 0) + 1;
+  stackingMechanicalRefreshVersions.set(queueKey, refreshVersion);
+  const previousQueue = stackingMechanicalRefreshQueues.get(queueKey) ?? Promise.resolve();
+  const nextQueue = previousQueue
+    .catch(() => undefined)
+    .then(() => runStackingMechanicalRefresh(actor, key, previousFlag, queueKey, refreshVersion));
+
+  stackingMechanicalRefreshQueues.set(queueKey, nextQueue);
+  try {
+    await nextQueue;
+  } finally {
+    if (stackingMechanicalRefreshQueues.get(queueKey) === nextQueue) {
+      stackingMechanicalRefreshQueues.delete(queueKey);
+      if (stackingMechanicalRefreshVersions.get(queueKey) === refreshVersion) {
+        stackingMechanicalRefreshVersions.delete(queueKey);
+      }
+    }
+  }
 }
 
 export async function resolveSaveDC(workflow, flag) {
@@ -1361,8 +1529,9 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = [], previousFlag = null) {
   try {
-    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    const indicatorEffects = actor.effects.filter((e) => e.statuses?.has("bot-active")) ?? [];
+    const legacyActiveBuff = actor.getFlag(MODULE_ID, "activeBuff");
+    const activeBuff = isActiveBuffRemovalPending(actor, legacyActiveBuff?.buffId) ? null : legacyActiveBuff;
+    const indicatorEffects = actor.effects.filter((e) => isActiveBuffIndicator(e)) ?? [];
 
     const previousBuffId = previousFlag?.buffId ?? null;
     const indicatorsToRemove = previousFlag
@@ -1393,15 +1562,7 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
       if (existingActiveIndicator && !indicatorsToRemove.includes(existingActiveIndicator)) {
         await deleteDocumentIfExists(existingActiveIndicator, "indicateur actif");
       }
-      const durationRounds = getFlagDurationInRounds(activeBuff);
-      await actor.createEmbeddedDocuments("ActiveEffect", [{
-        name: getActiveBuffIndicatorName(activeBuff),
-        img: activeBuff.itemImg ?? BUFF_ICON,
-        statuses: ["bot-active"],
-        changes: extraChanges,
-        duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
-        flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null, ...getBuffStackingFlags(activeBuff) } },
-      }]);
+      await createActiveBuffIndicator(actor, activeBuff, extraChanges);
     }
 
     await refreshStoredTargetIndicator(actor, previousFlag);
@@ -1717,15 +1878,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           await upsertActiveBuff(actor, retainedFlag);
           await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
           await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
+          await refreshStackingMechanicalEffects(actor, getStackingKey(currentFlag));
           debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
           return;
         }
+        const stackingKey = getStackingKey(currentFlag);
         await showBuffReminder(actor, currentFlag, "buffEnd");
         await removeActiveBuff(actor, currentFlag);
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         debugLog(`[${MODULE_ID}] Buff epuise a toutes les charges consommees`);
-        const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-        for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mecanique");
         const concentrationEffect = actor?.effects.find(
           (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
         );
@@ -1734,6 +1895,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           debugLog(`[${MODULE_ID}] Concentration retiree (charges epuisees) sur ${actor.name}`);
         }
         await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
+        await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);
         for (const token of targets) {
           if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
         }
@@ -1755,15 +1917,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         await upsertActiveBuff(actor, retainedFlag);
         await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
         await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
+        await refreshStackingMechanicalEffects(actor, getStackingKey(currentFlag));
         debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
         return;
       }
+      const stackingKey = getStackingKey(currentFlag);
       await showBuffReminder(actor, currentFlag, "buffEnd");
       await removeActiveBuff(actor, currentFlag);
       await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
       debugLog(`[${MODULE_ID}] Buff consomme sur ${actor?.name}`);
-      const mechEffects = actor?.effects.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true);
-      for (const e of mechEffects ?? []) await deleteDocumentIfExists(e, "effet mecanique");
       const concentrationEffect = actor?.effects.find(
         (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
       );
@@ -1772,6 +1934,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         debugLog(`[${MODULE_ID}] Concentration retiree sur ${actor?.name}`);
       }
       await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
+      await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);
       for (const token of targets) {
         if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
       }
@@ -2110,14 +2273,23 @@ export function buildMechanicalChanges(flag, actor = null) {
 
 export async function applyMechanicalBuffs(actor, flag, durationRounds) {
   try {
+    if (isActiveBuffRemovalPending(actor, flag?.buffId)) {
+      debugLog(`[${MODULE_ID}] Buff mecanique ignore : buff en suppression ${flag?.buffId ?? "sans-id"}`);
+      return;
+    }
+    const stackingKey = getStackingKey(flag);
+    await removeMechanicalEffectsForStack(actor, stackingKey);
+    if (!isDominantBuff(actor, flag)) {
+      debugLog(`[${MODULE_ID}] Buff mecanique ignore : instance non dominante (${flag.itemName ?? "buff"})`);
+      return;
+    }
     const changes = buildMechanicalChanges(flag, actor);
     if (!changes.length) return;
-    const resolvedDurationRounds = getFlagDurationInRounds(flag) ?? durationRounds ?? null;
     await actor.createEmbeddedDocuments("ActiveEffect", [{
-      name: flag.itemName ?? localize("BOT.fallback.effectName"),
+      name: getBuffDisplayName(flag),
       img: flag.itemImg ?? BUFF_ICON,
       changes,
-      duration: resolvedDurationRounds ? { rounds: resolvedDurationRounds, startRound: game.combat?.round ?? 0 } : {},
+      duration: {},
       flags: { [MODULE_ID]: { mechanicalBuff: true, buffId: flag.buffId ?? null, ...getBuffStackingFlags(flag) } },
     }]);
     debugLog(`[${MODULE_ID}] Buffs mecaniques appliques sur ${actor.name}`);
@@ -2143,7 +2315,7 @@ export async function applyBonusDamage(workflow, flag) {
       return;
     }
 
-    debugLog(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} â€” cibles : ${targets.size}`);
+    debugLog(`[${MODULE_ID}] Condition : ${flag.condition ?? "hit"} - cibles : ${targets.size}`);
 
     const configuredCriticalMode = game.settings.get(MODULE_ID, "bonusDamageCriticalMode");
     const criticalMode = ["system", "doubleDice", "maxBaseDice", "neverDouble"].includes(configuredCriticalMode)

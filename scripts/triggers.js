@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, applyMechanicalBuffs, buildMechanicalChanges, refreshBuffIndicator, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder } from "./effects.js";
-import { getActiveBuff, getActiveBuffs, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder } from "./effects.js";
+import { getActiveBuff, getActiveBuffs, getStackingKey, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
@@ -1387,6 +1387,11 @@ function resolveActiveBuffFromIndicatorEffect(actor, effect) {
   return { activeBuff: null, buffId: effectBuffId };
 }
 
+function isActiveBuffIndicatorEffect(effect) {
+  return effect?.flags?.[MODULE_ID]?.indicator === true
+    || effect?.statuses?.has?.("bot-active") === true;
+}
+
 function getControlledToken() {
   const controlled = canvas?.tokens?.controlled ?? [];
   if (!controlled.length) {
@@ -1465,15 +1470,21 @@ async function applyActivationStatus(carrierActor, carrierToken, activeFlag, sou
   };
   await applyStatusEffect(workflow, activeFlag, { skipConsume: true });
 }
+
+async function refreshStackAfterBuffRemoval(actor, previousFlag) {
+  const stackingKey = getStackingKey(previousFlag);
+  if (!stackingKey) return;
+  await refreshStackingMechanicalEffects(actor, stackingKey, previousFlag);
+}
+
 async function clearExistingBuffInstance(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-  const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
-  for (const effect of mechEffects) await effect.delete();
   await refreshBuffIndicator(actor, itemName, [], activeBuff);
+  await refreshStackAfterBuffRemoval(actor, activeBuff);
 }
 
 async function endActiveBuff(actor, activeBuff) {
@@ -1482,13 +1493,12 @@ async function endActiveBuff(actor, activeBuff) {
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-  const mechEffects = actor.effects?.filter((e) => e.flags?.[MODULE_ID]?.mechanicalBuff === true) ?? [];
-  for (const effect of mechEffects) await effect.delete();
   const concentrationEffect = actor.effects?.find(
     (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
   );
   if (concentrationEffect) await concentrationEffect.delete();
   await refreshBuffIndicator(actor, itemName, [], activeBuff);
+  await refreshStackAfterBuffRemoval(actor, activeBuff);
 }
 
 function shouldRollRepeatedSave(flag, timing) {
@@ -1869,6 +1879,7 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
       await removeActiveBuff(actor, buffId);
       await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
       await refreshBuffIndicator(actor, itemName, [], activeBuff);
+      await refreshStackAfterBuffRemoval(actor, activeBuff);
       removedCount += 1;
       debugLog(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
     }
@@ -2081,8 +2092,8 @@ async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, 
   activeFlag = await upsertActiveBuff(targetActor, activeFlag);
   debugLog(`[${MODULE_ID}] Buff active sur ${targetActor.name} via ${workflow.item?.name ?? activeFlag.itemName}, origine : ${sourceActorName}`);
   if (hasMechBuffs) {
-    const changes = buildMechanicalChanges(activeFlag, targetActor);
-    await refreshBuffIndicator(targetActor, null, changes);
+    await refreshBuffIndicator(targetActor);
+    await refreshStackingMechanicalEffects(targetActor, getStackingKey(activeFlag));
   } else {
     await refreshBuffIndicator(targetActor);
   }
@@ -2094,7 +2105,11 @@ async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, 
 
 export function registerTriggers() {
   registerLinkedStatusProtection();
-  game.actors.forEach((actor) => refreshBuffIndicator(actor));
+  game.actors.forEach((actor) => {
+    refreshBuffIndicator(actor);
+    const stackKeys = [...new Set(Object.values(getActiveBuffs(actor)).map((activeBuff) => getStackingKey(activeBuff)).filter(Boolean))];
+    for (const stackingKey of stackKeys) refreshStackingMechanicalEffects(actor, stackingKey);
+  });
 
   Hooks.on("preUpdateActor", (actor, changed, options = {}, userId) => {
     try {
@@ -2167,6 +2182,10 @@ export function registerTriggers() {
             ?? workflow.item?.identifier
             ?? null,
           originActorUuid: workflow.actor?.uuid ?? null,
+          originTokenName: workflow.token?.name
+            ?? workflow.token?.document?.name
+            ?? workflow.actor?.name
+            ?? null,
           originSpellLevel: workflow.castData?.castLevel
             ?? workflow.castData?.level
             ?? workflow.castLevel
@@ -2678,7 +2697,7 @@ export function registerTriggers() {
     try {
       if (await maybeEndBuffWhenLinkedStatusRemoved(effect, options)) return;
 
-      if (effect.statuses?.has("bot-active")) {
+      if (isActiveBuffIndicatorEffect(effect)) {
         if (options?.[MODULE_ID]?.allowActiveBuffIndicatorDeletion === true) return;
         const actor = effect.parent;
         if (!actor) return;
@@ -2692,6 +2711,7 @@ export function registerTriggers() {
         await showBuffReminder(actor, activeBuff, "buffEnd");
         await removeActiveBuff(actor, buffId ?? activeBuff);
         await refreshBuffIndicator(actor, itemName, [], activeBuff);
+        await refreshStackAfterBuffRemoval(actor, activeBuff);
         debugLog(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
         if (activeBuff?.duration?.concentration) {
           const concentrationEffect = actor.effects.find(
@@ -2751,8 +2771,10 @@ async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = nul
   if (!workflowMatchesStoredTarget(workflow, flag)) return;
   const applied = await applyEffect(workflow, flag);
   if (applied && flag.consumeOnTrigger === true) {
+    const itemName = flag.itemName;
     await showBuffReminder(actor, flag, "buffEnd");
     await removeActiveBuff(actor, flag);
-    await refreshBuffIndicator(actor, flag.itemName, [], flag);
+    await refreshBuffIndicator(actor, itemName, [], flag);
+    await refreshStackAfterBuffRemoval(actor, flag);
   }
 }

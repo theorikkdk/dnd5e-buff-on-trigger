@@ -11,6 +11,40 @@ function generateBuffId() {
   return `bot-${random}`;
 }
 
+const ACTIVE_BUFF_REMOVAL_TTL_MS = 3000;
+const pendingActiveBuffRemovals = new Map();
+
+function getActorRemovalKey(actor) {
+  return actor?.uuid ?? actor?.id ?? "unknown-actor";
+}
+
+function getPendingRemovalKey(actor, buffId) {
+  return `${getActorRemovalKey(actor)}:${buffId}`;
+}
+
+function getActiveBuffId(activeFlagOrId) {
+  return typeof activeFlagOrId === "string"
+    ? activeFlagOrId
+    : (activeFlagOrId?.buffId ?? (activeFlagOrId ? "legacy-activeBuff" : null));
+}
+
+export function markActiveBuffRemoval(actor, activeFlagOrId, { ttlMs = ACTIVE_BUFF_REMOVAL_TTL_MS } = {}) {
+  const buffId = getActiveBuffId(activeFlagOrId);
+  if (!actor || !buffId) return null;
+  const key = getPendingRemovalKey(actor, buffId);
+  const existing = pendingActiveBuffRemovals.get(key);
+  if (existing?.timeoutId) clearTimeout(existing.timeoutId);
+  const timeoutId = setTimeout(() => pendingActiveBuffRemovals.delete(key), ttlMs);
+  pendingActiveBuffRemovals.set(key, { buffId, actorKey: getActorRemovalKey(actor), timeoutId, createdAt: Date.now() });
+  debugLog(`[${MODULE_ID}] Buff marque en suppression : ${buffId}`);
+  return buffId;
+}
+
+export function isActiveBuffRemovalPending(actor, buffId) {
+  if (!actor || !buffId) return false;
+  return pendingActiveBuffRemovals.has(getPendingRemovalKey(actor, buffId));
+}
+
 function normalizeStackingKeyValue(value) {
   const text = String(value ?? "").trim();
   if (!text) return "";
@@ -105,7 +139,7 @@ export function getLegacyActiveBuff(actor) {
   return actor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
 }
 
-export function getActiveBuffs(actor) {
+function getRawActiveBuffs(actor) {
   const activeBuffs = actor?.getFlag?.(MODULE_ID, "activeBuffs");
   if (activeBuffs && typeof activeBuffs === "object" && !Array.isArray(activeBuffs)) {
     return activeBuffs;
@@ -115,6 +149,13 @@ export function getActiveBuffs(actor) {
   if (!legacy) return {};
   const legacyWithId = legacy.buffId ? legacy : { ...legacy, buffId: "legacy-activeBuff" };
   return legacyWithId?.buffId ? { [legacyWithId.buffId]: legacyWithId } : {};
+}
+
+export function getActiveBuffs(actor) {
+  return Object.fromEntries(
+    Object.entries(getRawActiveBuffs(actor))
+      .filter(([buffId]) => !isActiveBuffRemovalPending(actor, buffId))
+  );
 }
 
 export function getActiveBuff(actor, buffId) {
@@ -132,9 +173,11 @@ function indicatorNameMatchesBuff(effectName, activeBuff) {
 }
 
 function hasActiveBuffIndicator(actor, buffId, activeBuff) {
+  if (isActiveBuffRemovalPending(actor, buffId)) return false;
   const effects = actor?.effects ?? [];
   return effects.some((effect) => {
-    if (!effect?.statuses?.has?.("bot-active")) return false;
+    const effectFlag = effect?.flags?.[MODULE_ID] ?? {};
+    if (effectFlag.indicator !== true && !effect?.statuses?.has?.("bot-active")) return false;
     const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
     if (buffId && effectBuffId) return effectBuffId === buffId;
     return indicatorNameMatchesBuff(effect.name, activeBuff);
@@ -152,10 +195,44 @@ function getFallbackLegacyBuff(actor, activeBuffs) {
   return remaining.length ? remaining[remaining.length - 1] : null;
 }
 
+export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
+  if (!actor?.getFlag) return {};
+  const activeBuffs = clone(getRawActiveBuffs(actor));
+  const keep = new Set(keepBuffIds.filter(Boolean));
+  const pruned = Object.fromEntries(
+    Object.entries(activeBuffs).filter(([buffId, activeBuff]) =>
+      !isActiveBuffRemovalPending(actor, buffId)
+      && (keep.has(buffId) || hasActiveBuffIndicator(actor, buffId, activeBuff))
+    )
+  );
+
+  if (Object.keys(pruned).length === Object.keys(activeBuffs).length) return activeBuffs;
+  if (!actor?.setFlag || !actor?.unsetFlag) return pruned;
+
+  if (Object.keys(pruned).length) await actor.setFlag(MODULE_ID, "activeBuffs", pruned);
+  else await actor.unsetFlag(MODULE_ID, "activeBuffs");
+
+  const legacy = getLegacyActiveBuff(actor);
+  const legacyBuffId = legacy?.buffId ?? (legacy ? "legacy-activeBuff" : null);
+  if (legacyBuffId && !pruned[legacyBuffId]) {
+    const fallback = getFallbackLegacyBuff(actor, pruned);
+    if (fallback) await actor.setFlag(MODULE_ID, "activeBuff", fallback);
+    else await actor.unsetFlag(MODULE_ID, "activeBuff");
+  }
+
+  const removed = Object.keys(activeBuffs).filter((buffId) => !pruned[buffId]);
+  debugLog(`[${MODULE_ID}] Entrees activeBuffs fantomes nettoyees : ${removed.join(", ") || "aucune"}`);
+  return pruned;
+}
+
 export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true } = {}) {
   if (!actor?.setFlag || !activeFlag) return null;
   const flagWithId = ensureActiveBuffId(activeFlag);
-  const activeBuffs = clone(getActiveBuffs(actor));
+  if (isActiveBuffRemovalPending(actor, flagWithId.buffId)) {
+    debugLog(`[${MODULE_ID}] Upsert ignore : buff en suppression ${flagWithId.buffId}`);
+    return null;
+  }
+  const activeBuffs = clone(await pruneStaleActiveBuffs(actor));
   activeBuffs[flagWithId.buffId] = flagWithId;
   await actor.setFlag(MODULE_ID, "activeBuffs", activeBuffs);
 
@@ -167,12 +244,10 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true }
 
 export async function removeActiveBuff(actor, activeFlagOrId, { clearLegacy = true } = {}) {
   if (!actor?.unsetFlag) return;
-  const buffId = typeof activeFlagOrId === "string"
-    ? activeFlagOrId
-    : (activeFlagOrId?.buffId ?? (activeFlagOrId ? "legacy-activeBuff" : null));
+  const buffId = markActiveBuffRemoval(actor, activeFlagOrId);
   const legacy = getLegacyActiveBuff(actor);
   const legacyBuffId = legacy?.buffId ?? (legacy ? "legacy-activeBuff" : null);
-  let remainingActiveBuffs = clone(getActiveBuffs(actor));
+  let remainingActiveBuffs = clone(getRawActiveBuffs(actor));
   if (buffId) {
     if (remainingActiveBuffs[buffId]) {
       delete remainingActiveBuffs[buffId];
