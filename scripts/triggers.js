@@ -545,6 +545,20 @@ function getAttackActionCategories(actionType) {
   return categories;
 }
 
+function doAttackTypeFiltersMatch(filters, actionType) {
+  const normalizedFilters = normalizeAttackModeAttackTypes(filters);
+  if (!normalizedFilters.length) return true;
+  if (!ATTACK_ACTION_TYPES.includes(actionType)) return false;
+  return normalizedFilters.some((type) => {
+    if (type === actionType) return true;
+    if (type === "weapon") return ["mwak", "rwak"].includes(actionType);
+    if (type === "spell") return ["msak", "rsak"].includes(actionType);
+    if (type === "melee") return ["mwak", "msak"].includes(actionType);
+    if (type === "ranged") return ["rwak", "rsak"].includes(actionType);
+    return false;
+  });
+}
+
 function resolveAttackActionType(workflow = null, process = null, rollConfig = null) {
   const activity = workflow?.activity ?? process?.activity ?? rollConfig?.activity ?? process?.subject ?? null;
   const attackMode = workflow?.attackMode
@@ -569,85 +583,146 @@ function resolveAttackActionType(workflow = null, process = null, rollConfig = n
     ?? null;
 }
 
+function resolveIncomingAttackActionType(workflow = null, process = null, rollConfig = null) {
+  const activity = workflow?.activity ?? process?.activity ?? rollConfig?.activity ?? process?.subject ?? null;
+  const attackMode = workflow?.attackMode
+    ?? workflow?.rollConfig?.attackMode
+    ?? workflow?.attackRoll?.options?.attackMode
+    ?? rollConfig?.attackMode
+    ?? rollConfig?.options?.attackMode
+    ?? null;
+  if (attackMode && typeof activity?.getActionType === "function") {
+    const modeActionType = activity.getActionType(attackMode);
+    if (ATTACK_ACTION_TYPES.includes(modeActionType)) return modeActionType;
+  }
+
+  const explicitActionType = [
+    workflow?.activity?.actionType,
+    process?.activity?.actionType,
+    rollConfig?.activity?.actionType,
+    process?.subject?.actionType,
+    workflow?.item?.system?.actionType,
+    process?.item?.system?.actionType,
+    process?.subject?.item?.system?.actionType,
+    activity?.item?.system?.actionType,
+    activity?.system?.actionType,
+  ].find((actionType) => ATTACK_ACTION_TYPES.includes(actionType));
+  if (explicitActionType) return explicitActionType;
+
+  return [
+    workflow?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType,
+    process?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType,
+    process?.subject?.item?.system?.activities?.getByType?.("attack")?.[0]?.actionType,
+  ].find((actionType) => ATTACK_ACTION_TYPES.includes(actionType)) ?? null;
+}
+
+function getDominantFilteredRuntimeBuffs(actor, predicate) {
+  if (!actor?.getFlag) return [];
+  return Object.entries(getActiveBuffs(actor))
+    .map(([buffId, activeBuff]) => ({
+      ...(activeBuff ?? {}),
+      buffId: activeBuff?.buffId ?? buffId,
+    }))
+    .filter((activeBuff) => {
+      if (!isDominantBuff(actor, activeBuff)) return false;
+      const indicator = actor.effects?.find((effect) =>
+        (effect.flags?.[MODULE_ID]?.indicator === true || effect.statuses?.has?.("bot-active") === true)
+        && effect.flags?.[MODULE_ID]?.buffId === activeBuff.buffId
+      );
+      if (indicator?.disabled === true) return false;
+      return predicate(activeBuff);
+    });
+}
+
 function applyFilteredBearerAttackMode(workflow = null, rollConfig = null, process = null) {
   const attacker = workflow?.actor ?? workflow?.item?.actor ?? resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
-  const activeBuff = attacker?.getFlag?.(MODULE_ID, "activeBuff");
-  const mode = activeBuff?.buffs?.attackMode;
-  const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackModeAttackTypes ?? []);
-  if (!["advantage", "disadvantage"].includes(mode)) return false;
-
   const actionType = resolveAttackActionType(workflow, process, rollConfig);
   const categories = getAttackActionCategories(actionType);
-  const match = filters.length ? filters.some((type) => categories.has(type)) : true;
-  debugLog(`[${MODULE_ID}] Filtre jets d'attaque : attacker=${attacker?.name ?? "inconnu"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, match=${match}, mode=${mode}`);
-  if (!match) return false;
+  const activeBuffs = getDominantFilteredRuntimeBuffs(attacker, (activeBuff) => {
+    const mode = activeBuff?.buffs?.attackMode;
+    if (!["advantage", "disadvantage"].includes(mode)) return false;
+    const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackModeAttackTypes ?? []);
+    return filters.length ? filters.some((type) => categories.has(type)) : true;
+  });
+  if (!activeBuffs.length) return false;
 
-  if (workflow) applyFilteredAttackModeToMidiWorkflow(workflow, mode, getAttackModeAttributionLabel(activeBuff));
-  applyFilteredAttackModeToRollConfig(rollConfig, mode);
+  for (const activeBuff of activeBuffs) {
+    const mode = activeBuff.buffs.attackMode;
+    const filters = normalizeAttackModeAttackTypes(activeBuff.buffs.attackModeAttackTypes ?? []);
+    debugLog(`[${MODULE_ID}] Filtre jets d'attaque appliqué : attacker=${attacker?.name ?? "inconnu"}, buffId=${activeBuff.buffId ?? "none"}, stackingKey=${getStackingKey(activeBuff) ?? "none"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, mode=${mode}`);
+    if (workflow) applyFilteredAttackModeToMidiWorkflow(workflow, mode, getAttackModeAttributionLabel(activeBuff));
+    applyFilteredAttackModeToRollConfig(rollConfig, mode);
+  }
   return true;
 }
 
 function applyFilteredAttackBonus(workflow = null, rollConfig = null, process = null) {
   const attacker = workflow?.actor ?? workflow?.item?.actor ?? resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
-  const activeBuff = attacker?.getFlag?.(MODULE_ID, "activeBuff");
-  const formula = String(activeBuff?.buffs?.attackBonus ?? "").trim();
-  const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackBonusAttackTypes ?? []);
-  if (!formula) return false;
-
   const actionType = resolveAttackActionType(workflow, process, rollConfig);
   const categories = getAttackActionCategories(actionType);
-  const match = filters.length ? filters.some((type) => categories.has(type)) : true;
-  debugLog(`[${MODULE_ID}] Filtre modificateur attaques : attacker=${attacker?.name ?? "inconnu"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, match=${match}, formula=${formula}`);
-  if (!match) return false;
-
-  return addAttackBonusFormulaToRollConfig(rollConfig, formula);
+  const activeBuffs = getDominantFilteredRuntimeBuffs(attacker, (activeBuff) => {
+    const formula = String(activeBuff?.buffs?.attackBonus ?? "").trim();
+    if (!formula) return false;
+    const filters = normalizeAttackModeAttackTypes(activeBuff?.buffs?.attackBonusAttackTypes ?? []);
+    return filters.length ? filters.some((type) => categories.has(type)) : true;
+  });
+  let applied = false;
+  for (const activeBuff of activeBuffs) {
+    const formula = String(activeBuff.buffs.attackBonus).trim();
+    const filters = normalizeAttackModeAttackTypes(activeBuff.buffs.attackBonusAttackTypes ?? []);
+    const added = addAttackBonusFormulaToRollConfig(rollConfig, formula);
+    debugLog(`[${MODULE_ID}] Filtre modificateur attaques : attacker=${attacker?.name ?? "inconnu"}, buffId=${activeBuff.buffId ?? "none"}, stackingKey=${getStackingKey(activeBuff) ?? "none"}, actionType=${actionType ?? "none"}, categories=${JSON.stringify([...categories])}, expected=${JSON.stringify(filters)}, formula=${formula}, applied=${added}`);
+    applied = added || applied;
+  }
+  return applied;
 }
 
 function getFilteredIncomingAttackMatches(attacker, targets, workflow = null, rollConfig = null, process = null) {
   const midiTypeOrRace = globalThis.MidiQOL?.typeOrRace?.(attacker);
   const midiRaceOrType = globalThis.MidiQOL?.raceOrType?.(attacker);
   const attackerTypes = getActorCreatureTypeValues(attacker);
+  const actionType = resolveIncomingAttackActionType(workflow, process, rollConfig);
+  const attackCategories = getAttackActionCategories(actionType);
   const matches = [];
   for (const target of targets) {
-    const activeBuff = target.actor?.getFlag?.(MODULE_ID, "activeBuff");
-    const mode = activeBuff?.buffs?.incomingAttackMode;
-    const rawExpected = activeBuff?.buffs?.incomingAttackCreatureTypes;
-    const rawAttackTypes = activeBuff?.buffs?.incomingAttackAttackTypes;
+    const activeBuffs = getDominantFilteredRuntimeBuffs(target.actor, (activeBuff) =>
+      ["advantage", "disadvantage"].includes(activeBuff?.buffs?.incomingAttackMode)
+    );
     incomingFilterLog("target inspected", {
       target: summarizeIncomingTarget(target),
-      activeBuff: Boolean(activeBuff),
-      incomingAttackMode: mode ?? null,
-      incomingAttackCreatureTypes: rawExpected ?? [],
-      incomingAttackAttackTypes: rawAttackTypes ?? [],
+      activeBuffIds: activeBuffs.map((activeBuff) => activeBuff.buffId ?? null),
+      stackingKeys: activeBuffs.map((activeBuff) => getStackingKey(activeBuff) ?? null),
     });
-    if (!["advantage", "disadvantage"].includes(mode)) continue;
-    const expectedTypes = normalizeIncomingAttackCreatureTypes(rawExpected);
-    const expectedAttackTypes = normalizeAttackModeAttackTypes(rawAttackTypes);
-    if (!expectedTypes.length && !expectedAttackTypes.length) continue;
-    const actionType = resolveAttackActionType(workflow, process, rollConfig);
-    const attackCategories = getAttackActionCategories(actionType);
-    const creatureMatch = expectedTypes.length ? attackerTypes.some((type) => expectedTypes.includes(type)) : true;
-    const attackMatch = expectedAttackTypes.length ? expectedAttackTypes.some((type) => attackCategories.has(type)) : true;
-    const match = creatureMatch && attackMatch;
-    incomingFilterLog("type evaluated", {
-      attacker: attacker.name ?? null,
-      midiTypeOrRace,
-      midiRaceOrType,
-      detailsType: attacker.system?.details?.type ?? null,
-      detailsTypeValue: attacker.system?.details?.type?.value ?? null,
-      detailsTypeSubtype: attacker.system?.details?.type?.subtype ?? null,
-      detailsRace: attacker.system?.details?.race ?? null,
-      detectedTypes: attackerTypes,
-      expectedTypes,
-      actionType,
-      attackCategories: [...attackCategories],
-      expectedAttackTypes,
-      creatureMatch,
-      attackMatch,
-      match,
-      mode,
-    });
-    if (match) matches.push({ mode, target, activeBuff, expectedTypes, attackerTypes, expectedAttackTypes, attackCategories: [...attackCategories] });
+    for (const activeBuff of activeBuffs) {
+      const mode = activeBuff.buffs.incomingAttackMode;
+      const expectedTypes = normalizeIncomingAttackCreatureTypes(activeBuff.buffs.incomingAttackCreatureTypes);
+      const expectedAttackTypes = normalizeAttackModeAttackTypes(activeBuff.buffs.incomingAttackAttackTypes);
+      if (!expectedTypes.length && !expectedAttackTypes.length) continue;
+      const creatureMatch = expectedTypes.length ? attackerTypes.some((type) => expectedTypes.includes(type)) : true;
+      const attackMatch = doAttackTypeFiltersMatch(expectedAttackTypes, actionType);
+      const match = creatureMatch && attackMatch;
+      incomingFilterLog("type evaluated", {
+        attacker: attacker.name ?? null,
+        buffId: activeBuff.buffId ?? null,
+        stackingKey: getStackingKey(activeBuff) ?? null,
+        midiTypeOrRace,
+        midiRaceOrType,
+        detailsType: attacker.system?.details?.type ?? null,
+        detailsTypeValue: attacker.system?.details?.type?.value ?? null,
+        detailsTypeSubtype: attacker.system?.details?.type?.subtype ?? null,
+        detailsRace: attacker.system?.details?.race ?? null,
+        detectedTypes: attackerTypes,
+        expectedTypes,
+        actionType,
+        attackCategories: [...attackCategories],
+        expectedAttackTypes,
+        creatureMatch,
+        attackMatch,
+        match,
+        mode,
+      });
+      if (match) matches.push({ mode, target, activeBuff, expectedTypes, attackerTypes, expectedAttackTypes, attackCategories: [...attackCategories] });
+    }
   }
   return matches;
 }

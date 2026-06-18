@@ -775,12 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testConcentrationA.label": "[TEST] Concentration - A",
-  "BOT.presets.testConcentrationA.description": "Test preset for an item configured with concentration. Applies a passive buff to the selected target, or to the caster when no target is selected.",
-  "BOT.presets.testConcentrationB.label": "[TEST] Concentration - B",
-  "BOT.presets.testConcentrationB.description": "Second test preset for another item configured with concentration. Applies a passive buff to the selected target, or to the caster when no target is selected.",
-  "BOT.presets.testConcentrationConsumable.label": "[TEST] Concentration - Consumable",
-  "BOT.presets.testConcentrationConsumable.description": "Test preset for an item configured with concentration. The next successful weapon attack deals 1 force damage and then ends this buff.",
-  "BOT.presets.testConcentrationUnlinked.label": "[TEST] Concentration - Unlinked",
-  "BOT.presets.testConcentrationUnlinked.description": "Control preset for an item without concentration. Applies a passive buff that must remain when another concentration from the same caster ends."
+  "BOT.presets.testFilteredAttackAdvantage.label": "[TEST] Filtered attack - Advantage",
+  "BOT.presets.testFilteredAttackAdvantage.description": "Grants advantage on the bearer’s weapon attacks. Tests dominance and combination across different stacking keys.",
+  "BOT.presets.testFilteredAttackBonus.label": "[TEST] Filtered attack - Bonus",
+  "BOT.presets.testFilteredAttackBonus.description": "Adds +2 to the bearer’s melee attacks. A compatible melee weapon attack should receive this bonus and the dedicated advantage.",
+  "BOT.presets.testFilteredDefenseMelee.label": "[TEST] Filtered defense - Melee disadvantage",
+  "BOT.presets.testFilteredDefenseMelee.description": "Imposes disadvantage on incoming melee weapon attacks against the bearer.",
+  "BOT.presets.testFilteredDefenseWeapon.label": "[TEST] Filtered defense - Weapon disadvantage",
+  "BOT.presets.testFilteredDefenseWeapon.description": "Imposes disadvantage on incoming weapon attacks against the bearer. A melee weapon attack is compatible with both defensive presets."
 }

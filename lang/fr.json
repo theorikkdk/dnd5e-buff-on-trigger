@@ -775,12 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testConcentrationA.label": "[TEST] Concentration - A",
-  "BOT.presets.testConcentrationA.description": "Preset de test à appliquer à un item configuré avec concentration. Pose un buff passif sur la cible sélectionnée, ou sur le lanceur sans cible.",
-  "BOT.presets.testConcentrationB.label": "[TEST] Concentration - B",
-  "BOT.presets.testConcentrationB.description": "Second preset de test à appliquer à un autre item configuré avec concentration. Pose un buff passif sur la cible sélectionnée, ou sur le lanceur sans cible.",
-  "BOT.presets.testConcentrationConsumable.label": "[TEST] Concentration - Consommable",
-  "BOT.presets.testConcentrationConsumable.description": "Preset de test à appliquer à un item configuré avec concentration. La prochaine attaque d’arme réussie inflige 1 dégât de force puis termine ce buff.",
-  "BOT.presets.testConcentrationUnlinked.label": "[TEST] Concentration - Non lié",
-  "BOT.presets.testConcentrationUnlinked.description": "Preset de contrôle à appliquer à un item sans concentration. Pose un buff passif qui ne doit pas disparaître quand une concentration du même lanceur prend fin."
+  "BOT.presets.testFilteredAttackAdvantage.label": "[TEST] Filtré attaque - Avantage",
+  "BOT.presets.testFilteredAttackAdvantage.description": "Donne l’avantage aux attaques d’arme du porteur. Sert à vérifier la dominance et le cumul entre stackingKeys différents.",
+  "BOT.presets.testFilteredAttackBonus.label": "[TEST] Filtré attaque - Bonus",
+  "BOT.presets.testFilteredAttackBonus.description": "Ajoute +2 aux attaques de mêlée du porteur. Une attaque d’arme de mêlée compatible doit recevoir ce bonus et l’avantage du preset dédié.",
+  "BOT.presets.testFilteredDefenseMelee.label": "[TEST] Filtré défense - Désavantage mêlée",
+  "BOT.presets.testFilteredDefenseMelee.description": "Impose le désavantage aux attaques d’arme de mêlée entrantes contre le porteur.",
+  "BOT.presets.testFilteredDefenseWeapon.label": "[TEST] Filtré défense - Désavantage arme",
+  "BOT.presets.testFilteredDefenseWeapon.description": "Impose le désavantage aux attaques d’arme entrantes contre le porteur. Une attaque d’arme de mêlée est compatible avec les deux presets défensifs."
 }
