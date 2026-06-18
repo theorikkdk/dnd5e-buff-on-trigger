@@ -103,12 +103,13 @@ function incomingFilterLog(message, data = null) {
 function summarizeIncomingTarget(token) {
   const resolved = token?.object ?? token;
   const actor = resolved?.actor ?? (resolved?.documentName === "Actor" ? resolved : null);
+  const activeBuffIds = actor ? Object.keys(getActiveBuffs(actor)) : [];
   return {
     token: resolved?.name ?? resolved?.document?.name ?? null,
     tokenUuid: resolved?.document?.uuid ?? resolved?.uuid ?? null,
     actor: actor?.name ?? null,
     actorUuid: actor?.uuid ?? null,
-    hasActiveBuff: Boolean(actor?.getFlag?.(MODULE_ID, "activeBuff")),
+    activeBuffIds,
   };
 }
 
@@ -2770,16 +2771,18 @@ export function registerTriggers() {
 
         const lastTriggered = getLastDamagedTriggerTimestamp(actor, flag);
         if (now - lastTriggered < 1000) continue;
-        await markDamagedTriggerTimestamp(actor, flag, now);
         const buffId = flag.buffId ?? null;
+        if (!buffId) {
+          debugLog(`[${MODULE_ID}] damaged ignoré : buff sans buffId`);
+          continue;
+        }
+        await markDamagedTriggerTimestamp(actor, flag, now);
         debugLog(`[${MODULE_ID}] Déclencheur damaged différé pour éviter conflit concentration`);
         window.setTimeout(async () => {
           try {
             const delayedActor = fromUuidSync(actorUuid);
             if (!delayedActor?.getFlag) return;
-            const delayedFlag = buffId
-              ? getActiveBuff(delayedActor, buffId)
-              : delayedActor.getFlag(MODULE_ID, "activeBuff");
+            const delayedFlag = getActiveBuff(delayedActor, buffId);
             if (!delayedFlag || delayedFlag.type !== "damaged") return;
             const attackerToken = attackerTokenUuid
               ? (fromUuidSync(attackerTokenUuid)?.object ?? null)

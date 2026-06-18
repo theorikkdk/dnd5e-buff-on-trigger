@@ -775,8 +775,16 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testLinkedStrictA.label": "[TEST] Linked Strict - A",
-  "BOT.presets.testLinkedStrictA.description": "Applies Blinded and ends only this buff when its linked status is removed.",
-  "BOT.presets.testLinkedStrictB.label": "[TEST] Linked Strict - B",
-  "BOT.presets.testLinkedStrictB.description": "Applies Deafened and ends only this buff when its linked status is removed."
+  "BOT.presets.testFallbackDamagedA.label": "[TEST] Fallback - Damaged A",
+  "BOT.presets.testFallbackDamagedA.description": "When the bearer takes damage, deals 1 force damage to the attacker.",
+  "BOT.presets.testFallbackDamagedB.label": "[TEST] Fallback - Damaged B",
+  "BOT.presets.testFallbackDamagedB.description": "When the bearer takes damage, deals 1 psychic damage to the attacker.",
+  "BOT.presets.testFallbackDamagedFrequency.label": "[TEST] Fallback - Damaged frequency",
+  "BOT.presets.testFallbackDamagedFrequency.description": "When the bearer takes damage, deals 1 thunder damage to the attacker, at most once per round.",
+  "BOT.presets.testFallbackStatusA.label": "[TEST] Fallback - Status A",
+  "BOT.presets.testFallbackStatusA.description": "Applies Blinded and ends only this buff when its linked status is removed.",
+  "BOT.presets.testFallbackStatusB.label": "[TEST] Fallback - Status B",
+  "BOT.presets.testFallbackStatusB.description": "Applies Deafened and ends only this buff when its linked status is removed.",
+  "BOT.presets.testFallbackTurnFrequency.label": "[TEST] Fallback - Turn frequency",
+  "BOT.presets.testFallbackTurnFrequency.description": "Heals 1 HP at the start of the bearer’s turn, at most once per turn."
 }

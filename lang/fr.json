@@ -775,8 +775,16 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testLinkedStrictA.label": "[TEST] Linked Strict - A",
-  "BOT.presets.testLinkedStrictA.description": "Applique Aveuglé et termine uniquement ce buff lorsque son statut lié est supprimé.",
-  "BOT.presets.testLinkedStrictB.label": "[TEST] Linked Strict - B",
-  "BOT.presets.testLinkedStrictB.description": "Applique Assourdi et termine uniquement ce buff lorsque son statut lié est supprimé."
+  "BOT.presets.testFallbackDamagedA.label": "[TEST] Fallback - Damaged A",
+  "BOT.presets.testFallbackDamagedA.description": "Quand le porteur subit des dégâts, inflige 1 dégât de force à l’attaquant.",
+  "BOT.presets.testFallbackDamagedB.label": "[TEST] Fallback - Damaged B",
+  "BOT.presets.testFallbackDamagedB.description": "Quand le porteur subit des dégâts, inflige 1 dégât psychique à l’attaquant.",
+  "BOT.presets.testFallbackDamagedFrequency.label": "[TEST] Fallback - Damaged fréquence",
+  "BOT.presets.testFallbackDamagedFrequency.description": "Quand le porteur subit des dégâts, inflige 1 dégât de tonnerre à l’attaquant, au maximum une fois par round.",
+  "BOT.presets.testFallbackStatusA.label": "[TEST] Fallback - Statut A",
+  "BOT.presets.testFallbackStatusA.description": "Applique Aveuglé et termine uniquement ce buff lorsque son statut lié est supprimé.",
+  "BOT.presets.testFallbackStatusB.label": "[TEST] Fallback - Statut B",
+  "BOT.presets.testFallbackStatusB.description": "Applique Assourdi et termine uniquement ce buff lorsque son statut lié est supprimé.",
+  "BOT.presets.testFallbackTurnFrequency.label": "[TEST] Fallback - Fréquence tour",
+  "BOT.presets.testFallbackTurnFrequency.description": "Soigne 1 PV au début du tour du porteur, au maximum une fois par tour."
 }

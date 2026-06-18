@@ -1502,18 +1502,15 @@ export function shouldBlockTriggerFrequency(actor, flag) {
 
 export async function markTriggerFrequencyUsage(actor, flag = null) {
   const currentUsage = getCurrentTriggerUsage();
-  if (!currentUsage || !actor?.setFlag) return;
-
-  const activeBuff = flag ?? actor.getFlag(MODULE_ID, "activeBuff");
-  if (!activeBuff) return;
+  if (!currentUsage || !actor?.setFlag || !flag) return;
 
   await upsertActiveBuff(actor, {
-    ...activeBuff,
+    ...flag,
     runtime: {
-      ...(activeBuff.runtime ?? {}),
+      ...(flag.runtime ?? {}),
       lastTrigger: currentUsage,
     },
-  }, { writeLegacy: !flag });
+  });
 }
 
 function getLinkedStatusOriginItemUuid(flag) {
@@ -1692,22 +1689,19 @@ async function markLinkedStatusEffect(targetActor, statusId, ownerActor, flag) {
 export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = null) {
   try {
     const actor = actorOrToken?.actor ?? actorOrToken;
-    if (!actor?.getFlag || !actor?.toggleStatusEffect) return;
+    if (!actor?.getFlag || !actor?.toggleStatusEffect || !flag) return;
+    if (flag.status?.removeWhenBuffEnds !== true || flag.status?.protectWhileBuffActive !== true) return;
 
-    const activeBuff = flag ?? actor.getFlag(MODULE_ID, "activeBuff");
-    if (!activeBuff) return;
-    if (activeBuff.status?.removeWhenBuffEnds !== true || activeBuff.status?.protectWhileBuffActive !== true) return;
-
-    const statusIds = getConfiguredStatusIds(activeBuff);
+    const statusIds = getConfiguredStatusIds(flag);
     if (!statusIds.length) return;
 
     for (const statusId of statusIds) {
-      const linkedEffect = actor.effects?.find((effect) => linkedStatusMatchesBuff(effect, actor, activeBuff) && effect.flags?.[MODULE_ID]?.statusId === statusId && !effect.disabled) ?? null;
+      const linkedEffect = actor.effects?.find((effect) => linkedStatusMatchesBuff(effect, actor, flag) && effect.flags?.[MODULE_ID]?.statusId === statusId && !effect.disabled) ?? null;
       if (linkedEffect) continue;
       if (actorHasActiveStatus(actor, statusId)) continue;
 
       await actor.toggleStatusEffect(statusId, { active: true });
-      await markLinkedStatusEffect(actor, statusId, actor, activeBuff);
+      await markLinkedStatusEffect(actor, statusId, actor, flag);
       debugLog(`[${MODULE_ID}] Statut li\u00e9 manquant r\u00e9appliqu\u00e9 : ${statusId}`);
     }
   } catch (error) {
@@ -2496,6 +2490,16 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
 
     for (const modifier of modifiers) {
       if (!modifier?.formula || modifier.consumed) continue;
+      if (!modifier.buffId) {
+        rollModifierDebug("finalize ignored: missing buffId", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType,
+          stackingKey: modifier.stackingKey ?? null,
+          formula: modifier.formula ?? null,
+        });
+        continue;
+      }
       if (hasFinalizedRollModifier(actor, modifier, rollList)) {
         modifier.consumed = true;
         rollModifierDebug("finalize ignored: already finalized", {
@@ -2522,9 +2526,7 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
       markFinalizedRollModifier(actor, modifier, rollList);
       modifier.consumed = true;
 
-      const flag = modifier.buffId
-        ? getActiveBuff(actor, modifier.buffId)
-        : actor.getFlag(MODULE_ID, "activeBuff");
+      const flag = getActiveBuff(actor, modifier.buffId);
       if (!flag?.rollModifier?.enabled) continue;
       if (shouldUseRollModifierStackApplicationLock(flag)
         && hasRecentConsumableRollStack(actor, modifier, modifier.consumableStackToken ?? null)) {

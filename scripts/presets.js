@@ -1722,9 +1722,60 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testLinkedStrictA",
-    label: "BOT.presets.testLinkedStrictA.label",
-    description: "BOT.presets.testLinkedStrictA.description",
+    id: "testFallbackDamagedA",
+    label: "BOT.presets.testFallbackDamagedA.label",
+    description: "BOT.presets.testFallbackDamagedA.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "damaged",
+      damage: {
+        formula: "1",
+        type: "force",
+        targetMode: "attacker",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testFallbackDamagedB",
+    label: "BOT.presets.testFallbackDamagedB.label",
+    description: "BOT.presets.testFallbackDamagedB.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "damaged",
+      damage: {
+        formula: "1",
+        type: "psychic",
+        targetMode: "attacker",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testFallbackDamagedFrequency",
+    label: "BOT.presets.testFallbackDamagedFrequency.label",
+    description: "BOT.presets.testFallbackDamagedFrequency.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "damaged",
+      damage: {
+        formula: "1",
+        type: "thunder",
+        targetMode: "attacker",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "round",
+    },
+  },
+  {
+    id: "testFallbackStatusA",
+    label: "BOT.presets.testFallbackStatusA.label",
+    description: "BOT.presets.testFallbackStatusA.description",
     flag: {
       targetMode: "target",
       fallbackToSelfIfNoTarget: true,
@@ -1743,9 +1794,9 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testLinkedStrictB",
-    label: "BOT.presets.testLinkedStrictB.label",
-    description: "BOT.presets.testLinkedStrictB.description",
+    id: "testFallbackStatusB",
+    label: "BOT.presets.testFallbackStatusB.label",
+    description: "BOT.presets.testFallbackStatusB.description",
     flag: {
       targetMode: "target",
       fallbackToSelfIfNoTarget: true,
@@ -1761,6 +1812,22 @@ export const BUFF_PRESETS = [
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testFallbackTurnFrequency",
+    label: "BOT.presets.testFallbackTurnFrequency.label",
+    description: "BOT.presets.testFallbackTurnFrequency.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "turnStart",
+      healing: {
+        formula: "1",
+        targetMode: "self",
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "turn",
     },
   },
 ];
