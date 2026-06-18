@@ -13,6 +13,7 @@ function generateBuffId() {
 
 const ACTIVE_BUFF_REMOVAL_TTL_MS = 10000;
 const pendingActiveBuffRemovals = new Map();
+const pendingLegacyActiveBuffMigrations = new Map();
 
 function getActorRemovalKey(actor) {
   return actor?.uuid ?? actor?.id ?? "unknown-actor";
@@ -175,7 +176,7 @@ export function getLegacyActiveBuff(actor) {
   return actor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
 }
 
-export async function migrateLegacyActiveBuff(actor) {
+async function runLegacyActiveBuffMigration(actor) {
   if (!actor?.getFlag || !actor?.setFlag) return null;
 
   const existingActiveBuffs = actor.getFlag(MODULE_ID, "activeBuffs");
@@ -195,6 +196,25 @@ export async function migrateLegacyActiveBuff(actor) {
   await actor.setFlag(MODULE_ID, "activeBuffs", { [buffId]: migratedBuff });
   debugLog(`[${MODULE_ID}] Buff legacy migre vers activeBuffs : ${buffId} sur ${actor.name ?? actor.uuid ?? "acteur inconnu"}`);
   return migratedBuff;
+}
+
+export async function migrateLegacyActiveBuff(actor) {
+  if (!actor?.getFlag || !actor?.setFlag) return null;
+  const actorKey = actor.uuid ?? actor.id ?? null;
+  if (!actorKey) return runLegacyActiveBuffMigration(actor);
+
+  const pending = pendingLegacyActiveBuffMigrations.get(actorKey);
+  if (pending) return pending;
+
+  const migration = runLegacyActiveBuffMigration(actor);
+  pendingLegacyActiveBuffMigrations.set(actorKey, migration);
+  try {
+    return await migration;
+  } finally {
+    if (pendingLegacyActiveBuffMigrations.get(actorKey) === migration) {
+      pendingLegacyActiveBuffMigrations.delete(actorKey);
+    }
+  }
 }
 
 function getRawActiveBuffs(actor) {

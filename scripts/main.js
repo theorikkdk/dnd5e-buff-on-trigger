@@ -13,6 +13,64 @@ const MODULE_MACROS = [
   },
 ];
 
+function isPrimaryActiveGM() {
+  if (!game.user?.isGM || game.user.active === false) return false;
+  const activeGMs = (game.users?.filter?.((user) => user.isGM && user.active) ?? [])
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  return activeGMs[0]?.id === game.user.id;
+}
+
+async function migrateLegacyActorIfNeeded(actor) {
+  if (!isPrimaryActiveGM() || !actor?.getFlag) return null;
+  try {
+    return await migrateLegacyActiveBuff(actor);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur de migration activeBuff pour ${actor?.name ?? actor?.uuid ?? "acteur inconnu"} :`, error);
+    return null;
+  }
+}
+
+function changedTouchesLegacyBuff(changed) {
+  if (!changed || typeof changed !== "object") return false;
+  const isLegacyBuffFlagKey = (key) =>
+    ["activeBuff", "activeBuffs", "-=activeBuff", "-=activeBuffs"].includes(String(key));
+  const moduleFlagCandidates = [
+    changed.flags?.[MODULE_ID],
+    changed.delta?.flags?.[MODULE_ID],
+    changed.actorData?.flags?.[MODULE_ID],
+  ];
+  if (moduleFlagCandidates.some((moduleFlags) =>
+    moduleFlags
+    && typeof moduleFlags === "object"
+    && Object.keys(moduleFlags).some(isLegacyBuffFlagKey)
+  )) return true;
+  const prefixes = [
+    `flags.${MODULE_ID}.`,
+    `delta.flags.${MODULE_ID}.`,
+    `actorData.flags.${MODULE_ID}.`,
+  ];
+  return Object.keys(changed).some((key) => {
+    const prefix = prefixes.find((candidate) => key.startsWith(candidate));
+    return prefix ? isLegacyBuffFlagKey(key.slice(prefix.length)) : false;
+  });
+}
+
+function registerLegacyActiveBuffMigrationHooks() {
+  Hooks.on("createActor", (actor) => migrateLegacyActorIfNeeded(actor));
+  Hooks.on("updateActor", (actor, changed) => {
+    if (changedTouchesLegacyBuff(changed)) migrateLegacyActorIfNeeded(actor);
+  });
+  Hooks.on("createToken", (tokenDocument) => migrateLegacyActorIfNeeded(tokenDocument?.actor));
+  Hooks.on("updateToken", (tokenDocument, changed) => {
+    if (changedTouchesLegacyBuff(changed)) migrateLegacyActorIfNeeded(tokenDocument?.actor);
+  });
+  Hooks.on("canvasReady", () => {
+    for (const token of canvas?.tokens?.placeables ?? []) {
+      migrateLegacyActorIfNeeded(token.actor);
+    }
+  });
+}
+
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "debug", {
     name: "BOT.settings.debug.name",
@@ -94,14 +152,10 @@ Hooks.once("ready", async () => {
   }
 
   ensureModuleMacros();
-  if (game.user?.isGM) {
-    for (const actor of game.actors ?? []) {
-      try {
-        await migrateLegacyActiveBuff(actor);
-      } catch (error) {
-        console.error(`[${MODULE_ID}] Erreur de migration activeBuff pour ${actor?.name ?? actor?.uuid ?? "acteur inconnu"} :`, error);
-      }
-    }
+  registerLegacyActiveBuffMigrationHooks();
+  if (isPrimaryActiveGM()) {
+    for (const actor of game.actors ?? []) await migrateLegacyActorIfNeeded(actor);
+    for (const token of canvas?.tokens?.placeables ?? []) await migrateLegacyActorIfNeeded(token.actor);
   }
   registerTriggers();
   registerItemSheetButton();
