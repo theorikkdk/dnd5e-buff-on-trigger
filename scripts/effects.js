@@ -13,6 +13,7 @@ import {
   isActiveBuffRemovalPending,
   getBuffStackingFlags
 } from "./active-buffs.js";
+import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -2106,12 +2107,11 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
           stackingKey,
           activeBuffIdsAfterRemoveActiveBuff: Object.keys(getActiveBuffs(actor)),
         });
-        const concentrationEffect = actor?.effects.find(
-          (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
-        );
+        const concentrationEffect = findConcentrationEffectForBuff(currentFlag, actor);
         if (concentrationEffect) {
           await deleteDocumentIfExists(concentrationEffect, "concentration");
-          debugLog(`[${MODULE_ID}] Concentration retiree (charges epuisees) sur ${actor.name}`);
+          const concentrationActor = getConcentrationSourceActor(currentFlag, actor);
+          debugLog(`[${MODULE_ID}] Concentration retiree (charges epuisees) sur ${concentrationActor?.name ?? actor.name}`);
         }
         await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
         await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);
@@ -2181,12 +2181,11 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         stackingKey,
         activeBuffIdsAfterRemoveActiveBuff: Object.keys(getActiveBuffs(actor)),
       });
-      const concentrationEffect = actor?.effects.find(
-        (e) => e.statuses?.has("concentrating") || e.statuses?.has("concentration")
-      );
+      const concentrationEffect = findConcentrationEffectForBuff(currentFlag, actor);
       if (concentrationEffect) {
         await deleteDocumentIfExists(concentrationEffect, "concentration");
-        debugLog(`[${MODULE_ID}] Concentration retiree sur ${actor?.name}`);
+        const concentrationActor = getConcentrationSourceActor(currentFlag, actor);
+        debugLog(`[${MODULE_ID}] Concentration retiree sur ${concentrationActor?.name ?? actor?.name}`);
       }
       await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
       await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);

@@ -1,4 +1,5 @@
 import { MODULE_ID } from "./constants.js";
+import { itemRequiresConcentration } from "./concentration.js";
 
 const ROUND_UNIT_MULTIPLIERS = {
   round: 1,
@@ -33,7 +34,13 @@ export function getItemDurationInRounds(item) {
 
 export function buildItemDurationData(item) {
   const rounds = getItemDurationInRounds(item);
-  return rounds !== null ? { rounds, source: "item" } : null;
+  const concentration = itemRequiresConcentration(item);
+  if (rounds === null && !concentration) return null;
+  return {
+    ...(rounds !== null ? { rounds } : {}),
+    ...(concentration ? { concentration: true } : {}),
+    source: "item",
+  };
 }
 
 export function getFlagDurationInRounds(flag, item = null) {

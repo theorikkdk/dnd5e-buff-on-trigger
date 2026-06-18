@@ -2,6 +2,7 @@ import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, deb
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
 import { getActiveBuff, getActiveBuffs, getStackingKey, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
@@ -1090,15 +1091,6 @@ function prunePendingTemporaryHpEndConcentrationSkips(now = Date.now()) {
   }
 }
 
-function getActorConcentrationEffects(actor) {
-  const concentration = actor?.concentration?.effects;
-  if (concentration instanceof Set) return [...concentration];
-  if (Array.isArray(concentration)) return concentration;
-  return actor?.effects?.filter((effect) =>
-    effect.statuses?.has("concentrating") || effect.statuses?.has("concentration")
-  ) ?? [];
-}
-
 function concentrationEffectMatchesMarker(effect, marker) {
   const markerItemUuid = marker?.originItemUuid ?? null;
   if (!markerItemUuid || !effect) return null;
@@ -1115,25 +1107,6 @@ function concentrationEffectMatchesMarker(effect, marker) {
   ].filter(Boolean);
   if (!itemCandidates.length) return null;
   return itemCandidates.includes(markerItemUuid);
-}
-
-function findConcentrationEffectForBuff(actor, activeBuff) {
-  if (activeBuff?.duration?.concentration !== true) return null;
-  const concentrationEffects = getActorConcentrationEffects(actor);
-  if (!concentrationEffects.length) return null;
-
-  const marker = {
-    originItemUuid: activeBuff.originItemUuid ?? activeBuff.itemUuid ?? null,
-  };
-  const matchingEffect = concentrationEffects.find((effect) => concentrationEffectMatchesMarker(effect, marker) === true);
-  if (matchingEffect) return matchingEffect;
-
-  const remainingConcentrationBuffs = Object.values(getActiveBuffs(actor))
-    .filter((flag) => flag?.duration?.concentration === true && !sameActiveBuff(activeBuff, flag));
-  if (concentrationEffects.length === 1 && !remainingConcentrationBuffs.length) return concentrationEffects[0];
-
-  debugLog(`[${MODULE_ID}] Concentration non supprimée : aucun effet ciblé trouvé pour ${activeBuff.itemName ?? "buff"}`);
-  return null;
 }
 
 function createTemporaryHpEndConcentrationSkip(actor, activeBuff, preTemp, predictedTemp, source = "unknown") {
@@ -1578,7 +1551,7 @@ async function endActiveBuff(actor, activeBuff) {
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
   await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-  const concentrationEffect = findConcentrationEffectForBuff(actor, activeBuff);
+  const concentrationEffect = findConcentrationEffectForBuff(activeBuff, actor);
   if (concentrationEffect) {
     allowConcentrationDeletion(concentrationEffect);
     await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });
@@ -2043,10 +2016,10 @@ export async function changeStoredTarget() {
   return moveStoredTarget(ownerToken.actor, activeBuff, newTargetToken);
 }
 
-async function clearConcentrationLinkedBuffs(sourceActor) {
+async function clearConcentrationLinkedBuffs(sourceActor, concentrationEffect) {
   const sourceActorUuid = sourceActor?.uuid ?? null;
   const sourceActorId = sourceActor?.id ?? null;
-  if (!sourceActorUuid && !sourceActorId) return;
+  if ((!sourceActorUuid && !sourceActorId) || !concentrationEffect) return;
 
   const carrierEntries = new Map();
   const addCarrier = (actor, tokenDocument = null) => {
@@ -2082,30 +2055,48 @@ async function clearConcentrationLinkedBuffs(sourceActor) {
     }
   }
 
-  debugLog(`[${MODULE_ID}] Nettoyage concentration — porteurs inspectés : ${carrierEntries.size}`);
-
-  let removedCount = 0;
+  const candidates = [];
+  const candidateKeys = new Set();
   for (const { actor } of carrierEntries.values()) {
-    const activeBuffEntries = Object.entries(getActiveBuffs(actor));
-    if (!activeBuffEntries.length) continue;
-
-    for (const [buffId, activeBuff] of activeBuffEntries) {
-      if (!activeBuff) continue;
-      debugLog(`[${MODULE_ID}] Buff actif inspecté sur ${actor.name} — buffId=${buffId}, originActorUuid=${activeBuff.originActorUuid ?? "aucun"}`);
-
+    for (const [buffId, activeBuff] of Object.entries(getActiveBuffs(actor))) {
+      if (!activeBuff || !isConcentrationBuff(activeBuff)) continue;
       const matchesOrigin = (sourceActorUuid && activeBuff.originActorUuid === sourceActorUuid)
         || (!activeBuff.originActorUuid && sourceActorId && actor.id === sourceActorId);
       if (!matchesOrigin) continue;
-
-      const itemName = activeBuff.itemName;
-      await showBuffReminder(actor, activeBuff, "buffEnd");
-      await removeActiveBuff(actor, buffId);
-      await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
-      await refreshBuffIndicator(actor, itemName, [], activeBuff);
-      await refreshStackAfterBuffRemoval(actor, activeBuff);
-      removedCount += 1;
-      debugLog(`[${MODULE_ID}] Concentration brisée — buff distant supprimé sur ${actor.name}`);
+      const candidateKey = `${actor.uuid ?? actor.id ?? "actor"}|${buffId}`;
+      if (candidateKeys.has(candidateKey)) continue;
+      candidateKeys.add(candidateKey);
+      candidates.push({ actor, buffId, activeBuff });
     }
+  }
+
+  const effectItemReferences = getConcentrationEffectItemReferences(concentrationEffect);
+  let matchingCandidates = candidates.filter(({ activeBuff }) =>
+    concentrationEffectMatchesBuff(concentrationEffect, activeBuff, sourceActor) === true
+  );
+
+  if (!effectItemReferences.size && candidates.length) {
+    const itemGroups = new Set(candidates.map(({ activeBuff }) =>
+      activeBuff.originItemUuid ?? activeBuff.itemUuid ?? ""
+    ).filter(Boolean));
+    if (itemGroups.size === 1) {
+      matchingCandidates = candidates;
+      debugLog(`[${MODULE_ID}] Nettoyage concentration legacy : groupe d'item unique utilisé`);
+    }
+  }
+
+  debugLog(`[${MODULE_ID}] Nettoyage concentration — porteurs inspectés : ${carrierEntries.size}, candidats=${candidates.length}, correspondances=${matchingCandidates.length}`);
+
+  let removedCount = 0;
+  for (const { actor, buffId, activeBuff } of matchingCandidates) {
+    const itemName = activeBuff.itemName;
+    await showBuffReminder(actor, activeBuff, "buffEnd");
+    await removeActiveBuff(actor, buffId);
+    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+    await refreshBuffIndicator(actor, itemName, [], activeBuff);
+    await refreshStackAfterBuffRemoval(actor, activeBuff);
+    removedCount += 1;
+    debugLog(`[${MODULE_ID}] Concentration brisée — buff ${buffId} supprimé sur ${actor.name}`);
   }
 
   debugLog(`[${MODULE_ID}] Nettoyage concentration — buffs supprimés : ${removedCount}`);
@@ -2955,8 +2946,8 @@ export function registerTriggers() {
         await refreshBuffIndicator(actor, itemName, [], activeBuff);
         await refreshStackAfterBuffRemoval(actor, activeBuff);
         debugLog(`[${MODULE_ID}] Buff supprimé manuellement sur ${actor.name}`);
-        if (activeBuff?.duration?.concentration) {
-          const concentrationEffect = findConcentrationEffectForBuff(actor, activeBuff);
+        if (isConcentrationBuff(activeBuff)) {
+          const concentrationEffect = findConcentrationEffectForBuff(activeBuff, actor);
           if (concentrationEffect) {
             allowConcentrationDeletion(concentrationEffect);
             await concentrationEffect.delete({ [MODULE_ID]: { allowConcentrationDeletion: true } });
@@ -2970,7 +2961,7 @@ export function registerTriggers() {
         if (options?.[MODULE_ID]?.allowConcentrationDeletion === true || consumeAllowedConcentrationDeletion(effect)) return;
         const actor = effect.parent;
         if (!actor) return;
-        await clearConcentrationLinkedBuffs(actor);
+        await clearConcentrationLinkedBuffs(actor, effect);
         return;
       }
     } catch (error) {

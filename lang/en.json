@@ -775,8 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testStoredTargetMarkA.label": "[TEST] Mark - A",
-  "BOT.presets.testStoredTargetMarkA.description": "Temporary test preset. Stores the selected target. Successful attacks against that target deal 1 additional fire damage.",
-  "BOT.presets.testStoredTargetMarkB.label": "[TEST] Mark - B",
-  "BOT.presets.testStoredTargetMarkB.description": "Temporary test preset. Stores the selected target. Successful weapon attacks against that target deal 1 additional cold damage."
+  "BOT.presets.testConcentrationA.label": "[TEST] Concentration - A",
+  "BOT.presets.testConcentrationA.description": "Test preset for an item configured with concentration. Applies a passive buff to the selected target, or to the caster when no target is selected.",
+  "BOT.presets.testConcentrationB.label": "[TEST] Concentration - B",
+  "BOT.presets.testConcentrationB.description": "Second test preset for another item configured with concentration. Applies a passive buff to the selected target, or to the caster when no target is selected.",
+  "BOT.presets.testConcentrationConsumable.label": "[TEST] Concentration - Consumable",
+  "BOT.presets.testConcentrationConsumable.description": "Test preset for an item configured with concentration. The next successful weapon attack deals 1 force damage and then ends this buff.",
+  "BOT.presets.testConcentrationUnlinked.label": "[TEST] Concentration - Unlinked",
+  "BOT.presets.testConcentrationUnlinked.description": "Control preset for an item without concentration. Applies a passive buff that must remain when another concentration from the same caster ends."
 }

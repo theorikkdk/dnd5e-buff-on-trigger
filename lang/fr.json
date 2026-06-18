@@ -775,8 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testStoredTargetMarkA.label": "[TEST] Marque - A",
-  "BOT.presets.testStoredTargetMarkA.description": "Preset temporaire de test. Mémorise la cible sélectionnée. Les attaques réussies contre cette cible infligent 1 dégât de feu supplémentaire.",
-  "BOT.presets.testStoredTargetMarkB.label": "[TEST] Marque - B",
-  "BOT.presets.testStoredTargetMarkB.description": "Preset temporaire de test. Mémorise la cible sélectionnée. Les attaques d’arme réussies contre cette cible infligent 1 dégât de froid supplémentaire."
+  "BOT.presets.testConcentrationA.label": "[TEST] Concentration - A",
+  "BOT.presets.testConcentrationA.description": "Preset de test à appliquer à un item configuré avec concentration. Pose un buff passif sur la cible sélectionnée, ou sur le lanceur sans cible.",
+  "BOT.presets.testConcentrationB.label": "[TEST] Concentration - B",
+  "BOT.presets.testConcentrationB.description": "Second preset de test à appliquer à un autre item configuré avec concentration. Pose un buff passif sur la cible sélectionnée, ou sur le lanceur sans cible.",
+  "BOT.presets.testConcentrationConsumable.label": "[TEST] Concentration - Consommable",
+  "BOT.presets.testConcentrationConsumable.description": "Preset de test à appliquer à un item configuré avec concentration. La prochaine attaque d’arme réussie inflige 1 dégât de force puis termine ce buff.",
+  "BOT.presets.testConcentrationUnlinked.label": "[TEST] Concentration - Non lié",
+  "BOT.presets.testConcentrationUnlinked.description": "Preset de contrôle à appliquer à un item sans concentration. Pose un buff passif qui ne doit pas disparaître quand une concentration du même lanceur prend fin."
 }
