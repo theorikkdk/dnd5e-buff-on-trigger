@@ -1506,6 +1506,7 @@ function resolveActiveBuffFromIndicatorEffect(actor, effect) {
   if (effectBuffId) {
     const byId = getActiveBuff(actor, effectBuffId);
     if (byId) return { activeBuff: byId, buffId: effectBuffId };
+    return { activeBuff: null, buffId: effectBuffId };
   }
 
   const activeBuffs = getActiveBuffs(actor);

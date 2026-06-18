@@ -775,12 +775,10 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testSkillStealthAdvantage.label": "[TEST] Skill - Avantage discrétion",
-  "BOT.presets.testSkillStealthAdvantage.description": "Donne l’avantage aux tests de Discrétion du porteur.",
-  "BOT.presets.testSkillAthleticsBonus.label": "[TEST] Skill - Bonus athlétisme",
-  "BOT.presets.testSkillAthleticsBonus.description": "Ajoute +2 aux tests d’Athlétisme du porteur.",
-  "BOT.presets.testAbilityStrengthAdvantage.label": "[TEST] Ability - Avantage force",
-  "BOT.presets.testAbilityStrengthAdvantage.description": "Donne l’avantage aux tests de Force du porteur.",
-  "BOT.presets.testAbilityWisdomBonus.label": "[TEST] Ability - Bonus sagesse",
-  "BOT.presets.testAbilityWisdomBonus.description": "Ajoute +2 aux tests de Sagesse du porteur."
+  "BOT.presets.testIndicatorSameNameA.label": "[TEST] Indicateur - Même nom A",
+  "BOT.presets.testIndicatorSameNameA.description": "Buff passif servant à tester deux indicateurs portant le même nom mais liés à des buffId différents.",
+  "BOT.presets.testIndicatorSameNameB.label": "[TEST] Indicateur - Même nom B",
+  "BOT.presets.testIndicatorSameNameB.description": "Second buff passif servant à tester deux indicateurs portant le même nom mais liés à des buffId différents.",
+  "BOT.presets.testIndicatorTargetedRemoval.label": "[TEST] Indicateur - Suppression ciblée",
+  "BOT.presets.testIndicatorTargetedRemoval.description": "Buff passif servant à vérifier que la suppression manuelle d’un indicateur ne retire que le buff correspondant."
 }

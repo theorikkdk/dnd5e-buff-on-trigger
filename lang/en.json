@@ -775,12 +775,10 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testSkillStealthAdvantage.label": "[TEST] Skill - Stealth advantage",
-  "BOT.presets.testSkillStealthAdvantage.description": "Grants advantage on the bearer’s Stealth checks.",
-  "BOT.presets.testSkillAthleticsBonus.label": "[TEST] Skill - Athletics bonus",
-  "BOT.presets.testSkillAthleticsBonus.description": "Adds +2 to the bearer’s Athletics checks.",
-  "BOT.presets.testAbilityStrengthAdvantage.label": "[TEST] Ability - Strength advantage",
-  "BOT.presets.testAbilityStrengthAdvantage.description": "Grants advantage on the bearer’s Strength checks.",
-  "BOT.presets.testAbilityWisdomBonus.label": "[TEST] Ability - Wisdom bonus",
-  "BOT.presets.testAbilityWisdomBonus.description": "Adds +2 to the bearer’s Wisdom checks."
+  "BOT.presets.testIndicatorSameNameA.label": "[TEST] Indicator - Same name A",
+  "BOT.presets.testIndicatorSameNameA.description": "Passive buff used to test two indicators with the same name but different buffIds.",
+  "BOT.presets.testIndicatorSameNameB.label": "[TEST] Indicator - Same name B",
+  "BOT.presets.testIndicatorSameNameB.description": "Second passive buff used to test two indicators with the same name but different buffIds.",
+  "BOT.presets.testIndicatorTargetedRemoval.label": "[TEST] Indicator - Targeted removal",
+  "BOT.presets.testIndicatorTargetedRemoval.description": "Passive buff used to verify that manually deleting an indicator removes only its matching buff."
 }

@@ -1722,64 +1722,37 @@ export const BUFF_PRESETS = [
     },
   },
   {
-    id: "testSkillStealthAdvantage",
-    label: "BOT.presets.testSkillStealthAdvantage.label",
-    description: "BOT.presets.testSkillStealthAdvantage.description",
+    id: "testIndicatorSameNameA",
+    label: "BOT.presets.testIndicatorSameNameA.label",
+    description: "BOT.presets.testIndicatorSameNameA.description",
     flag: {
       targetMode: "target",
       fallbackToSelfIfNoTarget: true,
       type: "passive",
-      buffs: {
-        skills: ["ste"],
-      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },
   },
   {
-    id: "testSkillAthleticsBonus",
-    label: "BOT.presets.testSkillAthleticsBonus.label",
-    description: "BOT.presets.testSkillAthleticsBonus.description",
+    id: "testIndicatorSameNameB",
+    label: "BOT.presets.testIndicatorSameNameB.label",
+    description: "BOT.presets.testIndicatorSameNameB.description",
     flag: {
       targetMode: "target",
       fallbackToSelfIfNoTarget: true,
       type: "passive",
-      buffs: {
-        skillBonus: "+2",
-        skillBonusSkills: ["ath"],
-      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },
   },
   {
-    id: "testAbilityStrengthAdvantage",
-    label: "BOT.presets.testAbilityStrengthAdvantage.label",
-    description: "BOT.presets.testAbilityStrengthAdvantage.description",
+    id: "testIndicatorTargetedRemoval",
+    label: "BOT.presets.testIndicatorTargetedRemoval.label",
+    description: "BOT.presets.testIndicatorTargetedRemoval.description",
     flag: {
       targetMode: "target",
       fallbackToSelfIfNoTarget: true,
       type: "passive",
-      buffs: {
-        abilityCheckAdvantages: ["str"],
-      },
-      consumeOnTrigger: false,
-      triggerFrequency: "none",
-    },
-  },
-  {
-    id: "testAbilityWisdomBonus",
-    label: "BOT.presets.testAbilityWisdomBonus.label",
-    description: "BOT.presets.testAbilityWisdomBonus.description",
-    flag: {
-      targetMode: "target",
-      fallbackToSelfIfNoTarget: true,
-      type: "passive",
-      buffs: {
-        abilityCheckModifiers: {
-          wis: "+2",
-        },
-      },
       consumeOnTrigger: false,
       triggerFrequency: "none",
     },

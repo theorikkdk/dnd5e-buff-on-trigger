@@ -428,6 +428,15 @@ function getActiveBuffIndicatorName(activeBuff) {
   return `${baseName} \u26A1`;
 }
 
+function activeBuffIndicatorNameMatches(effectName, activeBuff) {
+  const itemName = String(activeBuff?.itemName ?? "").trim();
+  const visibleName = String(effectName ?? "").trim();
+  if (!itemName || !visibleName) return false;
+  return visibleName === itemName
+    || visibleName.startsWith(`${itemName} `)
+    || visibleName.startsWith(`${itemName} -`);
+}
+
 function getBuffSourceName(flag) {
   const sourceName = String(flag?.originTokenName ?? flag?.sourceTokenName ?? "").trim();
   if (sourceName) return sourceName;
@@ -444,7 +453,13 @@ function getBuffDisplayName(flag) {
 }
 
 async function updateActiveBuffIndicatorName(actor, activeBuff) {
-  const existing = actor?.effects?.find?.((e) => isActiveBuffIndicator(e));
+  const activeBuffId = activeBuff?.buffId ?? null;
+  const existing = actor?.effects?.find?.((effect) => {
+    if (!isActiveBuffIndicator(effect)) return false;
+    const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+    if (activeBuffId) return effectBuffId === activeBuffId;
+    return !effectBuffId && effect.name === getActiveBuffIndicatorName(activeBuff);
+  });
   if (!existing || existing.deleted) return;
   try {
     await existing.update({ name: getActiveBuffIndicatorName(activeBuff) });
@@ -1702,16 +1717,23 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
 
 export async function refreshBuffIndicator(actor, itemName = null, extraChanges = [], previousFlag = null) {
   try {
-    const legacyActiveBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    const activeBuff = isActiveBuffRemovalPending(actor, legacyActiveBuff?.buffId) ? null : legacyActiveBuff;
-    const indicatorEffects = actor.effects.filter((e) => isActiveBuffIndicator(e)) ?? [];
+    if (!actor?.effects) return;
+    const activeBuffs = Object.entries(getActiveBuffs(actor))
+      .map(([buffId, activeBuff]) => ({
+        ...(activeBuff ?? {}),
+        buffId: activeBuff?.buffId ?? buffId,
+      }))
+      .filter((activeBuff) => !isActiveBuffRemovalPending(actor, activeBuff.buffId));
+    const activeBuffsById = new Map(activeBuffs.map((activeBuff) => [activeBuff.buffId, activeBuff]));
+    let indicatorEffects = actor.effects.filter((effect) => isActiveBuffIndicator(effect)) ?? [];
 
     const previousBuffId = previousFlag?.buffId ?? null;
     const indicatorsToRemove = previousFlag
       ? indicatorEffects.filter((effect) => {
           const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
           if (previousBuffId) return effectBuffId === previousBuffId;
-          return effect.name === previousFlag.itemName || effect.name === getActiveBuffIndicatorName(previousFlag);
+          return !effectBuffId
+            && (effect.name === previousFlag.itemName || effect.name === getActiveBuffIndicatorName(previousFlag));
         })
       : [];
     for (const existing of indicatorsToRemove) {
@@ -1720,23 +1742,57 @@ export async function refreshBuffIndicator(actor, itemName = null, extraChanges 
 
     await cleanupLinkedStatusEffects(actor, previousFlag);
 
-    if (!activeBuff && itemName) {
+    if (previousFlag || (itemName && !activeBuffs.length)) {
+      const targetIndicatorReference = previousFlag ?? itemName;
       for (const token of canvas.tokens.placeables) {
-        if (token.actor) await removeTargetIndicator(token.actor, itemName);
+        if (token.actor) await removeTargetIndicator(token.actor, targetIndicatorReference);
       }
     }
 
-    if (activeBuff) {
-      const activeBuffId = activeBuff.buffId ?? null;
-      const existingActiveIndicator = indicatorEffects.find((effect) => {
-        const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
-        return activeBuffId ? effectBuffId === activeBuffId : effect.name === getActiveBuffIndicatorName(activeBuff);
-      });
-      if (existingActiveIndicator && !indicatorsToRemove.includes(existingActiveIndicator)) {
-        const desiredName = getActiveBuffIndicatorName(activeBuff);
-        if (existingActiveIndicator.name !== desiredName) {
-          await existingActiveIndicator.update({ name: desiredName });
+    indicatorEffects = actor.effects.filter((effect) => isActiveBuffIndicator(effect) && !effect.deleted) ?? [];
+    for (const effect of indicatorEffects) {
+      const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+      if (effectBuffId && !activeBuffsById.has(effectBuffId)) {
+        await deleteDocumentIfExists(effect, "indicateur actif perime");
+      }
+    }
+
+    indicatorEffects = actor.effects.filter((effect) => isActiveBuffIndicator(effect) && !effect.deleted) ?? [];
+    const claimedLegacyIndicators = new Set();
+    for (const activeBuff of activeBuffs) {
+      const desiredName = getActiveBuffIndicatorName(activeBuff);
+      const matchingById = indicatorEffects.filter(
+        (effect) => effect.flags?.[MODULE_ID]?.buffId === activeBuff.buffId
+      );
+      let existingActiveIndicator = matchingById[0] ?? null;
+      for (const duplicate of matchingById.slice(1)) {
+        await deleteDocumentIfExists(duplicate, "indicateur actif duplique");
+      }
+      if (!existingActiveIndicator) {
+        existingActiveIndicator = indicatorEffects.find((effect) => {
+          const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+          return !effectBuffId
+            && !claimedLegacyIndicators.has(effect.id)
+            && activeBuffIndicatorNameMatches(effect.name, activeBuff);
+        });
+        if (existingActiveIndicator) {
+          claimedLegacyIndicators.add(existingActiveIndicator.id);
+          await existingActiveIndicator.update({
+            name: desiredName,
+            img: activeBuff.itemImg ?? BUFF_ICON,
+            [`flags.${MODULE_ID}.indicator`]: true,
+            [`flags.${MODULE_ID}.buffId`]: activeBuff.buffId,
+            [`flags.${MODULE_ID}.stackingKey`]: getBuffStackingFlags(activeBuff).stackingKey,
+            [`flags.${MODULE_ID}.stackingMode`]: getBuffStackingFlags(activeBuff).stackingMode,
+            [`flags.${MODULE_ID}.appliedAt`]: getBuffStackingFlags(activeBuff).appliedAt,
+          });
         }
+      }
+      if (existingActiveIndicator) {
+        const updates = {};
+        if (existingActiveIndicator.name !== desiredName) updates.name = desiredName;
+        if (existingActiveIndicator.img !== (activeBuff.itemImg ?? BUFF_ICON)) updates.img = activeBuff.itemImg ?? BUFF_ICON;
+        if (Object.keys(updates).length) await existingActiveIndicator.update(updates);
       } else {
         await createActiveBuffIndicator(actor, activeBuff, extraChanges);
       }
@@ -1752,8 +1808,13 @@ export async function applyTargetIndicator(targetActor, flag) {
   if (!targetActor) return;
   const itemName = flag.itemName ?? localize("BOT.fallback.effectName");
   const itemImg = flag.itemImg ?? BUFF_ICON;
+  const buffId = flag?.buffId ?? null;
   const existing = targetActor.effects.find(
-    (e) => e.flags?.[MODULE_ID]?.targetIndicator === true && e.name === itemName
+    (effect) => {
+      if (effect.flags?.[MODULE_ID]?.targetIndicator !== true) return false;
+      const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+      return buffId ? effectBuffId === buffId : !effectBuffId && effect.name === itemName;
+    }
   );
   if (existing) return;
   await targetActor.createEmbeddedDocuments("ActiveEffect", [{
@@ -1766,12 +1827,19 @@ export async function applyTargetIndicator(targetActor, flag) {
   debugLog(`[${MODULE_ID}] Indicateur pose sur ${targetActor.name}`);
 }
 
-export async function removeTargetIndicator(targetActor, itemName) {
+export async function removeTargetIndicator(targetActor, flagOrItemName) {
   if (!targetActor) return;
-  const existing = targetActor.effects.find(
-    (e) => e.flags?.[MODULE_ID]?.targetIndicator && e.name === itemName
-  );
-  if (existing) await deleteDocumentIfExists(existing, "indicateur actif");
+  const buffId = typeof flagOrItemName === "object" ? flagOrItemName?.buffId ?? null : null;
+  const itemName = typeof flagOrItemName === "object"
+    ? flagOrItemName?.itemName ?? null
+    : flagOrItemName;
+  const matching = targetActor.effects.filter((effect) => {
+    if (effect.flags?.[MODULE_ID]?.targetIndicator !== true) return false;
+    const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
+    if (buffId) return effectBuffId === buffId;
+    return !effectBuffId && !!itemName && effect.name === itemName;
+  });
+  for (const effect of matching) await deleteDocumentIfExists(effect, "indicateur de cible");
 }
 
 function resolveTargets(workflow, flag) {
@@ -2116,7 +2184,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
         await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);
         for (const token of targets) {
-          if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
+          if (token.actor) await removeTargetIndicator(token.actor, currentFlag);
         }
       } else {
       const updatedFlag = { ...currentFlag, chargesRemaining: newCharges };
@@ -2190,7 +2258,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       await refreshBuffIndicator(actor, currentFlag.itemName, [], currentFlag);
       await refreshStackingMechanicalEffects(actor, stackingKey, currentFlag);
       for (const token of targets) {
-        if (token.actor) await removeTargetIndicator(token.actor, currentFlag.itemName);
+        if (token.actor) await removeTargetIndicator(token.actor, currentFlag);
       }
     }
 
