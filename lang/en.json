@@ -775,12 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testFilteredAttackAdvantage.label": "[TEST] Filtered attack - Advantage",
-  "BOT.presets.testFilteredAttackAdvantage.description": "Grants advantage on the bearer’s weapon attacks. Tests dominance and combination across different stacking keys.",
-  "BOT.presets.testFilteredAttackBonus.label": "[TEST] Filtered attack - Bonus",
-  "BOT.presets.testFilteredAttackBonus.description": "Adds +2 to the bearer’s melee attacks. A compatible melee weapon attack should receive this bonus and the dedicated advantage.",
-  "BOT.presets.testFilteredDefenseMelee.label": "[TEST] Filtered defense - Melee disadvantage",
-  "BOT.presets.testFilteredDefenseMelee.description": "Imposes disadvantage on incoming melee weapon attacks against the bearer.",
-  "BOT.presets.testFilteredDefenseWeapon.label": "[TEST] Filtered defense - Weapon disadvantage",
-  "BOT.presets.testFilteredDefenseWeapon.description": "Imposes disadvantage on incoming weapon attacks against the bearer. A melee weapon attack is compatible with both defensive presets."
+  "BOT.presets.testSkillStealthAdvantage.label": "[TEST] Skill - Stealth advantage",
+  "BOT.presets.testSkillStealthAdvantage.description": "Grants advantage on the bearer’s Stealth checks.",
+  "BOT.presets.testSkillAthleticsBonus.label": "[TEST] Skill - Athletics bonus",
+  "BOT.presets.testSkillAthleticsBonus.description": "Adds +2 to the bearer’s Athletics checks.",
+  "BOT.presets.testAbilityStrengthAdvantage.label": "[TEST] Ability - Strength advantage",
+  "BOT.presets.testAbilityStrengthAdvantage.description": "Grants advantage on the bearer’s Strength checks.",
+  "BOT.presets.testAbilityWisdomBonus.label": "[TEST] Ability - Wisdom bonus",
+  "BOT.presets.testAbilityWisdomBonus.description": "Adds +2 to the bearer’s Wisdom checks."
 }

@@ -2834,29 +2834,6 @@ export function registerTriggers() {
     }
   });
 
-  Hooks.on("dnd5e.preRollSkill", async (config, skillId) => {
-    const actor = config.subject ?? config.actor ?? null;
-    if (!actor?.getFlag) return;
-    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    const skills = activeBuff?.buffs?.skills;
-    if (skills?.length && (skills.includes("all") || skills.includes(skillId))) {
-      config.advantage = true;
-      debugLog(`[${MODULE_ID}] Avantage compétence ${skillId} appliqué sur ${actor.name}`);
-    }
-  });
-
-  Hooks.on("dnd5e.preRollAbility", async (actor, config, abilityId) => {
-    const activeBuff = actor.getFlag(MODULE_ID, "activeBuff");
-    if (activeBuff?.buffs?.skillMode === "advantage") {
-      config.advantage = true;
-      debugLog(`[${MODULE_ID}] Avantage caractéristique appliqué sur ${actor.name}`);
-    } else if (activeBuff?.buffs?.skillMode === "disadvantage") {
-      config.disadvantage = true;
-      debugLog(`[${MODULE_ID}] Désavantage caractéristique appliqué sur ${actor.name}`);
-    }
-  });
-
-
   Hooks.on("dnd5e.preRollAttack", async (...args) => {
     debugLog(`[${MODULE_ID}] Debug dnd5e.preRollAttack : ${summarizeRollHookArgs(args)}`);
   });

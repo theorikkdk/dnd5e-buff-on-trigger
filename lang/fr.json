@@ -775,12 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testFilteredAttackAdvantage.label": "[TEST] Filtré attaque - Avantage",
-  "BOT.presets.testFilteredAttackAdvantage.description": "Donne l’avantage aux attaques d’arme du porteur. Sert à vérifier la dominance et le cumul entre stackingKeys différents.",
-  "BOT.presets.testFilteredAttackBonus.label": "[TEST] Filtré attaque - Bonus",
-  "BOT.presets.testFilteredAttackBonus.description": "Ajoute +2 aux attaques de mêlée du porteur. Une attaque d’arme de mêlée compatible doit recevoir ce bonus et l’avantage du preset dédié.",
-  "BOT.presets.testFilteredDefenseMelee.label": "[TEST] Filtré défense - Désavantage mêlée",
-  "BOT.presets.testFilteredDefenseMelee.description": "Impose le désavantage aux attaques d’arme de mêlée entrantes contre le porteur.",
-  "BOT.presets.testFilteredDefenseWeapon.label": "[TEST] Filtré défense - Désavantage arme",
-  "BOT.presets.testFilteredDefenseWeapon.description": "Impose le désavantage aux attaques d’arme entrantes contre le porteur. Une attaque d’arme de mêlée est compatible avec les deux presets défensifs."
+  "BOT.presets.testSkillStealthAdvantage.label": "[TEST] Skill - Avantage discrétion",
+  "BOT.presets.testSkillStealthAdvantage.description": "Donne l’avantage aux tests de Discrétion du porteur.",
+  "BOT.presets.testSkillAthleticsBonus.label": "[TEST] Skill - Bonus athlétisme",
+  "BOT.presets.testSkillAthleticsBonus.description": "Ajoute +2 aux tests d’Athlétisme du porteur.",
+  "BOT.presets.testAbilityStrengthAdvantage.label": "[TEST] Ability - Avantage force",
+  "BOT.presets.testAbilityStrengthAdvantage.description": "Donne l’avantage aux tests de Force du porteur.",
+  "BOT.presets.testAbilityWisdomBonus.label": "[TEST] Ability - Bonus sagesse",
+  "BOT.presets.testAbilityWisdomBonus.description": "Ajoute +2 aux tests de Sagesse du porteur."
 }
