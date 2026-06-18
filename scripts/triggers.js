@@ -797,7 +797,7 @@ function resolveWorkflowBuffCarrier(workflow) {
   addCandidate(workflow?.attackerToken?.actor, workflow?.attackerToken, "workflow.attackerToken.actor");
   addCandidate(workflow?.item?.actor, workflow?.token ?? null, "workflow.item.actor");
 
-  return candidates.find(({ actor }) => actor.getFlag(MODULE_ID, "activeBuff")) ?? null;
+  return candidates.find(({ actor }) => Object.keys(getActiveBuffs(actor)).length > 0) ?? null;
 }
 
 function resolveAttackBuffCarrier(workflow) {
@@ -931,13 +931,18 @@ function getAutomaticEndReasons(activeBuff, workflow, actionType) {
 
 async function maybeEndActiveBuffForWorkflowAction(workflow, actionType) {
   const carrier = resolveWorkflowBuffCarrier(workflow);
-  const activeBuff = carrier?.actor?.getFlag(MODULE_ID, "activeBuff") ?? null;
-  const reasons = getAutomaticEndReasons(activeBuff, workflow, actionType);
-  if (!reasons.length) return false;
+  if (!carrier?.actor) return false;
 
-  await endActiveBuff(carrier.actor, activeBuff);
-  debugLog(`[${MODULE_ID}] Buff ended automatically on ${carrier.actor.name}: ${reasons.join(", ")}`);
-  return true;
+  let ended = false;
+  const activeFlags = getActiveBuffsForTrigger(carrier.actor, (activeFlag) => isDominantBuff(carrier.actor, activeFlag));
+  for (const activeFlag of activeFlags) {
+    const reasons = getAutomaticEndReasons(activeFlag, workflow, actionType);
+    if (!reasons.length) continue;
+    await endActiveBuff(carrier.actor, activeFlag);
+    debugLog(`[${MODULE_ID}] Buff ended automatically on ${carrier.actor.name}: ${activeFlag.itemName ?? activeFlag.buffId} (${reasons.join(", ")})`);
+    ended = true;
+  }
+  return ended;
 }
 
 function collectDamageTypes(value, types = new Set()) {
@@ -2317,12 +2322,20 @@ export function registerTriggers() {
       if (!workflow.activity && !workflow.item) return;
 
       const actionType = getWorkflowAttackActionType(workflow);
+      const attackCarrier = resolveAttackBuffCarrier(workflow);
+      const attackFlags = attackCarrier?.actor
+        ? getActiveBuffsForTrigger(
+            attackCarrier.actor,
+            (activeFlag) => isDominantBuff(attackCarrier.actor, activeFlag)
+              && doesAttackTriggerMatch(activeFlag.type, actionType)
+          )
+        : [];
       await maybeEndActiveBuffForWorkflowAction(workflow, actionType);
 
       // Phase 1 : l'item utilisé est un buff non-attaque → pose le marqueur sur l'acteur
       const buffConfig = workflow.item?.getFlag(MODULE_ID, "buffTrigger");
-      const actorFlag = workflow.actor.getFlag(MODULE_ID, "activeBuff");
-      if (buffConfig || actorFlag) debugLog(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
+      const actorHasActiveBuffs = Object.keys(getActiveBuffs(workflow.actor)).length > 0;
+      if (buffConfig || actorHasActiveBuffs) debugLog(`[${MODULE_ID}] RollComplete déclenché, actionType = ${actionType}`);
       if (buffConfig && !ATTACK_ACTION_TYPES.includes(actionType)) {
         const targetMode = buffConfig.targetMode === "ally" ? "target" : (buffConfig.targetMode ?? "self");
         const activeFlag = {
@@ -2472,22 +2485,21 @@ export function registerTriggers() {
       }
 
       // Phase 2 : attaque → lit le marqueur sur le porteur réel du buff et déclenche l'effet
-      const carrier = resolveAttackBuffCarrier(workflow);
-      const flag = carrier?.actor?.getFlag(MODULE_ID, "activeBuff") ?? null;
-      debugLog(`[${MODULE_ID}] Trigger attaque inspecté : attaquant=${workflow.actor?.name ?? "inconnu"}, porteur=${carrier?.actor?.name ?? "aucun"}, source=${carrier?.source ?? "aucune"}, activeBuff=${Boolean(flag)}, trigger=${flag?.type ?? "aucun"}, actionType=${actionType ?? "aucun"}, match=${flag ? doesAttackTriggerMatch(flag.type, actionType) : false}, hitTargets=${workflow.hitTargets?.size ?? 0}, damageTargetMode=${flag?.damage?.targetMode ?? "aucun"}`);
-      if (!flag) return;
-      await ensureLinkedStatusesForActiveBuff(carrier.actor, flag);
-      if (flag.type === "passive") return;
+      if (!attackCarrier?.actor || !attackFlags.length) return;
+      debugLog(`[${MODULE_ID}] Triggers attaque inspectés : attaquant=${workflow.actor?.name ?? "inconnu"}, porteur=${attackCarrier.actor.name ?? "inconnu"}, source=${attackCarrier.source ?? "aucune"}, buffs=${attackFlags.map((flag) => flag.buffId ?? flag.itemName).join(", ") || "aucun"}, actionType=${actionType ?? "aucun"}, hitTargets=${workflow.hitTargets?.size ?? 0}`);
 
-      if (doesAttackTriggerMatch(flag.type, actionType)) {
-        const triggerWorkflow = carrier?.actor && carrier.actor !== workflow.actor
-          ? {
-              ...workflow,
-              actor: carrier.actor,
-              token: carrier.token ?? workflow.token ?? carrier.actor.getActiveTokens?.()?.[0] ?? null,
-            }
-          : workflow;
-        handleAttackTrigger(triggerWorkflow, flag);
+      const triggerWorkflow = attackCarrier.actor !== workflow.actor
+        ? {
+            ...workflow,
+            actor: attackCarrier.actor,
+            token: attackCarrier.token ?? workflow.token ?? attackCarrier.actor.getActiveTokens?.()?.[0] ?? null,
+          }
+        : workflow;
+      for (const attackFlag of attackFlags) {
+        const flag = attackFlag.buffId ? getActiveBuff(attackCarrier.actor, attackFlag.buffId) : attackFlag;
+        if (!flag) continue;
+        await ensureLinkedStatusesForActiveBuff(attackCarrier.actor, flag);
+        await handleAttackTrigger(triggerWorkflow, flag);
       }
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur dans midi-qol.RollComplete :`, error);
@@ -2899,13 +2911,13 @@ export function registerTriggers() {
   });
 }
 
-function handleAttackTrigger(workflow, flag) {
+async function handleAttackTrigger(workflow, flag) {
   if (flag.type === "passive") return;
   const triggerType = getWorkflowAttackActionType(workflow) ?? flag.type;
   debugLog(`[${MODULE_ID}] Déclencheur ${triggerType} détecté sur ${workflow.actor?.name ?? "inconnu"} : trigger configuré=${flag.type}, condition=${flag.condition ?? "hit"}, hitTargets=${workflow.hitTargets?.size ?? 0}, damageTargetMode=${flag.damage?.targetMode ?? "aucun"}`);
   if (!doesAttackConditionMatch(workflow, flag)) return;
   if (!workflowMatchesStoredTarget(workflow, flag)) return;
-  applyEffect(workflow, flag);
+  await applyEffect(workflow, flag);
 }
 
 async function handleTurnTrigger(actor, flag, triggerType, overrideTargets = null) {
