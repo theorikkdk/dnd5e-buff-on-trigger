@@ -237,11 +237,6 @@ function pruneActiveBuffsWithoutIndicators(actor, activeBuffs) {
   return pruned;
 }
 
-function getFallbackLegacyBuff(actor, activeBuffs) {
-  const remaining = Object.values(activeBuffs ?? {}).filter(Boolean);
-  return remaining.length ? remaining[remaining.length - 1] : null;
-}
-
 export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   if (!actor?.getFlag) return {};
   const activeBuffs = clone(getRawActiveBuffs(actor));
@@ -261,9 +256,7 @@ export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   const legacy = getLegacyActiveBuff(actor);
   const legacyBuffId = legacy?.buffId ?? (legacy ? "legacy-activeBuff" : null);
   if (legacyBuffId && !pruned[legacyBuffId]) {
-    const fallback = getFallbackLegacyBuff(actor, pruned);
-    if (fallback) await actor.setFlag(MODULE_ID, "activeBuff", fallback);
-    else await actor.unsetFlag(MODULE_ID, "activeBuff");
+    await actor.unsetFlag(MODULE_ID, "activeBuff");
   }
 
   const removed = Object.keys(activeBuffs).filter((buffId) => !pruned[buffId]);
@@ -271,7 +264,7 @@ export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   return pruned;
 }
 
-export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true } = {}) {
+export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = false } = {}) {
   if (!actor?.setFlag || !activeFlag) return null;
   const flagWithId = ensureActiveBuffId(activeFlag);
   if (isActiveBuffRemovalPending(actor, flagWithId.buffId)) {
@@ -288,7 +281,7 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = true }
   activeBuffs[flagWithId.buffId] = flagWithId;
   await actor.setFlag(MODULE_ID, "activeBuffs", activeBuffs);
 
-  // Compatibility bridge: activeBuff remains the legacy "last active buff" until dispatchers migrate.
+  // Explicit compatibility escape hatch for callers that still need to seed the legacy flag.
   if (writeLegacy) await actor.setFlag(MODULE_ID, "activeBuff", flagWithId);
   debugLog(`[${MODULE_ID}] Buff actif indexe : ${flagWithId.buffId}`);
   return flagWithId;
@@ -312,16 +305,8 @@ export async function removeActiveBuff(actor, activeFlagOrId, { clearLegacy = tr
     }
   }
 
-  // Legacy cleanup is kept for current single-buff dispatchers.
-  if (clearLegacy) {
-    if (!buffId || !legacyBuffId || legacyBuffId === buffId) {
-      const fallback = getFallbackLegacyBuff(actor, remainingActiveBuffs);
-      if (fallback) {
-        await actor.setFlag(MODULE_ID, "activeBuff", fallback);
-        debugLog(`[${MODULE_ID}] Buff actif legacy promu : ${fallback.buffId ?? "sans-id"}`);
-      } else {
-        await actor.unsetFlag(MODULE_ID, "activeBuff");
-      }
-    }
+  // Legacy cleanup only removes the exact legacy entry; remaining modern buffs are never promoted.
+  if (clearLegacy && legacyBuffId && legacyBuffId === buffId) {
+    await actor.unsetFlag(MODULE_ID, "activeBuff");
   }
 }
