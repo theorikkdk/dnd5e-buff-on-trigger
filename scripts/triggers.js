@@ -1514,11 +1514,6 @@ function resolveActiveBuffFromIndicatorEffect(actor, effect) {
   const matched = Object.entries(activeBuffs).find(([, activeBuff]) => indicatorNameMatchesBuff(effect?.name, activeBuff));
   if (matched) return { activeBuff: matched[1], buffId: matched[0] };
 
-  const legacy = actor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
-  if (legacy && indicatorNameMatchesBuff(effect?.name, legacy)) {
-    return { activeBuff: legacy, buffId: legacy.buffId ?? null };
-  }
-
   return { activeBuff: null, buffId: effectBuffId };
 }
 
@@ -1742,10 +1737,7 @@ function resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag) {
     const legacyBuffId = buildRepeatedSaveSupportBuffId(ownerActor, activeBuff, linkedFlag.statusId ?? null);
     return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId || !linkedFlag.buffId;
   }) ?? null;
-  if (matchingBuff) return matchingBuff;
-
-  const legacyActiveBuff = ownerActor.getFlag(MODULE_ID, "activeBuff") ?? null;
-  return activeBuffMatchesLinkedStatus(legacyActiveBuff, ownerActor, linkedFlag) ? legacyActiveBuff : null;
+  return matchingBuff;
 }
 
 function isAllowedLinkedStatusDeletion(options = {}) {
@@ -1981,7 +1973,7 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
     storedTargetActorUuid: newTargetToken.actor.uuid ?? null,
   };
 
-  await upsertActiveBuff(actor, updatedFlag, { writeLegacy: false });
+  await upsertActiveBuff(actor, updatedFlag);
   const nextFlag = getActiveBuff(actor, updatedFlag.buffId) ?? updatedFlag;
   await refreshStoredTargetIndicator(actor, previousFlag);
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"

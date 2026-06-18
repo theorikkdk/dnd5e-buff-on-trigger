@@ -1635,12 +1635,7 @@ function resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag) {
     const legacyBuffId = buildLinkedStatusBuffId(ownerActor, activeBuff, linkedFlag.statusId);
     return linkedFlag.buffId === groupedBuffId || linkedFlag.buffId === legacyBuffId || !linkedFlag.buffId;
   }) ?? null;
-  if (matchingBuff) return matchingBuff;
-
-  const legacyActiveBuff = ownerActor.getFlag(MODULE_ID, "activeBuff") ?? null;
-  return legacyActiveBuff && linkedStatusMatchesBuff({ flags: { [MODULE_ID]: linkedFlag } }, ownerActor, legacyActiveBuff)
-    ? legacyActiveBuff
-    : null;
+  return matchingBuff;
 }
 
 async function cleanupLinkedStatusEffects(ownerActor, flag) {
@@ -2108,9 +2103,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         chargesRemaining: flag?.chargesRemaining ?? null,
         consumeOnTrigger: flag?.consumeOnTrigger ?? null,
       });
-      const currentFlag = flag?.buffId
-        ? getActiveBuff(actor, flag.buffId)
-        : actor?.getFlag?.(MODULE_ID, "activeBuff");
+      if (!flag?.buffId) {
+        rollModifierDebug("consume ignored: missing buffId", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          itemName: flag?.itemName ?? null,
+        });
+        return;
+      }
+      const currentFlag = getActiveBuff(actor, flag.buffId);
       if (!isSameActiveBuff(currentFlag, flag)) {
         rollModifierDebug("consume ignored: current flag mismatch", {
           actor: actor?.name ?? null,
@@ -2203,9 +2204,15 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         chargesRemaining: flag?.chargesRemaining ?? null,
         consumeOnTrigger: flag?.consumeOnTrigger ?? null,
       });
-      const currentFlag = flag?.buffId
-        ? getActiveBuff(actor, flag.buffId)
-        : actor?.getFlag?.(MODULE_ID, "activeBuff");
+      if (!flag?.buffId) {
+        rollModifierDebug("consume ignored: missing buffId", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          itemName: flag?.itemName ?? null,
+        });
+        return;
+      }
+      const currentFlag = getActiveBuff(actor, flag.buffId);
       if (!isSameActiveBuff(currentFlag, flag)) {
         rollModifierDebug("consume ignored: current flag mismatch", {
           actor: actor?.name ?? null,
