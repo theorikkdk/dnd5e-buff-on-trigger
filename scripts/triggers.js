@@ -1934,8 +1934,8 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
     storedTargetActorUuid: newTargetToken.actor.uuid ?? null,
   };
 
-  await upsertActiveBuff(actor, updatedFlag);
-  const nextFlag = actor.getFlag(MODULE_ID, "activeBuff") ?? updatedFlag;
+  await upsertActiveBuff(actor, updatedFlag, { writeLegacy: false });
+  const nextFlag = getActiveBuff(actor, updatedFlag.buffId) ?? updatedFlag;
   await refreshStoredTargetIndicator(actor, previousFlag);
   const originName = nextFlag.originActorUuid && typeof fromUuidSync === "function"
     ? fromUuidSync(nextFlag.originActorUuid)?.name ?? actor.name
@@ -1945,6 +1945,72 @@ async function moveStoredTarget(actor, activeBuff, newTargetToken) {
   debugLog(`[${MODULE_ID}] Cible mémorisée changée : ${previousName} -> ${nextName}`);
   debugLog(`[${MODULE_ID}] Indicateur de marque ajouté sur ${nextName}, origine ${originName}`);
   return true;
+}
+
+function getStoredTargetBuffChoices(actor) {
+  return getActiveBuffsForTrigger(actor, (activeBuff) =>
+    activeBuff.rememberTargetOnActivation === true
+      && isDominantBuff(actor, activeBuff)
+  );
+}
+
+async function chooseStoredTargetBuff(actor, activeBuffs) {
+  if (activeBuffs.length === 1) return activeBuffs[0];
+  if (!activeBuffs.length) return null;
+
+  const options = activeBuffs.map((activeBuff) => {
+    const buffId = escapeMultiTargetSummaryText(activeBuff.buffId ?? "");
+    const buffName = escapeMultiTargetSummaryText(activeBuff.itemName ?? game.i18n.localize("BOT.fallback.effectName"));
+    const targetName = escapeMultiTargetSummaryText(getStoredTargetName(activeBuff));
+    const originActor = activeBuff.originActorUuid && typeof fromUuidSync === "function"
+      ? fromUuidSync(activeBuff.originActorUuid)
+      : null;
+    const originName = escapeMultiTargetSummaryText(originActor?.name ?? actor.name);
+    const label = game.i18n.format("BOT.dialog.changeStoredTarget.option", {
+      buff: buffName,
+      target: targetName,
+      source: originName,
+    });
+    return `<option value="${buffId}">${label}</option>`;
+  }).join("");
+  const content = `
+    <form class="dnd5e-buff-on-trigger-change-target">
+      <div class="form-group">
+        <label>${game.i18n.localize("BOT.dialog.changeStoredTarget.prompt")}</label>
+        <select name="buffId">${options}</select>
+      </div>
+    </form>`;
+
+  const selectedBuffId = await new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    new Dialog({
+      title: game.i18n.localize("BOT.dialog.changeStoredTarget.title"),
+      content,
+      buttons: {
+        select: {
+          label: game.i18n.localize("BOT.dialog.changeStoredTarget.select"),
+          callback: (html) => {
+            const root = html?.[0] ?? html;
+            finish(root?.querySelector?.('[name="buffId"]')?.value ?? null);
+          },
+        },
+        cancel: {
+          label: game.i18n.localize("BOT.dialog.changeStoredTarget.cancel"),
+          callback: () => finish(null),
+        },
+      },
+      default: "select",
+      close: () => finish(null),
+    }).render(true);
+  });
+  return selectedBuffId
+    ? activeBuffs.find((activeBuff) => activeBuff.buffId === selectedBuffId) ?? null
+    : null;
 }
 
 export async function changeStoredTarget() {
@@ -1962,16 +2028,18 @@ export async function changeStoredTarget() {
     return false;
   }
 
-  const activeBuff = ownerToken.actor.getFlag(MODULE_ID, "activeBuff");
-  if (!activeBuff) {
+  const activeBuffs = getStoredTargetBuffChoices(ownerToken.actor);
+  if (!Object.keys(getActiveBuffs(ownerToken.actor)).length) {
     ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetNoActiveBuff"));
     return false;
   }
-  if (!activeBuff.rememberTargetOnActivation) {
+  if (!activeBuffs.length) {
     ui.notifications.warn(game.i18n.localize("BOT.notifications.changeStoredTargetNoStoredTarget"));
     return false;
   }
 
+  const activeBuff = await chooseStoredTargetBuff(ownerToken.actor, activeBuffs);
+  if (!activeBuff) return false;
   return moveStoredTarget(ownerToken.actor, activeBuff, newTargetToken);
 }
 

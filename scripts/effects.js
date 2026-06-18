@@ -627,32 +627,43 @@ export async function refreshStoredTargetIndicator(ownerActor, previousFlag = nu
     await removeStoredTargetIndicator(ownerActor, previousFlag);
   }
 
-  const activeBuff = ownerActor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
-  const metadata = getStoredTargetIndicatorMetadata(ownerActor, activeBuff);
-  if (!metadata) return;
+  const activeBuffs = Object.values(getActiveBuffs(ownerActor))
+    .filter((activeBuff) => activeBuff?.rememberTargetOnActivation === true)
+    .filter((activeBuff) => isDominantBuff(ownerActor, activeBuff));
+  const metadataEntries = activeBuffs
+    .map((activeBuff) => getStoredTargetIndicatorMetadata(ownerActor, activeBuff))
+    .filter(Boolean);
+  const expectedKeys = new Set(metadataEntries.map((metadata) => metadata.key));
 
-  const legacyIndicators = metadata.targetActor.effects.filter(
-    (effect) => effect.flags?.[MODULE_ID]?.storedTargetIndicator === true
-      && !effect.flags?.[MODULE_ID]?.storedTargetIndicatorKey
-  );
-  for (const legacyEffect of legacyIndicators) {
-    await legacyEffect.delete();
+  for (const actor of collectActorsForLinkedStatusCleanup()) {
+    const staleIndicators = actor.effects?.filter((effect) => {
+      const effectFlag = effect.flags?.[MODULE_ID];
+      if (effectFlag?.storedTargetIndicator !== true) return false;
+      if (effectFlag.ownerActorUuid && effectFlag.ownerActorUuid !== ownerActor?.uuid) return false;
+      if (!effectFlag.ownerActorUuid && effectFlag.originActorUuid && effectFlag.originActorUuid !== ownerActor?.uuid) return false;
+      return !effectFlag.storedTargetIndicatorKey || !expectedKeys.has(effectFlag.storedTargetIndicatorKey);
+    }) ?? [];
+    for (const effect of staleIndicators) {
+      await effect.delete();
+    }
   }
 
-  const existing = metadata.targetActor.effects.find(
-    (effect) => effect.flags?.[MODULE_ID]?.storedTargetIndicator === true
-      && effect.flags?.[MODULE_ID]?.storedTargetIndicatorKey === metadata.key
-  );
-  if (existing) return;
+  for (const metadata of metadataEntries) {
+    const existing = metadata.targetActor.effects.find(
+      (effect) => effect.flags?.[MODULE_ID]?.storedTargetIndicator === true
+        && effect.flags?.[MODULE_ID]?.storedTargetIndicatorKey === metadata.key
+    );
+    if (existing) continue;
 
-  await metadata.targetActor.createEmbeddedDocuments("ActiveEffect", [{
-    name: metadata.effectName,
-    img: metadata.effectImg,
-    statuses: ["bot-stored-target"],
-    flags: { [MODULE_ID]: metadata.effectFlags },
-    duration: {},
-  }]);
-  debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+    await metadata.targetActor.createEmbeddedDocuments("ActiveEffect", [{
+      name: metadata.effectName,
+      img: metadata.effectImg,
+      statuses: ["bot-stored-target"],
+      flags: { [MODULE_ID]: metadata.effectFlags },
+      duration: {},
+    }]);
+    debugLog(`[${MODULE_ID}] Indicateur de marque ajoute sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  }
 }
 
 function getActiveBuffStackEntries(actor, stackingKey) {
