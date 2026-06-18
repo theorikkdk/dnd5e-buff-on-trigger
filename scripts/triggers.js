@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
-import { getActiveBuff, getActiveBuffs, getStackingKey, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { getActiveBuff, getActiveBuffs, getStackingKey, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
@@ -1814,11 +1814,46 @@ async function cleanupLinkedStatusSupportBuff(linkedFlag) {
   await endActiveBuff(ownerActor, activeBuff);
 }
 
-async function handleLinkedStatusRepeatedSaves(actor, timing) {
+function getDominantActiveBuffsForTurn(actor, predicate = null) {
+  return getActiveBuffsForTrigger(actor, (activeFlag) =>
+    isDominantBuff(actor, activeFlag) && (!predicate || predicate(activeFlag))
+  );
+}
+
+async function handleActorTurnTiming(actor, reminderTiming, saveTiming, triggerType) {
+  const activeFlags = getDominantActiveBuffsForTurn(actor);
+  if (!activeFlags.length) return;
+
+  for (const activeFlag of activeFlags) {
+    await showBuffReminder(actor, activeFlag, reminderTiming);
+  }
+
+  const repeatedSaveFlags = activeFlags.filter((activeFlag) => shouldRollRepeatedSave(activeFlag, saveTiming));
+  for (const activeFlag of repeatedSaveFlags) {
+    await handleRepeatedSave(actor, activeFlag, saveTiming);
+  }
+  if (!repeatedSaveFlags.length) {
+    await handleLinkedStatusRepeatedSaves(actor, saveTiming, { dominantOnly: true });
+  }
+
+  for (const activeFlag of activeFlags) {
+    if (activeFlag.type !== triggerType) continue;
+    const currentFlag = activeFlag.buffId ? getActiveBuff(actor, activeFlag.buffId) : activeFlag;
+    if (!currentFlag) continue;
+    await handleTurnTrigger(actor, currentFlag, triggerType);
+  }
+}
+
+async function handleLinkedStatusRepeatedSaves(actor, timing, { dominantOnly = false } = {}) {
   const effects = getLinkedStatusRepeatedSaveEffects(actor, timing);
   const groups = new Map();
   for (const effect of effects) {
     const linkedFlag = effect.flags?.[MODULE_ID];
+    if (dominantOnly) {
+      const ownerActor = resolveActorUuid(linkedFlag?.ownerActorUuid);
+      const activeBuff = resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag);
+      if (!activeBuff || !isDominantBuff(ownerActor, activeBuff)) continue;
+    }
     const key = [
       linkedFlag?.buffId ?? effect.id,
       linkedFlag?.saveAbility ?? "",
@@ -2467,14 +2502,7 @@ export function registerTriggers() {
       const currentCombatant = combat.combatant;
       const currentActor = currentCombatant?.actor;
       if (currentActor) {
-        const flag = currentActor.getFlag(MODULE_ID, "activeBuff");
-        await showBuffReminder(currentActor, flag, "turnStart");
-        const repeatedSaveHandled = shouldRollRepeatedSave(flag, "startTurn");
-        const endedByRepeatedSave = await handleRepeatedSave(currentActor, flag, "startTurn");
-        if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(currentActor, "startTurn");
-        if (!endedByRepeatedSave && flag?.type === "turnStart") {
-          await handleTurnTrigger(currentActor, flag, "turnStart");
-        }
+        await handleActorTurnTiming(currentActor, "turnStart", "startTurn", "turnStart");
       }
 
       // targetTurnStart : cherche un lanceur dont le buff se déclenche sur le combattant qui commence son tour
@@ -2490,8 +2518,8 @@ export function registerTriggers() {
             }
           }
           for (const sceneActor of sceneActors.values()) {
-            const flag = sceneActor.getFlag(MODULE_ID, "activeBuff");
-            if (flag?.type === "targetTurnStart") {
+            const flags = getDominantActiveBuffsForTurn(sceneActor, (activeFlag) => activeFlag.type === "targetTurnStart");
+            for (const flag of flags) {
               await handleTurnTrigger(sceneActor, flag, "targetTurnStart", [currentToken]);
             }
           }
@@ -2505,14 +2533,7 @@ export function registerTriggers() {
       const prevActor = prevCombatant?.actor;
 
       if (prevActor) {
-        const flag = prevActor.getFlag(MODULE_ID, "activeBuff");
-        await showBuffReminder(prevActor, flag, "turnEnd");
-        const repeatedSaveHandled = shouldRollRepeatedSave(flag, "endTurn");
-        const endedByRepeatedSave = await handleRepeatedSave(prevActor, flag, "endTurn");
-        if (!repeatedSaveHandled) await handleLinkedStatusRepeatedSaves(prevActor, "endTurn");
-        if (!endedByRepeatedSave && flag?.type === "turnEnd") {
-          await handleTurnTrigger(prevActor, flag, "turnEnd");
-        }
+        await handleActorTurnTiming(prevActor, "turnEnd", "endTurn", "turnEnd");
       }
 
       // targetTurnEnd : cherche un lanceur dans la scène dont le buff se déclenche sur la cible qui vient de finir son tour
@@ -2528,8 +2549,8 @@ export function registerTriggers() {
             }
           }
           for (const sceneActor of sceneActors.values()) {
-            const flag = sceneActor.getFlag(MODULE_ID, "activeBuff");
-            if (flag?.type === "targetTurnEnd") {
+            const flags = getDominantActiveBuffsForTurn(sceneActor, (activeFlag) => activeFlag.type === "targetTurnEnd");
+            for (const flag of flags) {
               await handleTurnTrigger(sceneActor, flag, "targetTurnEnd", [prevToken]);
             }
           }
