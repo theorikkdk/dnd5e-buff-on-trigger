@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
-import { getActiveBuff, getActiveBuffs, getStackingKey, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
@@ -965,7 +965,7 @@ function shouldProcessDamageTakenEndCondition(actor, workflow, damageItem) {
 }
 
 function getDamagedTriggerKey(flag) {
-  return flag?.buffId ?? flag?.itemUuid ?? flag?.originItemUuid ?? "legacy";
+  return getDamagedTriggerCooldownKey(flag);
 }
 
 function getLastDamagedTriggerTimestamp(actor, flag) {
@@ -1616,7 +1616,7 @@ async function clearExistingBuffInstance(actor, activeBuff) {
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
-  await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+  await clearDamagedTriggerCooldown(actor, activeBuff);
   await refreshBuffIndicator(actor, itemName, [], activeBuff);
   await refreshStackAfterBuffRemoval(actor, activeBuff);
 }
@@ -1626,7 +1626,7 @@ async function endActiveBuff(actor, activeBuff) {
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");
   await removeActiveBuff(actor, activeBuff);
-  await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+  await clearDamagedTriggerCooldown(actor, activeBuff);
   const concentrationEffect = findConcentrationEffectForBuff(activeBuff, actor);
   if (concentrationEffect) {
     allowConcentrationDeletion(concentrationEffect);
@@ -2168,7 +2168,7 @@ async function clearConcentrationLinkedBuffs(sourceActor, concentrationEffect) {
     const itemName = activeBuff.itemName;
     await showBuffReminder(actor, activeBuff, "buffEnd");
     await removeActiveBuff(actor, buffId);
-    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+    await clearDamagedTriggerCooldown(actor, activeBuff);
     await refreshBuffIndicator(actor, itemName, [], activeBuff);
     await refreshStackAfterBuffRemoval(actor, activeBuff);
     removedCount += 1;

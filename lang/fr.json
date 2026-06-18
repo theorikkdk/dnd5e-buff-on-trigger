@@ -775,10 +775,8 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testIndicatorSameNameA.label": "[TEST] Indicateur - Même nom A",
-  "BOT.presets.testIndicatorSameNameA.description": "Buff passif servant à tester deux indicateurs portant le même nom mais liés à des buffId différents.",
-  "BOT.presets.testIndicatorSameNameB.label": "[TEST] Indicateur - Même nom B",
-  "BOT.presets.testIndicatorSameNameB.description": "Second buff passif servant à tester deux indicateurs portant le même nom mais liés à des buffId différents.",
-  "BOT.presets.testIndicatorTargetedRemoval.label": "[TEST] Indicateur - Suppression ciblée",
-  "BOT.presets.testIndicatorTargetedRemoval.description": "Buff passif servant à vérifier que la suppression manuelle d’un indicateur ne retire que le buff correspondant."
+  "BOT.presets.testDamagedCooldownA.label": "[TEST] Damaged cooldown - A",
+  "BOT.presets.testDamagedCooldownA.description": "Quand le porteur subit des dégâts, inflige 1 dégât de force à l’attaquant, au maximum une fois par round.",
+  "BOT.presets.testDamagedCooldownB.label": "[TEST] Damaged cooldown - B",
+  "BOT.presets.testDamagedCooldownB.description": "Quand le porteur subit des dégâts, inflige 1 dégât psychique à l’attaquant, au maximum une fois par round."
 }

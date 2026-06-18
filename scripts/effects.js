@@ -11,7 +11,8 @@ import {
   getDominantBuffForStack,
   isDominantBuff,
   isActiveBuffRemovalPending,
-  getBuffStackingFlags
+  getBuffStackingFlags,
+  clearDamagedTriggerCooldown
 } from "./active-buffs.js";
 import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
 
@@ -2151,7 +2152,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         if (shouldRetainBuffForRepeatedSave(currentFlag)) {
           const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
           await upsertActiveBuff(actor, retainedFlag);
-          await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+          await clearDamagedTriggerCooldown(actor, currentFlag);
           await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
           await refreshStackingMechanicalEffects(actor, getStackingKey(currentFlag));
           debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
@@ -2168,7 +2169,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
         });
         await showBuffReminder(actor, currentFlag, "buffEnd");
         await removeActiveBuff(actor, currentFlag);
-        await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+        await clearDamagedTriggerCooldown(actor, currentFlag);
         rollModifierDebug("consume exhausted buff removed", {
           actor: actor?.name ?? null,
           buffId: currentFlag?.buffId ?? null,
@@ -2225,7 +2226,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       if (shouldRetainBuffForRepeatedSave(currentFlag)) {
         const retainedFlag = buildRepeatedSaveOnlyFlag(currentFlag);
         await upsertActiveBuff(actor, retainedFlag);
-        await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+        await clearDamagedTriggerCooldown(actor, currentFlag);
         await refreshBuffIndicator(actor, currentFlag.itemName, [], null);
         await refreshStackingMechanicalEffects(actor, getStackingKey(currentFlag));
         debugLog(`[${MODULE_ID}] Buff conserve pour sauvegarde repetee apres consommation`);
@@ -2242,7 +2243,7 @@ async function consumeOrDecrementCharges(workflow, flag, targets, options = {}) 
       });
       await showBuffReminder(actor, currentFlag, "buffEnd");
       await removeActiveBuff(actor, currentFlag);
-      await actor?.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+      await clearDamagedTriggerCooldown(actor, currentFlag);
       rollModifierDebug("consumeOnTrigger buff removed", {
         actor: actor?.name ?? null,
         buffId: currentFlag?.buffId ?? null,

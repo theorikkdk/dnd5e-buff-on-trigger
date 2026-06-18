@@ -135,6 +135,31 @@ export function getBuffStackingFlags(activeFlag) {
   };
 }
 
+export function getDamagedTriggerCooldownKey(activeFlag) {
+  return activeFlag?.buffId ?? activeFlag?.itemUuid ?? activeFlag?.originItemUuid ?? "legacy";
+}
+
+export async function clearDamagedTriggerCooldown(actor, activeFlag) {
+  if (!actor?.getFlag || !actor?.setFlag || !actor?.unsetFlag) return;
+  const value = actor.getFlag(MODULE_ID, "_lastDamagedTrigger");
+  if (value === undefined || value === null) return;
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+    return;
+  }
+
+  const key = getDamagedTriggerCooldownKey(activeFlag);
+  if (!(key in value)) return;
+  const remaining = { ...value };
+  delete remaining[key];
+  if (Object.keys(remaining).length) {
+    await actor.setFlag(MODULE_ID, "_lastDamagedTrigger", remaining);
+  } else {
+    await actor.unsetFlag(MODULE_ID, "_lastDamagedTrigger");
+  }
+}
+
 export function ensureActiveBuffId(activeFlag) {
   if (!activeFlag) return null;
   return {
