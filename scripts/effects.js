@@ -1624,10 +1624,7 @@ function linkedStatusMatchesBuff(effect, ownerActor, flag) {
 
 function resolveActiveBuffForLinkedStatus(ownerActor, linkedFlag) {
   if (!ownerActor?.getFlag || !linkedFlag?.linkedStatus) return null;
-  if (linkedFlag.buffId) {
-    const activeBuff = getActiveBuff(ownerActor, linkedFlag.buffId);
-    if (activeBuff) return activeBuff;
-  }
+  if (linkedFlag.buffId) return getActiveBuff(ownerActor, linkedFlag.buffId);
 
   const activeBuffs = Object.values(getActiveBuffs(ownerActor));
   const matchingBuff = activeBuffs.find((activeBuff) => {

@@ -775,12 +775,8 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testPruneSameNameA.label": "[TEST] Prune - Même nom A",
-  "BOT.presets.testPruneSameNameA.description": "Buff passif servant à tester le pruning de deux buffs modernes portant le même nom.",
-  "BOT.presets.testPruneSameNameB.label": "[TEST] Prune - Même nom B",
-  "BOT.presets.testPruneSameNameB.description": "Second buff passif servant à tester le pruning de deux buffs modernes portant le même nom.",
-  "BOT.presets.testPruneMechanicalA.label": "[TEST] Prune - Effet mécanique A",
-  "BOT.presets.testPruneMechanicalA.description": "Ajoute +1 à la CA pour tester le nettoyage strict d’un effet mécanique moderne.",
-  "BOT.presets.testPruneMechanicalB.label": "[TEST] Prune - Effet mécanique B",
-  "BOT.presets.testPruneMechanicalB.description": "Ajoute +1 aux jets de sauvegarde pour tester deux effets mécaniques homonymes sur des stacks distinctes."
+  "BOT.presets.testLinkedStrictA.label": "[TEST] Linked Strict - A",
+  "BOT.presets.testLinkedStrictA.description": "Applique Aveuglé et termine uniquement ce buff lorsque son statut lié est supprimé.",
+  "BOT.presets.testLinkedStrictB.label": "[TEST] Linked Strict - B",
+  "BOT.presets.testLinkedStrictB.description": "Applique Assourdi et termine uniquement ce buff lorsque son statut lié est supprimé."
 }

@@ -775,12 +775,8 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "When the bearer has no temporary HP left",
   "BOT.ui.endConditions.summary.damageTaken": "damage taken",
   "BOT.ui.endConditions.summary.temporaryHpLost": "temporary HP lost",
-  "BOT.presets.testPruneSameNameA.label": "[TEST] Prune - Same name A",
-  "BOT.presets.testPruneSameNameA.description": "Passive buff used to test pruning two modern buffs with the same name.",
-  "BOT.presets.testPruneSameNameB.label": "[TEST] Prune - Same name B",
-  "BOT.presets.testPruneSameNameB.description": "Second passive buff used to test pruning two modern buffs with the same name.",
-  "BOT.presets.testPruneMechanicalA.label": "[TEST] Prune - Mechanical effect A",
-  "BOT.presets.testPruneMechanicalA.description": "Adds +1 AC to test strict cleanup of a modern mechanical effect.",
-  "BOT.presets.testPruneMechanicalB.label": "[TEST] Prune - Mechanical effect B",
-  "BOT.presets.testPruneMechanicalB.description": "Adds +1 to saving throws to test two same-name mechanical effects on distinct stacks."
+  "BOT.presets.testLinkedStrictA.label": "[TEST] Linked Strict - A",
+  "BOT.presets.testLinkedStrictA.description": "Applies Blinded and ends only this buff when its linked status is removed.",
+  "BOT.presets.testLinkedStrictB.label": "[TEST] Linked Strict - B",
+  "BOT.presets.testLinkedStrictB.description": "Applies Deafened and ends only this buff when its linked status is removed."
 }
