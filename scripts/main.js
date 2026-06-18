@@ -2,6 +2,7 @@ import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, debugLog } from "./constants.
 import { syncItemDurationFlag } from "./duration.js";
 import { changeStoredTarget, registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
+import { migrateLegacyActiveBuff } from "./active-buffs.js";
 
 const MODULE_MACROS = [
   {
@@ -82,7 +83,7 @@ Hooks.once("setup", () => {
   debugLog(`[${MODULE_ID}] Statut bot-active enregistré dans setup`);
 });
 
-Hooks.once("ready", () => {
+Hooks.once("ready", async () => {
   debugLog(`[${MODULE_ID}] Module ready`);
   const module = game.modules.get(MODULE_ID);
   if (module) {
@@ -93,6 +94,15 @@ Hooks.once("ready", () => {
   }
 
   ensureModuleMacros();
+  if (game.user?.isGM) {
+    for (const actor of game.actors ?? []) {
+      try {
+        await migrateLegacyActiveBuff(actor);
+      } catch (error) {
+        console.error(`[${MODULE_ID}] Erreur de migration activeBuff pour ${actor?.name ?? actor?.uuid ?? "acteur inconnu"} :`, error);
+      }
+    }
+  }
   registerTriggers();
   registerItemSheetButton();
 

@@ -175,6 +175,28 @@ export function getLegacyActiveBuff(actor) {
   return actor?.getFlag?.(MODULE_ID, "activeBuff") ?? null;
 }
 
+export async function migrateLegacyActiveBuff(actor) {
+  if (!actor?.getFlag || !actor?.setFlag) return null;
+
+  const existingActiveBuffs = actor.getFlag(MODULE_ID, "activeBuffs");
+  if (existingActiveBuffs !== undefined && existingActiveBuffs !== null) {
+    const isActiveBuffMap = typeof existingActiveBuffs === "object" && !Array.isArray(existingActiveBuffs);
+    if (!isActiveBuffMap || Object.keys(existingActiveBuffs).length) return null;
+  }
+
+  const legacy = getLegacyActiveBuff(actor);
+  if (!legacy || typeof legacy !== "object" || Array.isArray(legacy)) return null;
+
+  const buffId = String(legacy.buffId ?? "").trim() || "legacy-activeBuff";
+  const migratedBuff = {
+    ...clone(legacy),
+    buffId,
+  };
+  await actor.setFlag(MODULE_ID, "activeBuffs", { [buffId]: migratedBuff });
+  debugLog(`[${MODULE_ID}] Buff legacy migre vers activeBuffs : ${buffId} sur ${actor.name ?? actor.uuid ?? "acteur inconnu"}`);
+  return migratedBuff;
+}
+
 function getRawActiveBuffs(actor) {
   const activeBuffs = actor?.getFlag?.(MODULE_ID, "activeBuffs");
   if (activeBuffs && typeof activeBuffs === "object" && !Array.isArray(activeBuffs)) {
