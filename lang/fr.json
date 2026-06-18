@@ -775,8 +775,12 @@
   "BOT.ui.endConditions.onTemporaryHpLost": "Quand le porteur n’a plus de PV temporaires",
   "BOT.ui.endConditions.summary.damageTaken": "dégâts subis",
   "BOT.ui.endConditions.summary.temporaryHpLost": "perte des PV temporaires",
-  "BOT.presets.testDamagedCooldownA.label": "[TEST] Damaged cooldown - A",
-  "BOT.presets.testDamagedCooldownA.description": "Quand le porteur subit des dégâts, inflige 1 dégât de force à l’attaquant, au maximum une fois par round.",
-  "BOT.presets.testDamagedCooldownB.label": "[TEST] Damaged cooldown - B",
-  "BOT.presets.testDamagedCooldownB.description": "Quand le porteur subit des dégâts, inflige 1 dégât psychique à l’attaquant, au maximum une fois par round."
+  "BOT.presets.testPruneSameNameA.label": "[TEST] Prune - Même nom A",
+  "BOT.presets.testPruneSameNameA.description": "Buff passif servant à tester le pruning de deux buffs modernes portant le même nom.",
+  "BOT.presets.testPruneSameNameB.label": "[TEST] Prune - Même nom B",
+  "BOT.presets.testPruneSameNameB.description": "Second buff passif servant à tester le pruning de deux buffs modernes portant le même nom.",
+  "BOT.presets.testPruneMechanicalA.label": "[TEST] Prune - Effet mécanique A",
+  "BOT.presets.testPruneMechanicalA.description": "Ajoute +1 à la CA pour tester le nettoyage strict d’un effet mécanique moderne.",
+  "BOT.presets.testPruneMechanicalB.label": "[TEST] Prune - Effet mécanique B",
+  "BOT.presets.testPruneMechanicalB.description": "Ajoute +1 aux jets de sauvegarde pour tester deux effets mécaniques homonymes sur des stacks distinctes."
 }

@@ -692,8 +692,10 @@ function getActiveBuffStackEntries(actor, stackingKey) {
 
 function activeEffectMatchesStack(effect, stackingKey, buffIds = new Set(), relatedFlags = []) {
   const effectFlag = effect?.flags?.[MODULE_ID] ?? {};
-  if (stackingKey && getStackingKey(effectFlag) === stackingKey) return true;
-  if (effectFlag.buffId && buffIds.has(effectFlag.buffId)) return true;
+  const effectBuffId = effectFlag.buffId ?? null;
+  const effectStackingKey = getStackingKey(effectFlag);
+  if (effectBuffId) return buffIds.has(effectBuffId);
+  if (effectStackingKey) return effectStackingKey === stackingKey;
 
   const effectName = String(effect?.name ?? "").trim();
   return relatedFlags.some((flag) => {

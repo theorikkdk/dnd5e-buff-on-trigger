@@ -211,18 +211,29 @@ function indicatorNameMatchesBuff(effectName, activeBuff) {
 function hasActiveBuffIndicator(actor, buffId, activeBuff) {
   if (isActiveBuffRemovalPending(actor, buffId)) return false;
   const effects = actor?.effects ?? [];
+  const activeBuffId = activeBuff?.buffId
+    ?? (buffId && buffId !== "legacy-activeBuff" ? buffId : null);
   return effects.some((effect) => {
     const effectFlag = effect?.flags?.[MODULE_ID] ?? {};
     if (effectFlag.indicator !== true && !effect?.statuses?.has?.("bot-active")) return false;
-    const effectBuffId = effect.flags?.[MODULE_ID]?.buffId ?? null;
-    if (buffId && effectBuffId) return effectBuffId === buffId;
-    return indicatorNameMatchesBuff(effect.name, activeBuff);
+    const effectBuffId = effectFlag.buffId ?? null;
+    if (activeBuffId) return effectBuffId === activeBuffId;
+    return !effectBuffId && indicatorNameMatchesBuff(effect.name, activeBuff);
   });
+}
+
+function shouldRetainActiveBuffEntry(actor, buffId, activeBuff, keep = new Set()) {
+  if (isActiveBuffRemovalPending(actor, buffId)) return false;
+  if (keep.has(buffId)) return true;
+  if (activeBuff?.buffId || (buffId && buffId !== "legacy-activeBuff")) return true;
+  return hasActiveBuffIndicator(actor, buffId, activeBuff);
 }
 
 function pruneActiveBuffsWithoutIndicators(actor, activeBuffs) {
   const entries = Object.entries(activeBuffs ?? {});
-  const pruned = Object.fromEntries(entries.filter(([buffId, activeBuff]) => hasActiveBuffIndicator(actor, buffId, activeBuff)));
+  const pruned = Object.fromEntries(
+    entries.filter(([buffId, activeBuff]) => shouldRetainActiveBuffEntry(actor, buffId, activeBuff))
+  );
   return pruned;
 }
 
@@ -237,8 +248,7 @@ export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   const keep = new Set(keepBuffIds.filter(Boolean));
   const pruned = Object.fromEntries(
     Object.entries(activeBuffs).filter(([buffId, activeBuff]) =>
-      !isActiveBuffRemovalPending(actor, buffId)
-      && (keep.has(buffId) || hasActiveBuffIndicator(actor, buffId, activeBuff))
+      shouldRetainActiveBuffEntry(actor, buffId, activeBuff, keep)
     )
   );
 
