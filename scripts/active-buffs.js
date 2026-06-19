@@ -14,6 +14,30 @@ function generateBuffId() {
 const ACTIVE_BUFF_REMOVAL_TTL_MS = 10000;
 const pendingActiveBuffRemovals = new Map();
 const pendingLegacyActiveBuffMigrations = new Map();
+const activeBuffMutationQueues = new Map();
+
+function getActorMutationKey(actor) {
+  return actor?.uuid ?? actor?.id ?? null;
+}
+
+async function enqueueActiveBuffMutation(actor, operation) {
+  const actorKey = getActorMutationKey(actor);
+  if (!actorKey) return operation();
+
+  const previousMutation = activeBuffMutationQueues.get(actorKey) ?? Promise.resolve();
+  const currentMutation = previousMutation
+    .catch(() => undefined)
+    .then(operation);
+  activeBuffMutationQueues.set(actorKey, currentMutation);
+
+  try {
+    return await currentMutation;
+  } finally {
+    if (activeBuffMutationQueues.get(actorKey) === currentMutation) {
+      activeBuffMutationQueues.delete(actorKey);
+    }
+  }
+}
 
 function getActorRemovalKey(actor) {
   return actor?.uuid ?? actor?.id ?? "unknown-actor";
@@ -200,13 +224,13 @@ async function runLegacyActiveBuffMigration(actor) {
 
 export async function migrateLegacyActiveBuff(actor) {
   if (!actor?.getFlag || !actor?.setFlag) return null;
-  const actorKey = actor.uuid ?? actor.id ?? null;
+  const actorKey = getActorMutationKey(actor);
   if (!actorKey) return runLegacyActiveBuffMigration(actor);
 
   const pending = pendingLegacyActiveBuffMigrations.get(actorKey);
   if (pending) return pending;
 
-  const migration = runLegacyActiveBuffMigration(actor);
+  const migration = enqueueActiveBuffMutation(actor, () => runLegacyActiveBuffMigration(actor));
   pendingLegacyActiveBuffMigrations.set(actorKey, migration);
   try {
     return await migration;
@@ -279,7 +303,7 @@ function pruneActiveBuffsWithoutIndicators(actor, activeBuffs) {
   return pruned;
 }
 
-export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
+async function runPruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   if (!actor?.getFlag) return {};
   const activeBuffs = clone(getRawActiveBuffs(actor));
   const keep = new Set(keepBuffIds.filter(Boolean));
@@ -306,7 +330,12 @@ export async function pruneStaleActiveBuffs(actor, { keepBuffIds = [] } = {}) {
   return pruned;
 }
 
-export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = false } = {}) {
+export async function pruneStaleActiveBuffs(actor, options = {}) {
+  if (!actor?.getFlag) return {};
+  return enqueueActiveBuffMutation(actor, () => runPruneStaleActiveBuffs(actor, options));
+}
+
+async function runUpsertActiveBuff(actor, activeFlag, { writeLegacy = false } = {}) {
   if (!actor?.setFlag || !activeFlag) return null;
   const flagWithId = ensureActiveBuffId(activeFlag);
   if (isActiveBuffRemovalPending(actor, flagWithId.buffId)) {
@@ -319,7 +348,7 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = false 
     })}`);
     return null;
   }
-  const activeBuffs = clone(await pruneStaleActiveBuffs(actor));
+  const activeBuffs = clone(await runPruneStaleActiveBuffs(actor));
   activeBuffs[flagWithId.buffId] = flagWithId;
   await actor.setFlag(MODULE_ID, "activeBuffs", activeBuffs);
 
@@ -329,7 +358,12 @@ export async function upsertActiveBuff(actor, activeFlag, { writeLegacy = false 
   return flagWithId;
 }
 
-export async function removeActiveBuff(actor, activeFlagOrId, { clearLegacy = true } = {}) {
+export async function upsertActiveBuff(actor, activeFlag, options = {}) {
+  if (!actor?.setFlag || !activeFlag) return null;
+  return enqueueActiveBuffMutation(actor, () => runUpsertActiveBuff(actor, activeFlag, options));
+}
+
+async function runRemoveActiveBuff(actor, activeFlagOrId, { clearLegacy = true } = {}) {
   if (!actor?.unsetFlag) return;
   const buffId = markActiveBuffRemoval(actor, activeFlagOrId);
   const previousFlag = typeof activeFlagOrId === "string"
@@ -351,4 +385,9 @@ export async function removeActiveBuff(actor, activeFlagOrId, { clearLegacy = tr
   if (clearLegacy && legacyBuffId && legacyBuffId === buffId) {
     await actor.unsetFlag(MODULE_ID, "activeBuff");
   }
+}
+
+export async function removeActiveBuff(actor, activeFlagOrId, options = {}) {
+  if (!actor?.unsetFlag) return;
+  return enqueueActiveBuffMutation(actor, () => runRemoveActiveBuff(actor, activeFlagOrId, options));
 }
