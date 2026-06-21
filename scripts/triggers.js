@@ -1434,10 +1434,14 @@ function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
 
 function findExistingBuffInstances(actor, newFlag) {
   if (!actor?.getFlag) return [];
-  if (getStackingMode(newFlag) === "alwaysStack") return [];
+  if (["alwaysStack", "sameEffect"].includes(getStackingMode(newFlag))) return [];
   return Object.entries(getActiveBuffs(actor))
     .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
     .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
+}
+
+function shouldUseActiveBuffForRuntime(actor, activeBuff) {
+  return getStackingMode(activeBuff) !== "sameEffect" || isDominantBuff(actor, activeBuff);
 }
 
 function getActiveBuffsForTrigger(actor, predicate = null) {
@@ -2704,7 +2708,9 @@ export function registerTriggers() {
       if (!actor) return;
       if (token.actor.id !== actor.id) return;
       const damageTaken = getDamageTakenAmount(damageItem, workflow);
-      const initialActiveFlags = getActiveBuffsForTrigger(actor);
+      const initialActiveFlags = getActiveBuffsForTrigger(actor, (activeFlag) =>
+        shouldUseActiveBuffForRuntime(actor, activeFlag)
+      );
       if (damageTaken > 0 && shouldProcessDamagedRepeatedSave(actor, workflow, damageItem)) {
         const repeatedSaveFlags = initialActiveFlags.filter((activeFlag) => shouldRollRepeatedSave(activeFlag, "damaged"));
         const repeatedSaveHandled = repeatedSaveFlags.length > 0;
@@ -2717,13 +2723,18 @@ export function registerTriggers() {
       }
 
       if (damageTaken > 0 && shouldProcessDamageTakenEndCondition(actor, workflow, damageItem)) {
-        for (const flag of getActiveBuffsForTrigger(actor)) {
+        for (const flag of getActiveBuffsForTrigger(actor, (activeFlag) =>
+          shouldUseActiveBuffForRuntime(actor, activeFlag)
+        )) {
           scheduleTemporaryHpLostEndCheck(actor, flag, damageItem, workflow, damageTaken);
           await maybeEndActiveBuffForDamageTaken(actor, flag, damageItem, workflow);
         }
       }
 
-      const damagedFlags = getActiveBuffsForTrigger(actor, (activeFlag) => activeFlag.type === "damaged");
+      const damagedFlags = getActiveBuffsForTrigger(actor, (activeFlag) =>
+        activeFlag.type === "damaged"
+        && shouldUseActiveBuffForRuntime(actor, activeFlag)
+      );
       if (!damagedFlags.length) {
         debugLog(`[${MODULE_ID}] midi-qol.isDamaged : aucun buff actif trouvé sur ${actor.name}`);
         return;
@@ -2808,7 +2819,10 @@ export function registerTriggers() {
     try {
       const actor = token.actor;
       if (!actor) return;
-      const healedFlags = getActiveBuffsForTrigger(actor, (activeFlag) => activeFlag.type === "healed");
+      const healedFlags = getActiveBuffsForTrigger(actor, (activeFlag) =>
+        activeFlag.type === "healed"
+        && shouldUseActiveBuffForRuntime(actor, activeFlag)
+      );
       if (!healedFlags.length) return;
       for (const flag of healedFlags) {
         debugLog(`[${MODULE_ID}] Déclencheur healed sur ${actor.name} (${flag.itemName ?? flag.buffId ?? "buff"})`);

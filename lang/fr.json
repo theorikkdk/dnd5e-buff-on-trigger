@@ -792,5 +792,7 @@
   "BOT.presets.testReplacementMultiTarget.label": "[TEST] Remplacement multi-cibles",
   "BOT.presets.testReplacementMultiTarget.description": "Buff multi-cibles simple sans concentration pour tester des ensembles qui se chevauchent, par exemple A+B puis B+C.",
   "BOT.presets.testReplacementAlwaysStack.label": "[TEST] Remplacement alwaysStack",
-  "BOT.presets.testReplacementAlwaysStack.description": "Buff multi-cibles simple sans concentration qui crée toujours une nouvelle instance coexistante."
+  "BOT.presets.testReplacementAlwaysStack.description": "Buff multi-cibles simple sans concentration qui crée toujours une nouvelle instance coexistante.",
+  "BOT.presets.testReplacementSameEffect.label": "[TEST] Remplacement sameEffect",
+  "BOT.presets.testReplacementSameEffect.description": "Buff multi-cibles de +1 CA qui conserve plusieurs instances tout en n’appliquant mécaniquement que l’instance dominante."
 }

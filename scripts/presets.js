@@ -1869,4 +1869,21 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "testReplacementSameEffect",
+    label: "BOT.presets.testReplacementSameEffect.label",
+    description: "BOT.presets.testReplacementSameEffect.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      allowMultipleTargets: true,
+      stackingMode: "sameEffect",
+      type: "passive",
+      buffs: {
+        ac: 1,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
