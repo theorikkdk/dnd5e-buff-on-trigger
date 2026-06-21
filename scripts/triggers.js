@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
-import { clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
@@ -1434,6 +1434,7 @@ function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
 
 function findExistingBuffInstances(actor, newFlag) {
   if (!actor?.getFlag) return [];
+  if (getStackingMode(newFlag) === "alwaysStack") return [];
   return Object.entries(getActiveBuffs(actor))
     .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
     .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));

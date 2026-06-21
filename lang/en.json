@@ -790,5 +790,7 @@
   "BOT.presets.testReplacementNormal.label": "[TEST] Replacement normal",
   "BOT.presets.testReplacementNormal.description": "Simple non-concentration buff for testing replacement on the same target while preserving other targets.",
   "BOT.presets.testReplacementMultiTarget.label": "[TEST] Replacement multi-target",
-  "BOT.presets.testReplacementMultiTarget.description": "Simple non-concentration multi-target buff for testing overlapping target sets such as A+B followed by B+C."
+  "BOT.presets.testReplacementMultiTarget.description": "Simple non-concentration multi-target buff for testing overlapping target sets such as A+B followed by B+C.",
+  "BOT.presets.testReplacementAlwaysStack.label": "[TEST] Replacement alwaysStack",
+  "BOT.presets.testReplacementAlwaysStack.description": "Simple non-concentration multi-target buff that always creates a new coexisting instance."
 }

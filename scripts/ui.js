@@ -1306,6 +1306,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       presetMetaPresetLabel: rawPresetMeta?.presetLabel ?? "",
       presetMetaDirty: rawPresetMeta?.dirty === true,
       presetStatusText: getPresetMetaStatusText(rawPresetMeta),
+      stackingMode: raw.stackingMode ?? "normal",
       buffAC:                    raw.buffs?.ac ?? "",
       buffAttackMode:            raw.buffs?.attackMode ?? "none",
       buffAttackModeAttackTypesList: normalizeAttackModeAttackTypes(raw.buffs?.attackModeAttackTypes ?? []).join(","),
@@ -1717,6 +1718,7 @@ function buildBuffConfigFromForm(form) {
     ),
     consumeOnTrigger: !!readFormValue(form, "consumeOnTrigger"),
     triggerFrequency: readFormValue(form, "triggerFrequency", "none"),
+    stackingMode: readFormValue(form, "stackingMode", "normal"),
     presetMeta: readPresetMetaFromForm(form),
     endConditions: (readFormValue(form, "endConditionOnAttack") || readFormValue(form, "endConditionOnSpellCast") || readFormValue(form, "endConditionOnDamageDealt") || readFormValue(form, "endConditionOnDamageTaken") || readFormValue(form, "endConditionOnTemporaryHpLost")) ? {
       onAttack: !!readFormValue(form, "endConditionOnAttack"),
@@ -1875,6 +1877,7 @@ function buildDefaultBuffConfig() {
     targetFilters: null,
     consumeOnTrigger: true,
     triggerFrequency: "none",
+    stackingMode: "normal",
     presetMeta: null,
     endConditions: null,
     reminders: null,
@@ -2076,6 +2079,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "rememberTargetOnActivation", !!flag.rememberTargetOnActivation);
   setFormValue(form, "fallbackToSelfIfNoTarget", !!flag.fallbackToSelfIfNoTarget);
   setFormValue(form, "allowMultipleTargets", !!flag.allowMultipleTargets && normalizeGlobalTargetMode(flag.targetMode) === "target" && !flag.rememberTargetOnActivation);
+  setFormValue(form, "stackingMode", flag.stackingMode ?? "normal");
   setFormValue(form, "multiTargetLimitEnabled", flag.multiTargetLimit?.enabled === true);
   setFormValue(form, "multiTargetLimitBaseTargets", flag.multiTargetLimit?.baseTargets ?? 1);
   setFormValue(form, "multiTargetLimitBaseSpellLevel", flag.multiTargetLimit?.baseSpellLevel ?? 1);

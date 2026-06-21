@@ -790,5 +790,7 @@
   "BOT.presets.testReplacementNormal.label": "[TEST] Remplacement normal",
   "BOT.presets.testReplacementNormal.description": "Buff simple sans concentration pour tester le remplacement sur une même cible sans supprimer les autres cibles.",
   "BOT.presets.testReplacementMultiTarget.label": "[TEST] Remplacement multi-cibles",
-  "BOT.presets.testReplacementMultiTarget.description": "Buff multi-cibles simple sans concentration pour tester des ensembles qui se chevauchent, par exemple A+B puis B+C."
+  "BOT.presets.testReplacementMultiTarget.description": "Buff multi-cibles simple sans concentration pour tester des ensembles qui se chevauchent, par exemple A+B puis B+C.",
+  "BOT.presets.testReplacementAlwaysStack.label": "[TEST] Remplacement alwaysStack",
+  "BOT.presets.testReplacementAlwaysStack.description": "Buff multi-cibles simple sans concentration qui crée toujours une nouvelle instance coexistante."
 }

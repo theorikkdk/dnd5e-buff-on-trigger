@@ -13,6 +13,7 @@
     <input type="hidden" name="presetMetaPresetType" value="{{flag.presetMetaPresetType}}" />
     <input type="hidden" name="presetMetaPresetLabel" value="{{flag.presetMetaPresetLabel}}" />
     <input type="hidden" name="presetMetaDirty" value="{{#if flag.presetMetaDirty}}1{{/if}}" />
+    <input type="hidden" name="stackingMode" value="{{flag.stackingMode}}" />
     <div class="bot-preset-select-row">
       <label>{{localize "BOT.ui.presets.searchLabel"}}</label>
       <input type="text" name="presetSearch" placeholder="{{localize "BOT.ui.presets.searchPlaceholder"}}" oninput="botFilterPresets(this)" />

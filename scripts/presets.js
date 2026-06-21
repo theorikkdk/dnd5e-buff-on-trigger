@@ -1855,4 +1855,18 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "testReplacementAlwaysStack",
+    label: "BOT.presets.testReplacementAlwaysStack.label",
+    description: "BOT.presets.testReplacementAlwaysStack.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      allowMultipleTargets: true,
+      stackingMode: "alwaysStack",
+      type: "passive",
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
