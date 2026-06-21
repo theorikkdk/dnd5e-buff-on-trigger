@@ -185,6 +185,14 @@ export function classifyNoStackApplication(activeBuffs, newFlag) {
   };
 }
 
+export function findReplacementCandidateBuffIds(activeBuffs, newFlag) {
+  if (["alwaysStack", "sameEffect"].includes(getStackingMode(newFlag))) return [];
+  return Object.entries(activeBuffs ?? {})
+    .filter(([, activeBuff]) => activeBuff && isSameBuffSourceAndItem(activeBuff, newFlag))
+    .map(([buffId]) => buffId)
+    .filter(Boolean);
+}
+
 export function getBuffAppliedAt(activeFlag) {
   const appliedAt = Number(activeFlag?.appliedAt);
   return Number.isFinite(appliedAt) ? appliedAt : 0;

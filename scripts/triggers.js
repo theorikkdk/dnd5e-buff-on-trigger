@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
-import { classifyNoStackApplication, clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { classifyNoStackApplication, clearDamagedTriggerCooldown, findReplacementCandidateBuffIds, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
@@ -1419,25 +1419,11 @@ function doesAttackConditionMatch(workflow, flag) {
   return false;
 }
 
-function getBuffItemUuid(flag) {
-  return flag?.originItemUuid ?? flag?.itemUuid ?? null;
-}
-
-function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
-  const newOriginActorUuid = newFlag?.originActorUuid ?? null;
-  const newItemUuid = getBuffItemUuid(newFlag);
-  return !!newOriginActorUuid
-    && !!newItemUuid
-    && existingFlag?.originActorUuid === newOriginActorUuid
-    && getBuffItemUuid(existingFlag) === newItemUuid;
-}
-
 function findExistingBuffInstances(actor, newFlag) {
   if (!actor?.getFlag) return [];
-  if (["alwaysStack", "sameEffect"].includes(getStackingMode(newFlag))) return [];
-  return Object.entries(getActiveBuffs(actor))
-    .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
-    .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
+  const activeBuffs = getActiveBuffs(actor);
+  return findReplacementCandidateBuffIds(activeBuffs, newFlag)
+    .map((buffId) => ({ actor, buffId, activeBuff: activeBuffs[buffId] }));
 }
 
 function shouldUseActiveBuffForRuntime(actor, activeBuff) {
