@@ -1583,6 +1583,21 @@ async function clearExistingBuffInstance(actor, activeBuff) {
   await refreshStackAfterBuffRemoval(actor, activeBuff);
 }
 
+async function clearReplacementCandidates(actor, candidateBuffIds, appliedFlag) {
+  const appliedBuffId = appliedFlag?.buffId ?? null;
+  if (!actor?.getFlag || !appliedBuffId) return 0;
+
+  let removedCount = 0;
+  for (const candidateBuffId of new Set(candidateBuffIds ?? [])) {
+    if (!candidateBuffId || candidateBuffId === appliedBuffId) continue;
+    const existingBuff = getActiveBuff(actor, candidateBuffId);
+    if (!existingBuff) continue;
+    await clearExistingBuffInstance(actor, existingBuff);
+    removedCount += 1;
+  }
+  return removedCount;
+}
+
 async function endActiveBuff(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
@@ -2529,28 +2544,22 @@ export function registerTriggers() {
           }
           const targetActor = effectiveTargetMode === "target" ? targetToken.actor : workflow.actor;
           const carrierToken = effectiveTargetMode === "target" ? targetToken : (workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null);
-          pendingApplications.push({ targetActor, carrierToken, targetFlag, activationSave });
+          const replacementCandidateBuffIds = findExistingBuffInstances(targetActor, targetFlag)
+            .map(({ buffId }) => buffId)
+            .filter(Boolean);
+          pendingApplications.push({
+            targetActor,
+            carrierToken,
+            targetFlag,
+            activationSave,
+            replacementCandidateBuffIds,
+          });
         }
 
         if (!pendingApplications.length) {
           await reportMultiTargetActivation(workflow, activeFlag, activationResults);
           debugLog(`[${MODULE_ID}] Activation annulee - aucune cible n'a recu le buff`);
           return;
-        }
-
-        const existingBuffsByKey = new Map();
-        for (const application of pendingApplications) {
-          for (const existing of findExistingBuffInstances(application.targetActor, application.targetFlag)) {
-            const existingKey = `${existing.actor?.uuid ?? existing.actor?.id ?? "actor"}|${existing.buffId}`;
-            existingBuffsByKey.set(existingKey, existing);
-          }
-        }
-        const existingBuffs = [...existingBuffsByKey.values()];
-        if (existingBuffs.length) {
-          for (const existing of existingBuffs) {
-            await clearExistingBuffInstance(existing.actor, existing.activeBuff);
-          }
-          debugLog(`[${MODULE_ID}] Ancien buff remplace : ${workflow.item.name}`);
         }
 
         for (const application of pendingApplications) {
@@ -2564,7 +2573,24 @@ export function registerTriggers() {
               hasMechBuffs,
               sourceActorName
             );
-            if (appliedFlag) application.targetFlag = appliedFlag;
+            if (appliedFlag?.buffId) {
+              application.targetFlag = appliedFlag;
+              const replacedCount = await clearReplacementCandidates(
+                application.targetActor,
+                application.replacementCandidateBuffIds,
+                appliedFlag
+              );
+              if (replacedCount > 0) {
+                await applyActivationStatus(
+                  application.targetActor,
+                  application.carrierToken,
+                  appliedFlag,
+                  workflow,
+                  application.activationSave?.saveResults ?? null
+                );
+                debugLog(`[${MODULE_ID}] Ancien buff remplace sur ${application.targetActor?.name ?? "porteur inconnu"} : ${workflow.item.name}`);
+              }
+            }
             activationResults.push({ status: appliedFlag ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
           } catch (error) {
             activationResults.push({ status: "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
