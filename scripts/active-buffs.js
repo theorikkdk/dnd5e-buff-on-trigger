@@ -122,6 +122,69 @@ export function getStackingMode(activeFlag) {
   return ["normal", "sameEffect", "noStack", "alwaysStack"].includes(mode) ? mode : "normal";
 }
 
+function getBuffItemUuid(activeFlag) {
+  return activeFlag?.originItemUuid ?? activeFlag?.itemUuid ?? null;
+}
+
+function isSameBuffSourceAndItem(existingFlag, newFlag) {
+  const existingOriginActorUuid = existingFlag?.originActorUuid ?? null;
+  const newOriginActorUuid = newFlag?.originActorUuid ?? null;
+  const existingItemUuid = getBuffItemUuid(existingFlag);
+  const newItemUuid = getBuffItemUuid(newFlag);
+  return !!existingOriginActorUuid
+    && !!newOriginActorUuid
+    && !!existingItemUuid
+    && !!newItemUuid
+    && existingOriginActorUuid === newOriginActorUuid
+    && existingItemUuid === newItemUuid;
+}
+
+export function classifyNoStackApplication(activeBuffs, newFlag) {
+  if (getStackingMode(newFlag) !== "noStack") {
+    return {
+      status: "allowed",
+      blockingBuff: null,
+      blockingBuffId: null,
+      replacementCandidateBuffIds: [],
+    };
+  }
+
+  const stackingKey = getStackingKey(newFlag);
+  if (!stackingKey) {
+    return {
+      status: "allowed",
+      blockingBuff: null,
+      blockingBuffId: null,
+      replacementCandidateBuffIds: [],
+    };
+  }
+
+  const matchingEntries = Object.entries(activeBuffs ?? {})
+    .filter(([, activeBuff]) => activeBuff && getStackingKey(activeBuff) === stackingKey);
+  const blockingEntry = matchingEntries.find(([, activeBuff]) =>
+    !isSameBuffSourceAndItem(activeBuff, newFlag)
+  );
+  if (blockingEntry) {
+    const [blockingBuffId, blockingBuff] = blockingEntry;
+    return {
+      status: "blocked",
+      blockingBuff,
+      blockingBuffId,
+      replacementCandidateBuffIds: [],
+    };
+  }
+
+  const replacementCandidateBuffIds = matchingEntries
+    .map(([buffId]) => buffId)
+    .filter(Boolean);
+  return {
+    status: replacementCandidateBuffIds.length ? "replaceable" : "allowed",
+    blockingBuff: null,
+    blockingBuffId: null,
+    replacementCandidateBuffIds,
+  };
+}
+
 export function getBuffAppliedAt(activeFlag) {
   const appliedAt = Number(activeFlag?.appliedAt);
   return Number.isFinite(appliedAt) ? appliedAt : 0;
@@ -361,6 +424,69 @@ async function runUpsertActiveBuff(actor, activeFlag, { writeLegacy = false } = 
 export async function upsertActiveBuff(actor, activeFlag, options = {}) {
   if (!actor?.setFlag || !activeFlag) return null;
   return enqueueActiveBuffMutation(actor, () => runUpsertActiveBuff(actor, activeFlag, options));
+}
+
+async function runUpsertNoStackActiveBuff(actor, activeFlag) {
+  if (!actor?.setFlag || !activeFlag) {
+    return {
+      status: "failed",
+      activeBuff: null,
+      blockingBuff: null,
+      blockingBuffId: null,
+      replacementCandidateBuffIds: [],
+    };
+  }
+
+  const flagWithId = ensureActiveBuffId(activeFlag);
+  if (isActiveBuffRemovalPending(actor, flagWithId.buffId)) {
+    return {
+      status: "failed",
+      activeBuff: null,
+      blockingBuff: null,
+      blockingBuffId: null,
+      replacementCandidateBuffIds: [],
+    };
+  }
+
+  const activeBuffs = clone(await runPruneStaleActiveBuffs(actor));
+  const classification = classifyNoStackApplication(activeBuffs, flagWithId);
+  if (classification.status === "blocked") {
+    debugLog(`[${MODULE_ID}] Application noStack bloquee : ${JSON.stringify({
+      actor: actor?.name ?? null,
+      actorUuid: actor?.uuid ?? null,
+      stackingKey: getStackingKey(flagWithId) ?? null,
+      blockingBuffId: classification.blockingBuffId,
+      blockingItemName: classification.blockingBuff?.itemName ?? null,
+    })}`);
+    return {
+      ...classification,
+      activeBuff: null,
+    };
+  }
+
+  activeBuffs[flagWithId.buffId] = flagWithId;
+  await actor.setFlag(MODULE_ID, "activeBuffs", activeBuffs);
+  debugLog(`[${MODULE_ID}] Buff noStack actif indexe : ${flagWithId.buffId}`);
+  return {
+    status: "applied",
+    activeBuff: flagWithId,
+    blockingBuff: null,
+    blockingBuffId: null,
+    replacementCandidateBuffIds: classification.replacementCandidateBuffIds,
+  };
+}
+
+export async function upsertNoStackActiveBuff(actor, activeFlag) {
+  if (!actor?.setFlag || !activeFlag) {
+    return {
+      status: "failed",
+      activeBuff: null,
+      blockingBuff: null,
+      blockingBuffId: null,
+      replacementCandidateBuffIds: [],
+    };
+  }
+  return enqueueActiveBuffMutation(actor, () => runUpsertNoStackActiveBuff(actor, activeFlag));
 }
 
 async function runRemoveActiveBuff(actor, activeFlagOrId, { clearLegacy = true } = {}) {

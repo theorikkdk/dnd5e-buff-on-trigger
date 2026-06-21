@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
-import { clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, upsertActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { classifyNoStackApplication, clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
@@ -2258,6 +2258,7 @@ function buildMultiTargetActivationSummaryText(itemName, counts) {
   const parts = [];
   if (counts.affected > 0) parts.push(formatMultiTargetActivationCount("affected", counts.affected));
   if (counts.resisted > 0) parts.push(formatMultiTargetActivationCount("resisted", counts.resisted));
+  if (counts.blocked > 0) parts.push(formatMultiTargetActivationCount("blocked", counts.blocked));
   if (counts.invalid > 0) parts.push(formatMultiTargetActivationCount("invalid", counts.invalid));
   if (counts.failed > 0) parts.push(formatMultiTargetActivationCount("failed", counts.failed));
   if (!counts.affected && parts.length) parts.unshift(game.i18n.localize("BOT.chat.multiTargetActivation.noneAffected"));
@@ -2317,6 +2318,7 @@ async function reportMultiTargetActivation(workflow, activeFlag, results) {
   const counts = {
     affected: countActivationResults(results, "affected"),
     resisted: countActivationResults(results, "resisted"),
+    blocked: countActivationResults(results, "blocked"),
     invalid: countActivationResults(results, "invalid"),
     failed: countActivationResults(results, "failed"),
   };
@@ -2329,11 +2331,13 @@ async function reportMultiTargetActivation(workflow, activeFlag, results) {
 
   const affectedNames = joinMultiTargetNames(results, "affected");
   const resistedNames = joinMultiTargetNames(results, "resisted");
+  const blockedNames = joinMultiTargetNames(results, "blocked");
   const invalidDetails = buildInvalidTargetDetails(results);
   const failedNames = joinMultiTargetNames(results, "failed");
   const details = [
     affectedNames ? game.i18n.format("BOT.chat.multiTargetActivation.affectedList", { targets: affectedNames }) : null,
     resistedNames ? game.i18n.format("BOT.chat.multiTargetActivation.resistedList", { targets: resistedNames }) : null,
+    blockedNames ? game.i18n.format("BOT.chat.multiTargetActivation.blockedList", { targets: blockedNames }) : null,
     invalidDetails ? game.i18n.format("BOT.chat.multiTargetActivation.invalidList", { targets: invalidDetails }) : null,
     failedNames ? game.i18n.format("BOT.chat.multiTargetActivation.failedList", { targets: failedNames }) : null,
   ].filter(Boolean);
@@ -2353,9 +2357,35 @@ function buildActivationTargetFlag(baseFlag, targetToken) {
   return flag;
 }
 
+function getNoStackBlockedNotification(targetActor, activeFlag, blockingBuff = null) {
+  return game.i18n.format("BOT.notifications.noStackBlocked", {
+    item: activeFlag?.itemName ?? game.i18n.localize("BOT.fallback.effectName"),
+    target: targetActor?.name ?? game.i18n.localize("BOT.ui.summary.notConfigured"),
+    existing: blockingBuff?.itemName ?? game.i18n.localize("BOT.fallback.effectName"),
+  });
+}
+
 async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, workflow, activationSave, hasMechBuffs, sourceActorName) {
-  if (!targetActor?.setFlag) return false;
-  activeFlag = await upsertActiveBuff(targetActor, activeFlag);
+  if (!targetActor?.setFlag) return { status: "failed", activeFlag: null, replacementCandidateBuffIds: [] };
+
+  let replacementCandidateBuffIds = [];
+  if (getStackingMode(activeFlag) === "noStack") {
+    const noStackResult = await upsertNoStackActiveBuff(targetActor, activeFlag);
+    if (noStackResult.status !== "applied") {
+      return {
+        status: noStackResult.status,
+        activeFlag: null,
+        blockingBuff: noStackResult.blockingBuff ?? null,
+        replacementCandidateBuffIds: [],
+      };
+    }
+    activeFlag = noStackResult.activeBuff;
+    replacementCandidateBuffIds = noStackResult.replacementCandidateBuffIds ?? [];
+  } else {
+    activeFlag = await upsertActiveBuff(targetActor, activeFlag);
+    if (!activeFlag) return { status: "failed", activeFlag: null, replacementCandidateBuffIds: [] };
+  }
+
   debugLog(`[${MODULE_ID}] Buff active sur ${targetActor.name} via ${workflow.item?.name ?? activeFlag.itemName}, origine : ${sourceActorName}`);
   if (hasMechBuffs) {
     await refreshBuffIndicator(targetActor);
@@ -2366,7 +2396,11 @@ async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, 
   await applyActivationTemporaryHp(targetActor, targetToken, activeFlag, workflow);
   await applyActivationStatus(targetActor, targetToken, activeFlag, workflow, activationSave?.saveResults ?? null);
   await showBuffReminder(targetActor, activeFlag, "activation");
-  return activeFlag;
+  return {
+    status: "applied",
+    activeFlag,
+    replacementCandidateBuffIds,
+  };
 }
 
 export function registerTriggers() {
@@ -2513,6 +2547,7 @@ export function registerTriggers() {
           ? (allowMultipleTargets ? selectedTargets : [selectedTargetToken].filter(Boolean))
           : [selfToken].filter(Boolean);
         const pendingApplications = [];
+        const appliedApplications = [];
         const activationResults = [];
 
         for (const targetToken of targetsToApply) {
@@ -2522,14 +2557,6 @@ export function registerTriggers() {
             ui.notifications.warn(formatTargetRestrictionFailure(targetFilterResult));
             activationResults.push({ status: "invalid", name: getActivationTargetName(targetToken), restriction: targetFilterResult });
             debugLog(`[${MODULE_ID}] Cible ignoree : hors restrictions`);
-            continue;
-          }
-
-          const activationSaveTarget = effectiveTargetMode === "target" ? targetToken : (shouldFallbackToSelf ? selfToken : null);
-          const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
-          if (!activationSave.shouldApply) {
-            activationResults.push({ status: "resisted", name: getActivationTargetName(targetToken) });
-            debugLog(`[${MODULE_ID}] Cible ignoree - JS d'activation non satisfait : ${targetToken?.actor?.name ?? "inconnue"}`);
             continue;
           }
 
@@ -2549,6 +2576,29 @@ export function registerTriggers() {
           }
           const targetActor = effectiveTargetMode === "target" ? targetToken.actor : workflow.actor;
           const carrierToken = effectiveTargetMode === "target" ? targetToken : (workflow.token ?? workflow.actor?.getActiveTokens?.()?.[0] ?? null);
+          const noStackPreflight = classifyNoStackApplication(getActiveBuffs(targetActor), targetFlag);
+          if (noStackPreflight.status === "blocked") {
+            const targetName = targetActor?.name ?? getActivationTargetName(targetToken);
+            activationResults.push({
+              status: "blocked",
+              name: targetName,
+              blockingBuff: noStackPreflight.blockingBuff ?? null,
+            });
+            if (!allowMultipleTargets || targetsToApply.length === 1) {
+              ui.notifications.warn(getNoStackBlockedNotification(targetActor, targetFlag, noStackPreflight.blockingBuff));
+            }
+            debugLog(`[${MODULE_ID}] Cible ignoree - noStack bloque sur ${targetName}`);
+            continue;
+          }
+
+          const activationSaveTarget = effectiveTargetMode === "target" ? targetToken : (shouldFallbackToSelf ? selfToken : null);
+          const activationSave = await shouldApplyBuffAfterActivationSave(workflow, activeFlag, activationSaveTarget);
+          if (!activationSave.shouldApply) {
+            activationResults.push({ status: "resisted", name: getActivationTargetName(targetToken) });
+            debugLog(`[${MODULE_ID}] Cible ignoree - JS d'activation non satisfait : ${targetToken?.actor?.name ?? "inconnue"}`);
+            continue;
+          }
+
           const replacementCandidateBuffIds = findExistingBuffInstances(targetActor, targetFlag)
             .map(({ buffId }) => buffId)
             .filter(Boolean);
@@ -2569,7 +2619,7 @@ export function registerTriggers() {
 
         for (const application of pendingApplications) {
           try {
-            const appliedFlag = await applyActivatedBuffInstance(
+            const applicationResult = await applyActivatedBuffInstance(
               application.targetActor,
               application.carrierToken,
               application.targetFlag,
@@ -2578,11 +2628,33 @@ export function registerTriggers() {
               hasMechBuffs,
               sourceActorName
             );
+            if (applicationResult.status === "blocked") {
+              activationResults.push({
+                status: "blocked",
+                name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken),
+                blockingBuff: applicationResult.blockingBuff ?? null,
+              });
+              if (!allowMultipleTargets || targetsToApply.length === 1) {
+                ui.notifications.warn(getNoStackBlockedNotification(
+                  application.targetActor,
+                  application.targetFlag,
+                  applicationResult.blockingBuff
+                ));
+              }
+              debugLog(`[${MODULE_ID}] Application noStack refusee atomiquement sur ${application.targetActor?.name ?? "porteur inconnu"}`);
+              continue;
+            }
+
+            const appliedFlag = applicationResult.activeFlag;
             if (appliedFlag?.buffId) {
               application.targetFlag = appliedFlag;
+              appliedApplications.push(application);
+              const replacementCandidateBuffIds = getStackingMode(appliedFlag) === "noStack"
+                ? applicationResult.replacementCandidateBuffIds
+                : application.replacementCandidateBuffIds;
               const replacedCount = await clearReplacementCandidates(
                 application.targetActor,
-                application.replacementCandidateBuffIds,
+                replacementCandidateBuffIds,
                 appliedFlag
               );
               if (replacedCount > 0) {
@@ -2596,7 +2668,7 @@ export function registerTriggers() {
                 debugLog(`[${MODULE_ID}] Ancien buff remplace sur ${application.targetActor?.name ?? "porteur inconnu"} : ${workflow.item.name}`);
               }
             }
-            activationResults.push({ status: appliedFlag ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
+            activationResults.push({ status: applicationResult.status === "applied" ? "affected" : "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
           } catch (error) {
             activationResults.push({ status: "failed", name: application.targetActor?.name ?? getActivationTargetName(application.carrierToken) });
             console.error(`[${MODULE_ID}] Erreur application multi-cible :`, error);
@@ -2605,9 +2677,9 @@ export function registerTriggers() {
 
         await reportMultiTargetActivation(workflow, activeFlag, activationResults);
 
-        if (effectiveTargetMode !== "target" && !hasMechBuffs) {
+        if (effectiveTargetMode !== "target" && !hasMechBuffs && appliedApplications.length) {
           for (const token of game.user.targets) {
-            if (token.actor) await applyTargetIndicator(token.actor, pendingApplications[0].targetFlag);
+            if (token.actor) await applyTargetIndicator(token.actor, appliedApplications[0].targetFlag);
           }
         }
         return;

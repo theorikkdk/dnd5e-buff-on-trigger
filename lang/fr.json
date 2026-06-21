@@ -708,6 +708,7 @@
   "BOT.ui.allowMultipleTargets": "Autoriser plusieurs cibles",
   "BOT.ui.summary.allowMultipleTargets": "Cibles multiples",
   "BOT.notifications.tooManyTargetsSelected": "Trop de cibles sélectionnées : maximum {max} cible(s) pour ce niveau d’emplacement.",
+  "BOT.notifications.noStackBlocked": "{item} n’a pas été appliqué à {target} : {existing} occupe déjà cette catégorie d’effet non cumulable.",
   "BOT.ui.multiTargetLimit.title": "Limite de cibles",
   "BOT.ui.multiTargetLimit.enabled": "Activer une limite de cibles",
   "BOT.ui.multiTargetLimit.baseTargets": "Nombre de cibles de base",
@@ -719,11 +720,14 @@
   "BOT.chat.multiTargetActivation.summary": "{item} : {details}.",
   "BOT.chat.multiTargetActivation.noneAffected": "aucune cible affectée",
   "BOT.chat.multiTargetActivation.invalidList": "Cibles ignorées : {targets}.",
+  "BOT.chat.multiTargetActivation.blockedList": "Cibles bloquées : {targets}.",
   "BOT.chat.multiTargetActivation.failedList": "Erreurs : {targets}.",
   "BOT.chat.multiTargetActivation.affected.one": "{count} cible affectée",
   "BOT.chat.multiTargetActivation.affected.many": "{count} cibles affectées",
   "BOT.chat.multiTargetActivation.resisted.one": "{count} cible a résisté",
   "BOT.chat.multiTargetActivation.resisted.many": "{count} cibles ont résisté",
+  "BOT.chat.multiTargetActivation.blocked.one": "{count} cible bloquée",
+  "BOT.chat.multiTargetActivation.blocked.many": "{count} cibles bloquées",
   "BOT.chat.multiTargetActivation.invalid.one": "{count} cible ignorée",
   "BOT.chat.multiTargetActivation.invalid.many": "{count} cibles ignorées",
   "BOT.chat.multiTargetActivation.failed.one": "{count} cible en échec technique",
@@ -794,5 +798,7 @@
   "BOT.presets.testReplacementAlwaysStack.label": "[TEST] Remplacement alwaysStack",
   "BOT.presets.testReplacementAlwaysStack.description": "Buff multi-cibles simple sans concentration qui crée toujours une nouvelle instance coexistante.",
   "BOT.presets.testReplacementSameEffect.label": "[TEST] Remplacement sameEffect",
-  "BOT.presets.testReplacementSameEffect.description": "Buff multi-cibles de +1 CA qui conserve plusieurs instances tout en n’appliquant mécaniquement que l’instance dominante."
+  "BOT.presets.testReplacementSameEffect.description": "Buff multi-cibles de +1 CA qui conserve plusieurs instances tout en n’appliquant mécaniquement que l’instance dominante.",
+  "BOT.presets.testReplacementNoStack.label": "[TEST] Remplacement noStack",
+  "BOT.presets.testReplacementNoStack.description": "Buff multi-cibles de +1 CA qui refuse une autre source utilisant la même catégorie d’effet non cumulable."
 }

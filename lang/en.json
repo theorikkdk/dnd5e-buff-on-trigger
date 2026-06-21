@@ -708,6 +708,7 @@
   "BOT.ui.allowMultipleTargets": "Allow multiple targets",
   "BOT.ui.summary.allowMultipleTargets": "Multiple targets",
   "BOT.notifications.tooManyTargetsSelected": "Too many targets selected: maximum {max} target(s) for this spell slot level.",
+  "BOT.notifications.noStackBlocked": "{item} was not applied to {target}: {existing} already occupies this non-stackable effect category.",
   "BOT.ui.multiTargetLimit.title": "Target limit",
   "BOT.ui.multiTargetLimit.enabled": "Enable target limit",
   "BOT.ui.multiTargetLimit.baseTargets": "Base target count",
@@ -719,11 +720,14 @@
   "BOT.chat.multiTargetActivation.summary": "{item}: {details}.",
   "BOT.chat.multiTargetActivation.noneAffected": "no target affected",
   "BOT.chat.multiTargetActivation.invalidList": "Ignored targets: {targets}.",
+  "BOT.chat.multiTargetActivation.blockedList": "Blocked targets: {targets}.",
   "BOT.chat.multiTargetActivation.failedList": "Errors: {targets}.",
   "BOT.chat.multiTargetActivation.affected.one": "{count} target affected",
   "BOT.chat.multiTargetActivation.affected.many": "{count} targets affected",
   "BOT.chat.multiTargetActivation.resisted.one": "{count} target resisted",
   "BOT.chat.multiTargetActivation.resisted.many": "{count} targets resisted",
+  "BOT.chat.multiTargetActivation.blocked.one": "{count} target blocked",
+  "BOT.chat.multiTargetActivation.blocked.many": "{count} targets blocked",
   "BOT.chat.multiTargetActivation.invalid.one": "{count} target ignored",
   "BOT.chat.multiTargetActivation.invalid.many": "{count} targets ignored",
   "BOT.chat.multiTargetActivation.failed.one": "{count} target failed",
@@ -794,5 +798,7 @@
   "BOT.presets.testReplacementAlwaysStack.label": "[TEST] Replacement alwaysStack",
   "BOT.presets.testReplacementAlwaysStack.description": "Simple non-concentration multi-target buff that always creates a new coexisting instance.",
   "BOT.presets.testReplacementSameEffect.label": "[TEST] Replacement sameEffect",
-  "BOT.presets.testReplacementSameEffect.description": "Multi-target +1 AC buff that keeps multiple instances while only the dominant instance applies mechanically."
+  "BOT.presets.testReplacementSameEffect.description": "Multi-target +1 AC buff that keeps multiple instances while only the dominant instance applies mechanically.",
+  "BOT.presets.testReplacementNoStack.label": "[TEST] Replacement noStack",
+  "BOT.presets.testReplacementNoStack.description": "Multi-target +1 AC buff that refuses another source using the same non-stackable effect category."
 }
