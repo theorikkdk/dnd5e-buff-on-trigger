@@ -43,6 +43,7 @@
   "BOT.dialog.changeStoredTarget.select": "Déplacer cette marque",
   "BOT.dialog.changeStoredTarget.cancel": "Annuler",
   "BOT.notifications.gmOnly": "Seul un MJ peut utiliser cette action.",
+  "BOT.notifications.primaryGmOnly": "Seul le MJ principal actif peut recréer les macros du module.",
   "BOT.notifications.moduleMacrosRecreated": "Macros du module recréées.",
   "BOT.notifications.moduleMacroAlreadyExists": "La macro existe déjà.",
   "BOT.notifications.customPresetSaved": "Preset enregistré.",

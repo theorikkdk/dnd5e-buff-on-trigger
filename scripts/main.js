@@ -228,7 +228,7 @@ Hooks.once("ready", async () => {
     };
   }
 
-  ensureModuleMacros();
+  if (isPrimaryActiveGM()) await ensureModuleMacros({ updateExisting: true });
   registerLegacyActiveBuffMigrationHooks();
   if (isPrimaryActiveGM()) {
     for (const actor of game.actors ?? []) await migrateLegacyActorIfNeeded(actor);
@@ -257,6 +257,10 @@ class ModuleMacrosConfig extends FormApplication {
       ui.notifications.warn(game.i18n.localize("BOT.notifications.gmOnly"));
       return;
     }
+    if (!isPrimaryActiveGM()) {
+      ui.notifications.warn(game.i18n.localize("BOT.notifications.primaryGmOnly"));
+      return;
+    }
 
     const result = await ensureModuleMacros({ updateExisting: true });
     if (result.created > 0 || result.updated > 0) {
@@ -269,27 +273,34 @@ class ModuleMacrosConfig extends FormApplication {
 
 async function ensureModuleMacros({ updateExisting = false } = {}) {
   const result = { created: 0, updated: 0, existing: 0 };
-  if (!game.user?.isGM || !game.macros || typeof Macro === "undefined") return result;
+  if (!isPrimaryActiveGM() || !game.macros || typeof Macro === "undefined") return result;
 
   for (const macroData of MODULE_MACROS) {
     const name = game.i18n.localize(macroData.nameKey);
-    const existing = findModuleMacro(macroData, name);
-    const desired = {
+    const existing = findModuleMacro(macroData);
+    const desiredFields = {
       name,
       type: "script",
       command: macroData.command,
       img: macroData.img,
-      flags: { [MODULE_ID]: { utility: macroData.utility } },
+      flags: { [MODULE_ID]: { official: true, utility: macroData.utility } },
     };
 
     if (!existing) {
-      await Macro.create(desired);
+      await Macro.create(desiredFields);
       result.created += 1;
       continue;
     }
 
-    if (updateExisting && shouldUpdateMacro(existing, desired, macroData.utility)) {
-      await existing.update(desired);
+    const desiredUpdate = {
+      type: desiredFields.type,
+      command: desiredFields.command,
+      img: desiredFields.img,
+      [`flags.${MODULE_ID}.official`]: true,
+      [`flags.${MODULE_ID}.utility`]: macroData.utility,
+    };
+    if (updateExisting && shouldUpdateMacro(existing, desiredFields, macroData.utility)) {
+      await existing.update(desiredUpdate);
       result.updated += 1;
     } else {
       result.existing += 1;
@@ -299,17 +310,17 @@ async function ensureModuleMacros({ updateExisting = false } = {}) {
   return result;
 }
 
-function findModuleMacro(macroData, localizedName) {
-  return game.macros.find((macro) => macro.flags?.[MODULE_ID]?.utility === macroData.utility)
-    ?? game.macros.find((macro) => macro.command === macroData.command)
-    ?? game.macros.find((macro) => macro.name === localizedName);
+function findModuleMacro(macroData) {
+  return game.macros.find((macro) =>
+    macro.flags?.[MODULE_ID]?.utility === macroData.utility
+  ) ?? null;
 }
 
 function shouldUpdateMacro(existing, desired, utility) {
-  return existing.name !== desired.name
-    || existing.type !== desired.type
+  return existing.type !== desired.type
     || existing.command !== desired.command
     || existing.img !== desired.img
+    || existing.flags?.[MODULE_ID]?.official !== true
     || existing.flags?.[MODULE_ID]?.utility !== utility;
 }
 

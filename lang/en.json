@@ -43,6 +43,7 @@
   "BOT.dialog.changeStoredTarget.select": "Move this mark",
   "BOT.dialog.changeStoredTarget.cancel": "Cancel",
   "BOT.notifications.gmOnly": "Only a GM can use this action.",
+  "BOT.notifications.primaryGmOnly": "Only the primary active GM can recreate module macros.",
   "BOT.notifications.moduleMacrosRecreated": "Module macros recreated.",
   "BOT.notifications.moduleMacroAlreadyExists": "The macro already exists.",
   "BOT.notifications.customPresetSaved": "Preset saved.",
