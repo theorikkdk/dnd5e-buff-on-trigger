@@ -1903,4 +1903,53 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  {
+    id: "testDeleteTokenStoredTarget",
+    label: "BOT.presets.testDeleteTokenStoredTarget.label",
+    description: "BOT.presets.testDeleteTokenStoredTarget.description",
+    flag: {
+      targetMode: "self",
+      rememberTargetOnActivation: true,
+      type: "passive",
+      buffs: {
+        ac: 0,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testDeleteTokenTargetIndicator",
+    label: "BOT.presets.testDeleteTokenTargetIndicator.label",
+    description: "BOT.presets.testDeleteTokenTargetIndicator.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testDeleteTokenLinkedStatus",
+    label: "BOT.presets.testDeleteTokenLinkedStatus.label",
+    description: "BOT.presets.testDeleteTokenLinkedStatus.description",
+    flag: {
+      targetMode: "self",
+      type: "passive",
+      buffs: {
+        ac: 0,
+      },
+      status: {
+        id: "deafened",
+        ids: ["deafened"],
+        timing: "activation",
+        targetMode: "storedTarget",
+        applyCondition: "always",
+        removeWhenBuffEnds: true,
+        protectWhileBuffActive: true,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];

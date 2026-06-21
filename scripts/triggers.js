@@ -1,6 +1,6 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
+import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
 import { classifyNoStackApplication, clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
@@ -2562,7 +2562,7 @@ export function registerTriggers() {
           duration: buildItemDurationData(workflow.item) ?? buffConfig.duration,
           chargesRemaining: buffConfig.charges ?? null
         };
-        const hasMechBuffs = activeFlag.buffs && Object.values(activeFlag.buffs).some((v) => v !== null);
+        const hasMechBuffs = hasConfiguredMechanicalBuffs(activeFlag, workflow.actor);
         const sourceActorName = workflow.actor.name;
         const selectedTargets = [...(game.user?.targets ?? [])].filter((token) => token?.actor);
         const allowMultipleTargets = targetMode === "target"

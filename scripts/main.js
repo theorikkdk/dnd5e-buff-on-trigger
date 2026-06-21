@@ -1,8 +1,11 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, debugLog } from "./constants.js";
 import { syncItemDurationFlag } from "./duration.js";
 import { changeStoredTarget, collectActiveSceneActors, refreshActorBuffRuntime, registerTriggers } from "./triggers.js";
+import { cleanupExternalBuffArtifactsForDeletedToken } from "./effects.js";
 import { registerItemSheetButton } from "./ui.js";
-import { migrateLegacyActiveBuff } from "./active-buffs.js";
+import { getActiveBuffs, migrateLegacyActiveBuff } from "./active-buffs.js";
+
+const pendingDeletedTokenBuffSnapshots = new Map();
 
 const MODULE_MACROS = [
   {
@@ -63,6 +66,53 @@ function actorHasBuffRuntimeState(actor) {
     || (activeBuffs && typeof activeBuffs === "object" && !Array.isArray(activeBuffs));
 }
 
+function getTokenDocumentRuntimeKey(tokenDocument) {
+  return tokenDocument?.uuid
+    ?? (tokenDocument?.id && tokenDocument?.parent?.id ? `${tokenDocument.parent.id}.${tokenDocument.id}` : null)
+    ?? tokenDocument?.id
+    ?? null;
+}
+
+function captureDeletedTokenBuffSnapshot(tokenDocument) {
+  if (!isPrimaryActiveGM() || tokenDocument?.actorLink === true) return;
+  const tokenUuid = getTokenDocumentRuntimeKey(tokenDocument);
+  const actor = tokenDocument?.actor;
+  if (!tokenUuid || !actor?.getFlag) return;
+
+  const activeBuffs = foundry.utils.deepClone(getActiveBuffs(actor));
+  const buffIds = Object.entries(activeBuffs)
+    .map(([buffId, activeBuff]) => activeBuff?.buffId ?? buffId)
+    .filter(Boolean);
+  const snapshot = {
+    tokenUuid,
+    actorUuid: actor.uuid ?? null,
+    activeBuffs,
+    buffIds: [...new Set(buffIds)],
+  };
+  pendingDeletedTokenBuffSnapshots.set(tokenUuid, snapshot);
+  window.setTimeout(() => {
+    if (pendingDeletedTokenBuffSnapshots.get(tokenUuid) === snapshot) {
+      pendingDeletedTokenBuffSnapshots.delete(tokenUuid);
+    }
+  }, 30000);
+}
+
+async function cleanupDeletedTokenBuffSnapshot(tokenDocument) {
+  if (!isPrimaryActiveGM() || tokenDocument?.actorLink === true) return;
+  const tokenUuid = getTokenDocumentRuntimeKey(tokenDocument);
+  if (!tokenUuid) return;
+  const snapshot = pendingDeletedTokenBuffSnapshots.get(tokenUuid);
+  if (!snapshot) return;
+
+  try {
+    await cleanupExternalBuffArtifactsForDeletedToken(snapshot);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur de nettoyage externe apres suppression du token ${tokenUuid} :`, error);
+  } finally {
+    pendingDeletedTokenBuffSnapshots.delete(tokenUuid);
+  }
+}
+
 async function refreshRuntimeActorIfNeeded(actor) {
   if (!actor?.getFlag) return;
   try {
@@ -84,6 +134,12 @@ function registerLegacyActiveBuffMigrationHooks() {
   });
   Hooks.on("updateToken", (tokenDocument, changed) => {
     if (changedTouchesLegacyBuff(changed)) refreshRuntimeActorIfNeeded(tokenDocument?.actor);
+  });
+  Hooks.on("preDeleteToken", (tokenDocument) => {
+    captureDeletedTokenBuffSnapshot(tokenDocument);
+  });
+  Hooks.on("deleteToken", async (tokenDocument) => {
+    await cleanupDeletedTokenBuffSnapshot(tokenDocument);
   });
   Hooks.on("canvasReady", async () => {
     for (const actor of collectActiveSceneActors()) {

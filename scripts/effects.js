@@ -1560,6 +1560,48 @@ function collectActorsForLinkedStatusCleanup() {
   return [...actors.values()];
 }
 
+export async function cleanupExternalBuffArtifactsForDeletedToken(snapshot) {
+  const ownerActorUuid = snapshot?.actorUuid ?? null;
+  const buffIds = new Set((snapshot?.buffIds ?? []).filter(Boolean));
+  if (!ownerActorUuid && !buffIds.size) {
+    return { storedTargetIndicators: 0, linkedStatuses: 0, targetIndicators: 0 };
+  }
+
+  const removed = {
+    storedTargetIndicators: 0,
+    linkedStatuses: 0,
+    targetIndicators: 0,
+  };
+
+  for (const actor of collectActorsForLinkedStatusCleanup()) {
+    if (ownerActorUuid && actor?.uuid === ownerActorUuid) continue;
+    const effects = [...(actor.effects ?? [])];
+    for (const effect of effects) {
+      const effectFlag = effect.flags?.[MODULE_ID] ?? {};
+      let artifactType = null;
+      if (ownerActorUuid && effectFlag.storedTargetIndicator === true && effectFlag.ownerActorUuid === ownerActorUuid) {
+        artifactType = "storedTargetIndicators";
+      } else if (ownerActorUuid && effectFlag.linkedStatus === true && effectFlag.ownerActorUuid === ownerActorUuid) {
+        artifactType = "linkedStatuses";
+      } else if (effectFlag.targetIndicator === true && effectFlag.buffId && buffIds.has(effectFlag.buffId)) {
+        artifactType = "targetIndicators";
+      }
+      if (!artifactType) continue;
+      if (await deleteDocumentIfExists(effect, `artefact externe ${artifactType}`)) {
+        removed[artifactType] += 1;
+      }
+    }
+  }
+
+  debugLog(`[${MODULE_ID}] Artefacts externes nettoyes apres suppression du token : ${JSON.stringify({
+    tokenUuid: snapshot?.tokenUuid ?? null,
+    actorUuid: ownerActorUuid,
+    buffIds: [...buffIds],
+    removed,
+  })}`);
+  return removed;
+}
+
 function resolveLinkedStatusOwnerActor(linkedFlag, fallbackActor = null) {
   const ownerUuid = linkedFlag?.ownerActorUuid ?? null;
   if (ownerUuid) {
@@ -2803,6 +2845,15 @@ export function buildMechanicalChanges(flag, actor = null) {
     changes.push({ key: "system.skills.prc.bonuses.passive", mode: 2, value: String(passivePerception), priority: 20 });
   }
   return changes;
+}
+
+export function hasConfiguredMechanicalBuffs(flag, actor = null) {
+  const buffs = flag?.buffs;
+  if (!buffs) return false;
+  return buildMechanicalChanges(flag, actor).length > 0
+    || !!buffs.attackMode
+    || !!buffs.attackBonus
+    || !!buffs.incomingAttackMode;
 }
 
 export async function applyMechanicalBuffs(actor, flag, durationRounds) {

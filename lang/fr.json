@@ -800,5 +800,11 @@
   "BOT.presets.testReplacementSameEffect.label": "[TEST] Remplacement sameEffect",
   "BOT.presets.testReplacementSameEffect.description": "Buff multi-cibles de +1 CA qui conserve plusieurs instances tout en n’appliquant mécaniquement que l’instance dominante.",
   "BOT.presets.testReplacementNoStack.label": "[TEST] Remplacement noStack",
-  "BOT.presets.testReplacementNoStack.description": "Buff multi-cibles de +1 CA qui refuse une autre source utilisant la même catégorie d’effet non cumulable."
+  "BOT.presets.testReplacementNoStack.description": "Buff multi-cibles de +1 CA qui refuse une autre source utilisant la même catégorie d’effet non cumulable.",
+  "BOT.presets.testDeleteTokenStoredTarget.label": "[TEST] DeleteToken - Cible mémorisée",
+  "BOT.presets.testDeleteTokenStoredTarget.description": "Conserve le buff sur le lanceur et crée un indicateur de cible mémorisée sur la cible sélectionnée. Une cible est obligatoire.",
+  "BOT.presets.testDeleteTokenTargetIndicator.label": "[TEST] DeleteToken - Indicateur de cible",
+  "BOT.presets.testDeleteTokenTargetIndicator.description": "Conserve le buff sur le lanceur et crée un indicateur visible sur la cible sélectionnée. Sans cible, seul le lanceur reçoit le buff.",
+  "BOT.presets.testDeleteTokenLinkedStatus.label": "[TEST] DeleteToken - Statut lié",
+  "BOT.presets.testDeleteTokenLinkedStatus.description": "Conserve le buff sur le lanceur et applique le statut lié et protégé Assourdi à la cible sélectionnée. Sans cible, seul le lanceur reçoit le buff."
 }

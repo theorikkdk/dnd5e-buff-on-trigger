@@ -800,5 +800,11 @@
   "BOT.presets.testReplacementSameEffect.label": "[TEST] Replacement sameEffect",
   "BOT.presets.testReplacementSameEffect.description": "Multi-target +1 AC buff that keeps multiple instances while only the dominant instance applies mechanically.",
   "BOT.presets.testReplacementNoStack.label": "[TEST] Replacement noStack",
-  "BOT.presets.testReplacementNoStack.description": "Multi-target +1 AC buff that refuses another source using the same non-stackable effect category."
+  "BOT.presets.testReplacementNoStack.description": "Multi-target +1 AC buff that refuses another source using the same non-stackable effect category.",
+  "BOT.presets.testDeleteTokenStoredTarget.label": "[TEST] DeleteToken - Stored Target",
+  "BOT.presets.testDeleteTokenStoredTarget.description": "Keeps the buff on the caster and creates a stored-target indicator on the selected target. A target is required.",
+  "BOT.presets.testDeleteTokenTargetIndicator.label": "[TEST] DeleteToken - Target Indicator",
+  "BOT.presets.testDeleteTokenTargetIndicator.description": "Keeps the buff on the caster and creates a visible target indicator on the selected target. With no target, only the caster receives the buff.",
+  "BOT.presets.testDeleteTokenLinkedStatus.label": "[TEST] DeleteToken - Linked Status",
+  "BOT.presets.testDeleteTokenLinkedStatus.description": "Keeps the buff on the caster and applies a protected linked Deafened status to the selected target. With no target, only the caster receives the buff."
 }
