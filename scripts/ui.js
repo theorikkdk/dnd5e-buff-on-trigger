@@ -1,4 +1,4 @@
-import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog } from "./constants.js";
+import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_PROF_IDS, WEAPON_PROF_IDS, LANGUAGE_IDS, ATTACK_TRIGGER_TYPES, debugLog, isDebugEnabled } from "./constants.js";
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
@@ -1544,6 +1544,7 @@ function getAllPresets() {
 }
 
 function getPresetOptions() {
+  const showTestPresets = isDebugEnabled();
   return getAllPresets().map((preset) => {
     const label = preset.source === "custom"
       ? game.i18n.format("BOT.ui.presets.customPrefix", { label: preset.label })
@@ -1557,9 +1558,10 @@ function getPresetOptions() {
       description,
       source: preset.source,
       presetType: getPresetType(preset),
+      isTestPreset: String(preset.id ?? "").startsWith("test") || label.startsWith("[TEST]"),
       searchText: [preset.id, label, description, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", label.startsWith("[TEST]") || String(preset.id).startsWith("test") ? "[TEST]" : ""].join(" ").toLowerCase(),
     };
-  });
+  }).filter((preset) => showTestPresets || !preset.isTestPreset);
 }
 
 function getPresetType(preset) {
