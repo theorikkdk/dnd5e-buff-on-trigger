@@ -1419,38 +1419,6 @@ function doesAttackConditionMatch(workflow, flag) {
   return false;
 }
 
-function collectBuffCarrierEntries() {
-  const carrierEntries = new Map();
-  const addCarrier = (actor, tokenDocument = null) => {
-    if (!actor?.getFlag) return;
-    const key = actor.uuid
-      ?? tokenDocument?.uuid
-      ?? (tokenDocument?.id && tokenDocument?.parent?.id ? `${tokenDocument.parent.id}.${tokenDocument.id}` : null)
-      ?? actor.id
-      ?? null;
-    if (!key || carrierEntries.has(key)) return;
-    carrierEntries.set(key, { actor, tokenDocument });
-  };
-
-  for (const actor of game.actors.contents) addCarrier(actor);
-
-  if (canvas?.tokens?.placeables) {
-    for (const token of canvas.tokens.placeables) addCarrier(token.actor ?? null, token.document ?? null);
-  }
-
-  if (canvas?.scene?.tokens) {
-    for (const tokenDocument of canvas.scene.tokens) addCarrier(tokenDocument.actor ?? null, tokenDocument);
-  }
-
-  if (game?.scenes?.contents) {
-    for (const scene of game.scenes.contents) {
-      for (const tokenDocument of scene.tokens ?? []) addCarrier(tokenDocument.actor ?? null, tokenDocument);
-    }
-  }
-
-  return [...carrierEntries.values()];
-}
-
 function getBuffItemUuid(flag) {
   return flag?.originItemUuid ?? flag?.itemUuid ?? null;
 }
@@ -1464,12 +1432,10 @@ function doesBuffMatchSameOriginAndItem(existingFlag, newFlag) {
     && getBuffItemUuid(existingFlag) === newItemUuid;
 }
 
-function findExistingBuffInstances(newFlag) {
-  return collectBuffCarrierEntries()
-    .flatMap(({ actor }) =>
-      Object.entries(getActiveBuffs(actor))
-        .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
-    )
+function findExistingBuffInstances(actor, newFlag) {
+  if (!actor?.getFlag) return [];
+  return Object.entries(getActiveBuffs(actor))
+    .map(([buffId, activeBuff]) => ({ actor, buffId, activeBuff }))
     .filter(({ activeBuff }) => doesBuffMatchSameOriginAndItem(activeBuff, newFlag));
 }
 
@@ -2572,7 +2538,14 @@ export function registerTriggers() {
           return;
         }
 
-        const existingBuffs = findExistingBuffInstances(activeFlag);
+        const existingBuffsByKey = new Map();
+        for (const application of pendingApplications) {
+          for (const existing of findExistingBuffInstances(application.targetActor, application.targetFlag)) {
+            const existingKey = `${existing.actor?.uuid ?? existing.actor?.id ?? "actor"}|${existing.buffId}`;
+            existingBuffsByKey.set(existingKey, existing);
+          }
+        }
+        const existingBuffs = [...existingBuffsByKey.values()];
         if (existingBuffs.length) {
           for (const existing of existingBuffs) {
             await clearExistingBuffInstance(existing.actor, existing.activeBuff);

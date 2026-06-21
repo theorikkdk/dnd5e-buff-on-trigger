@@ -1830,4 +1830,29 @@ export const BUFF_PRESETS = [
       triggerFrequency: "turn",
     },
   },
+  {
+    id: "testReplacementNormal",
+    label: "BOT.presets.testReplacementNormal.label",
+    description: "BOT.presets.testReplacementNormal.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "testReplacementMultiTarget",
+    label: "BOT.presets.testReplacementMultiTarget.label",
+    description: "BOT.presets.testReplacementMultiTarget.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      allowMultipleTargets: true,
+      type: "passive",
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
 ];
