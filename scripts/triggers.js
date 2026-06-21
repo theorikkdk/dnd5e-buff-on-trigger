@@ -1,7 +1,7 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
 import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion } from "./effects.js";
-import { classifyNoStackApplication, clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
+import { classifyNoStackApplication, clearDamagedTriggerCooldown, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 
 const recentConcentrationRolls = new Map();
@@ -2403,13 +2403,66 @@ async function applyActivatedBuffInstance(targetActor, targetToken, activeFlag, 
   };
 }
 
+function getActiveSceneActorKey(actor, tokenDocument = null) {
+  if (tokenDocument?.actorLink === false) {
+    return tokenDocument.uuid
+      ?? actor?.uuid
+      ?? (tokenDocument.id && tokenDocument.parent?.id ? `${tokenDocument.parent.id}.${tokenDocument.id}` : null)
+      ?? actor?.id
+      ?? null;
+  }
+  return actor?.uuid
+    ?? tokenDocument?.uuid
+    ?? actor?.id
+    ?? null;
+}
+
+export function collectActiveSceneActors() {
+  const actors = new Map();
+  const addActor = (actor, tokenDocument = null) => {
+    if (!actor?.getFlag) return;
+    const key = getActiveSceneActorKey(actor, tokenDocument);
+    if (!key || actors.has(key)) return;
+    actors.set(key, actor);
+  };
+
+  for (const token of canvas?.tokens?.placeables ?? []) {
+    addActor(token.actor ?? null, token.document ?? null);
+  }
+  for (const tokenDocument of canvas?.scene?.tokens ?? []) {
+    addActor(tokenDocument.actor ?? null, tokenDocument);
+  }
+  return [...actors.values()];
+}
+
+export async function refreshActorBuffRuntime(actor) {
+  if (!actor?.getFlag) return;
+  await pruneStaleActiveBuffs(actor);
+  const activeBuffs = Object.values(getActiveBuffs(actor)).filter(Boolean);
+  await refreshBuffIndicator(actor);
+  for (const activeBuff of activeBuffs) {
+    await ensureLinkedStatusesForActiveBuff(actor, activeBuff);
+  }
+  const stackKeys = [...new Set(activeBuffs.map((activeBuff) => getStackingKey(activeBuff)).filter(Boolean))];
+  for (const stackingKey of stackKeys) {
+    await refreshStackingMechanicalEffects(actor, stackingKey);
+  }
+}
+
 export function registerTriggers() {
   registerLinkedStatusProtection();
-  game.actors.forEach((actor) => {
-    refreshBuffIndicator(actor);
-    const stackKeys = [...new Set(Object.values(getActiveBuffs(actor)).map((activeBuff) => getStackingKey(activeBuff)).filter(Boolean))];
-    for (const stackingKey of stackKeys) refreshStackingMechanicalEffects(actor, stackingKey);
-  });
+  const runtimeActors = new Map();
+  for (const actor of game.actors ?? []) {
+    const key = actor?.uuid ?? actor?.id ?? null;
+    if (key) runtimeActors.set(key, actor);
+  }
+  for (const actor of collectActiveSceneActors()) {
+    const key = actor?.uuid ?? actor?.id ?? null;
+    if (key) runtimeActors.set(key, actor);
+  }
+  for (const actor of runtimeActors.values()) {
+    refreshActorBuffRuntime(actor);
+  }
 
   Hooks.on("preUpdateActor", (actor, changed, options = {}, userId) => {
     try {
@@ -2726,9 +2779,8 @@ export function registerTriggers() {
         if (isHostile || isUserTarget) {
           const sceneActors = new Map();
           for (const token of canvas.tokens.placeables) {
-            if (token.actor && !sceneActors.has(token.actor.id)) {
-              sceneActors.set(token.actor.id, token.actor);
-            }
+            const key = getActiveSceneActorKey(token.actor ?? null, token.document ?? null);
+            if (token.actor && key && !sceneActors.has(key)) sceneActors.set(key, token.actor);
           }
           for (const sceneActor of sceneActors.values()) {
             const flags = getDominantActiveBuffsForTurn(sceneActor, (activeFlag) => activeFlag.type === "targetTurnStart");
@@ -2757,9 +2809,8 @@ export function registerTriggers() {
         if (isHostile || isUserTarget) {
           const sceneActors = new Map();
           for (const token of canvas.tokens.placeables) {
-            if (token.actor && !sceneActors.has(token.actor.id)) {
-              sceneActors.set(token.actor.id, token.actor);
-            }
+            const key = getActiveSceneActorKey(token.actor ?? null, token.document ?? null);
+            if (token.actor && key && !sceneActors.has(key)) sceneActors.set(key, token.actor);
           }
           for (const sceneActor of sceneActors.values()) {
             const flags = getDominantActiveBuffsForTurn(sceneActor, (activeFlag) => activeFlag.type === "targetTurnEnd");

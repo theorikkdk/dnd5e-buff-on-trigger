@@ -1,6 +1,6 @@
 import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, debugLog } from "./constants.js";
 import { syncItemDurationFlag } from "./duration.js";
-import { changeStoredTarget, registerTriggers } from "./triggers.js";
+import { changeStoredTarget, collectActiveSceneActors, refreshActorBuffRuntime, registerTriggers } from "./triggers.js";
 import { registerItemSheetButton } from "./ui.js";
 import { migrateLegacyActiveBuff } from "./active-buffs.js";
 
@@ -55,18 +55,39 @@ function changedTouchesLegacyBuff(changed) {
   });
 }
 
+function actorHasBuffRuntimeState(actor) {
+  if (!actor?.getFlag) return false;
+  const legacy = actor.getFlag(MODULE_ID, "activeBuff");
+  const activeBuffs = actor.getFlag(MODULE_ID, "activeBuffs");
+  return !!legacy
+    || (activeBuffs && typeof activeBuffs === "object" && !Array.isArray(activeBuffs));
+}
+
+async function refreshRuntimeActorIfNeeded(actor) {
+  if (!actor?.getFlag) return;
+  try {
+    await migrateLegacyActorIfNeeded(actor);
+    await refreshActorBuffRuntime(actor);
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur de refresh runtime pour ${actor?.name ?? actor?.uuid ?? "acteur inconnu"} :`, error);
+  }
+}
+
 function registerLegacyActiveBuffMigrationHooks() {
   Hooks.on("createActor", (actor) => migrateLegacyActorIfNeeded(actor));
   Hooks.on("updateActor", (actor, changed) => {
     if (changedTouchesLegacyBuff(changed)) migrateLegacyActorIfNeeded(actor);
   });
-  Hooks.on("createToken", (tokenDocument) => migrateLegacyActorIfNeeded(tokenDocument?.actor));
-  Hooks.on("updateToken", (tokenDocument, changed) => {
-    if (changedTouchesLegacyBuff(changed)) migrateLegacyActorIfNeeded(tokenDocument?.actor);
+  Hooks.on("createToken", (tokenDocument) => {
+    const actor = tokenDocument?.actor;
+    if (actorHasBuffRuntimeState(actor)) refreshRuntimeActorIfNeeded(actor);
   });
-  Hooks.on("canvasReady", () => {
-    for (const token of canvas?.tokens?.placeables ?? []) {
-      migrateLegacyActorIfNeeded(token.actor);
+  Hooks.on("updateToken", (tokenDocument, changed) => {
+    if (changedTouchesLegacyBuff(changed)) refreshRuntimeActorIfNeeded(tokenDocument?.actor);
+  });
+  Hooks.on("canvasReady", async () => {
+    for (const actor of collectActiveSceneActors()) {
+      await refreshRuntimeActorIfNeeded(actor);
     }
   });
 }
