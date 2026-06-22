@@ -20,3 +20,33 @@ export function removeCustomPresetsByIds(customPresets, presetIds) {
     removedCount: removedIds.length,
   };
 }
+
+export function selectCustomPresetsForExport(customPresets, visiblePresetIds, selectedPresetIds = null) {
+  const entries = Object.entries(customPresets ?? {});
+  const byId = new Map();
+  for (const [settingKey, preset] of entries) {
+    byId.set(settingKey, preset);
+    if (preset?.id) byId.set(preset.id, preset);
+  }
+
+  const visibleIds = [...new Set((visiblePresetIds ?? []).filter((id) => typeof id === "string" && id))];
+  const selectedSet = selectedPresetIds === null
+    ? null
+    : new Set((selectedPresetIds ?? []).filter((id) => typeof id === "string" && id));
+  const presets = [];
+  const exportedIds = [];
+
+  for (const id of visibleIds) {
+    if (selectedSet && !selectedSet.has(id)) continue;
+    const preset = byId.get(id);
+    if (!preset || typeof preset !== "object" || Array.isArray(preset)) continue;
+    presets.push(clone(preset));
+    exportedIds.push(id);
+  }
+
+  return {
+    presets,
+    exportedIds,
+    exportedCount: presets.length,
+  };
+}

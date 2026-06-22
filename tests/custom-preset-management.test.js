@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { removeCustomPresetsByIds } from "../scripts/custom-preset-management.js";
+import {
+  removeCustomPresetsByIds,
+  selectCustomPresetsForExport,
+} from "../scripts/custom-preset-management.js";
 
 function makeCustomPresets() {
   return {
@@ -58,4 +61,66 @@ test("built-in ids cannot be deleted because they are absent from customPresets"
 
   assert.equal(result.removedCount, 0);
   assert.deepEqual(result.customPresets, source);
+});
+
+test("exports all visible custom presets in visible order", () => {
+  const result = selectCustomPresetsForExport(
+    makeCustomPresets(),
+    ["custom-second", "custom-first"],
+  );
+
+  assert.equal(result.exportedCount, 2);
+  assert.deepEqual(result.exportedIds, ["custom-second", "custom-first"]);
+  assert.deepEqual(result.presets.map((preset) => preset.label), ["Second", "First"]);
+});
+
+test("exports only selected visible preset ids", () => {
+  const result = selectCustomPresetsForExport(
+    makeCustomPresets(),
+    ["custom-first", "custom-second", "custom-third"],
+    ["custom-second"],
+  );
+
+  assert.equal(result.exportedCount, 1);
+  assert.deepEqual(result.exportedIds, ["custom-second"]);
+});
+
+test("export ignores missing ids and presets excluded from the visible list", () => {
+  const source = {
+    ...makeCustomPresets(),
+    "custom-invalid": { id: "custom-invalid", label: "Invalid" },
+  };
+  const result = selectCustomPresetsForExport(
+    source,
+    ["custom-first", "missing"],
+    ["custom-first", "custom-invalid", "missing"],
+  );
+
+  assert.equal(result.exportedCount, 1);
+  assert.deepEqual(result.exportedIds, ["custom-first"]);
+});
+
+test("TEST customs are exported only when included in the visible ids", () => {
+  const hiddenResult = selectCustomPresetsForExport(
+    makeCustomPresets(),
+    ["custom-first", "custom-second"],
+  );
+  const debugResult = selectCustomPresetsForExport(
+    makeCustomPresets(),
+    ["custom-first", "custom-second", "custom-third"],
+  );
+
+  assert.equal(hiddenResult.presets.some((preset) => preset.isTestPreset), false);
+  assert.equal(debugResult.presets.some((preset) => preset.isTestPreset), true);
+});
+
+test("empty export selection is handled cleanly", () => {
+  const result = selectCustomPresetsForExport(
+    makeCustomPresets(),
+    ["custom-first"],
+    [],
+  );
+
+  assert.equal(result.exportedCount, 0);
+  assert.deepEqual(result.presets, []);
 });

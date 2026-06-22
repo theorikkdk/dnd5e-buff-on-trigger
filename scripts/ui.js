@@ -3,7 +3,7 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
 import { isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
-import { removeCustomPresetsByIds } from "./custom-preset-management.js";
+import { removeCustomPresetsByIds, selectCustomPresetsForExport } from "./custom-preset-management.js";
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
@@ -1160,7 +1160,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         if (action === "apply") window.botApplyPreset(button);
         else if (action === "reset") window.botResetBuffConfig(button);
         else if (action === "save") window.botSaveCustomPreset(button);
-        else if (action === "export") window.botExportCustomPresets(button);
         else if (action === "import") window.botImportCustomPresets(button);
         else if (action === "manage") window.botManageCustomPresets(button);
       });
@@ -1884,6 +1883,11 @@ function buildCustomPresetManagementDialogContent() {
   if (!presets.length) {
     return `<div class="bot-custom-preset-dialog">
       <p class="hint bot-custom-preset-management-empty">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.manageNone"))}</p>
+      <div class="bot-custom-preset-dialog-actions">
+        <button type="button" class="bot-custom-preset-export-all" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.exportAllVisible"))}</button>
+        <button type="button" class="bot-custom-preset-export-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.exportSelection"))}</button>
+        <button type="button" class="bot-custom-preset-delete-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.deleteSelection"))}</button>
+      </div>
     </div>`;
   }
 
@@ -1899,7 +1903,11 @@ function buildCustomPresetManagementDialogContent() {
       <button type="button" data-bot-custom-preset-select="none">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.selectNone"))}</button>
     </div>
     <div class="bot-custom-preset-management-list">${rows}</div>
-    <button type="button" class="bot-custom-preset-delete-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.deleteSelection"))}</button>
+    <div class="bot-custom-preset-dialog-actions">
+      <button type="button" class="bot-custom-preset-export-all">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.exportAllVisible"))}</button>
+      <button type="button" class="bot-custom-preset-export-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.exportSelection"))}</button>
+      <button type="button" class="bot-custom-preset-delete-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.deleteSelection"))}</button>
+    </div>
   </div>`;
 }
 
@@ -1907,20 +1915,34 @@ function setupCustomPresetManagementDialog(dialog, html, mainForm) {
   const root = html?.[0] ?? html;
   if (!root?.querySelector) return;
   const checkboxes = () => [...root.querySelectorAll(".bot-custom-preset-checkbox")];
+  const exportAllButton = root.querySelector(".bot-custom-preset-export-all");
+  const exportSelectionButton = root.querySelector(".bot-custom-preset-export-selection");
   const deleteButton = root.querySelector(".bot-custom-preset-delete-selection");
-  const updateDeleteButton = () => {
-    if (deleteButton) deleteButton.disabled = !checkboxes().some((checkbox) => checkbox.checked);
+  const updateSelectionButtons = () => {
+    const hasSelection = checkboxes().some((checkbox) => checkbox.checked);
+    if (exportSelectionButton) exportSelectionButton.disabled = !hasSelection;
+    if (deleteButton) deleteButton.disabled = !hasSelection;
   };
 
   root.querySelector('[data-bot-custom-preset-select="all"]')?.addEventListener("click", () => {
     for (const checkbox of checkboxes()) checkbox.checked = true;
-    updateDeleteButton();
+    updateSelectionButtons();
   });
   root.querySelector('[data-bot-custom-preset-select="none"]')?.addEventListener("click", () => {
     for (const checkbox of checkboxes()) checkbox.checked = false;
-    updateDeleteButton();
+    updateSelectionButtons();
   });
-  root.addEventListener("change", updateDeleteButton);
+  root.addEventListener("change", updateSelectionButtons);
+  exportAllButton?.addEventListener("click", () => {
+    exportManagedCustomPresets(checkboxes().map((checkbox) => checkbox.value));
+  });
+  exportSelectionButton?.addEventListener("click", () => {
+    const visibleIds = checkboxes().map((checkbox) => checkbox.value);
+    const selectedIds = checkboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value);
+    exportManagedCustomPresets(visibleIds, selectedIds);
+  });
   deleteButton?.addEventListener("click", async () => {
     const selectedIds = checkboxes()
       .filter((checkbox) => checkbox.checked)
@@ -1945,7 +1967,7 @@ function setupCustomPresetManagementDialog(dialog, html, mainForm) {
     await dialog.close();
     window.setTimeout(() => openCustomPresetManagementDialog(mainForm), 0);
   });
-  updateDeleteButton();
+  updateSelectionButtons();
 }
 
 function openCustomPresetManagementDialog(mainForm) {
@@ -2456,24 +2478,31 @@ function downloadPresetJson(payload) {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-window.botExportCustomPresets = function() {
+function exportManagedCustomPresets(visiblePresetIds, selectedPresetIds = null) {
   try {
-    const presets = Object.values(getCustomPresets())
-      .filter((preset) => preset?.label && isPlainObject(preset.flag))
-      .filter((preset) => isValidStoredCustomPreset(preset, {
-        defaultConfig: buildDefaultBuffConfig(),
-      }));
-    if (!presets.length) {
+    const result = selectCustomPresetsForExport(
+      getCustomPresets(),
+      visiblePresetIds,
+      selectedPresetIds
+    );
+    if (!result.exportedCount) {
       ui.notifications.info(game.i18n.localize("BOT.notifications.noCustomPresetsToExport"));
       return;
     }
 
-    const payload = JSON.stringify({ module: MODULE_ID, version: "1", presets }, null, 2);
+    const payload = JSON.stringify({
+      module: MODULE_ID,
+      version: "1",
+      presets: result.presets,
+    }, null, 2);
     downloadPresetJson(payload);
+    ui.notifications.info(game.i18n.format("BOT.notifications.customPresetsExported", {
+      count: result.exportedCount,
+    }));
   } catch (error) {
-    console.error(`[${MODULE_ID}] Erreur dans botExportCustomPresets :`, error);
+    console.error(`[${MODULE_ID}] Erreur dans exportManagedCustomPresets :`, error);
   }
-};
+}
 function readJsonFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

@@ -120,8 +120,9 @@
   gap: 6px;
 }
 
-.bot-custom-preset-dialog .bot-custom-preset-delete-selection {
-  width: 100%;
+.bot-custom-preset-dialog-actions {
+  display: grid;
+  gap: 6px;
 }
 
 .buff-on-trigger-config label {
