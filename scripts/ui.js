@@ -3,6 +3,7 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
 import { isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
+import { removeCustomPresetsByIds } from "./custom-preset-management.js";
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
@@ -1161,7 +1162,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
         else if (action === "save") window.botSaveCustomPreset(button);
         else if (action === "export") window.botExportCustomPresets(button);
         else if (action === "import") window.botImportCustomPresets(button);
-        else if (action === "delete") window.botDeleteCustomPreset(button);
+        else if (action === "manage") window.botManageCustomPresets(button);
       });
     });
     this.element.querySelectorAll?.('.bot-collapsible-panel')?.forEach((panel) => {
@@ -1578,6 +1579,10 @@ function getPresetType(preset) {
   return id.startsWith("test") || label.startsWith("[TEST]") ? "test" : "builtIn";
 }
 
+function getManageableCustomPresetOptions() {
+  return getPresetOptions().filter((preset) => preset.source === "custom");
+}
+
 function getPresetDisplayLabel(presetOrMeta) {
   if (!presetOrMeta) return "";
   if (presetOrMeta.source === "custom" || presetOrMeta.presetType === "custom") {
@@ -1861,6 +1866,102 @@ function refreshPresetSelect(form, selectedId = "") {
   window.botFilterPresets(form?.querySelector?.('[name="presetSearch"]'));
   window.botUpdatePresetDescription(select);
   window.botUpdatePresetActions(select);
+}
+
+function escapeCustomPresetManagementText(value) {
+  const text = String(value ?? "");
+  if (typeof foundry.utils.escapeHTML === "function") return foundry.utils.escapeHTML(text);
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function buildCustomPresetManagementDialogContent() {
+  const presets = getManageableCustomPresetOptions();
+  if (!presets.length) {
+    return `<div class="bot-custom-preset-dialog">
+      <p class="hint bot-custom-preset-management-empty">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.manageNone"))}</p>
+    </div>`;
+  }
+
+  const rows = presets.map((preset) => `
+    <label class="bot-custom-preset-management-row">
+      <input type="checkbox" class="bot-custom-preset-checkbox" value="${escapeCustomPresetManagementText(preset.id)}" />
+      <span>${escapeCustomPresetManagementText(preset.label)}</span>
+    </label>
+  `).join("");
+  return `<div class="bot-custom-preset-dialog">
+    <div class="bot-custom-preset-selection-actions">
+      <button type="button" data-bot-custom-preset-select="all">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.selectAll"))}</button>
+      <button type="button" data-bot-custom-preset-select="none">${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.selectNone"))}</button>
+    </div>
+    <div class="bot-custom-preset-management-list">${rows}</div>
+    <button type="button" class="bot-custom-preset-delete-selection" disabled>${escapeCustomPresetManagementText(game.i18n.localize("BOT.ui.presets.deleteSelection"))}</button>
+  </div>`;
+}
+
+function setupCustomPresetManagementDialog(dialog, html, mainForm) {
+  const root = html?.[0] ?? html;
+  if (!root?.querySelector) return;
+  const checkboxes = () => [...root.querySelectorAll(".bot-custom-preset-checkbox")];
+  const deleteButton = root.querySelector(".bot-custom-preset-delete-selection");
+  const updateDeleteButton = () => {
+    if (deleteButton) deleteButton.disabled = !checkboxes().some((checkbox) => checkbox.checked);
+  };
+
+  root.querySelector('[data-bot-custom-preset-select="all"]')?.addEventListener("click", () => {
+    for (const checkbox of checkboxes()) checkbox.checked = true;
+    updateDeleteButton();
+  });
+  root.querySelector('[data-bot-custom-preset-select="none"]')?.addEventListener("click", () => {
+    for (const checkbox of checkboxes()) checkbox.checked = false;
+    updateDeleteButton();
+  });
+  root.addEventListener("change", updateDeleteButton);
+  deleteButton?.addEventListener("click", async () => {
+    const selectedIds = checkboxes()
+      .filter((checkbox) => checkbox.checked)
+      .map((checkbox) => checkbox.value)
+      .filter(Boolean);
+    if (!selectedIds.length) return;
+    const confirmed = window.confirm(game.i18n.format("BOT.ui.presets.confirmDeleteMultiple", {
+      count: selectedIds.length,
+    }));
+    if (!confirmed) return;
+
+    const result = removeCustomPresetsByIds(
+      foundry.utils.deepClone(getCustomPresets()),
+      selectedIds
+    );
+    if (!result.removedCount) return;
+    await game.settings.set(MODULE_ID, "customPresets", result.customPresets);
+    if (mainForm?.isConnected) refreshPresetSelect(mainForm);
+    ui.notifications.info(game.i18n.format("BOT.notifications.customPresetsDeleted", {
+      count: result.removedCount,
+    }));
+    await dialog.close();
+    window.setTimeout(() => openCustomPresetManagementDialog(mainForm), 0);
+  });
+  updateDeleteButton();
+}
+
+function openCustomPresetManagementDialog(mainForm) {
+  if (!globalThis.Dialog) return;
+  let dialog;
+  dialog = new Dialog({
+    title: game.i18n.localize("BOT.ui.presets.manageCustom"),
+    content: buildCustomPresetManagementDialogContent(),
+    buttons: {
+      close: {
+        label: game.i18n.localize("BOT.ui.presets.close"),
+      },
+    },
+    render: (html) => setupCustomPresetManagementDialog(dialog, html, mainForm),
+  });
+  dialog.render(true);
 }
 function getPresetById(id) {
   return getAllPresets().find((preset) => preset.id === id) ?? null;
@@ -2462,6 +2563,11 @@ window.botDeleteCustomPreset = async function(buttonEl) {
   await game.settings.set(MODULE_ID, "customPresets", customPresets);
   refreshPresetSelect(form);
   ui.notifications.info(game.i18n.format("BOT.notifications.customPresetDeleted", { name: preset.label }));
+};
+
+window.botManageCustomPresets = function(buttonEl) {
+  const form = buttonEl.closest("form");
+  openCustomPresetManagementDialog(form);
 };
 window.botApplyPreset = function(buttonEl) {
   const form = buttonEl.closest("form");

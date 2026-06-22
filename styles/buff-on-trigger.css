@@ -96,6 +96,34 @@
   overflow: auto;
 }
 
+.bot-custom-preset-management-list {
+  display: grid;
+  gap: 4px;
+  max-height: 300px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.bot-custom-preset-management-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.bot-custom-preset-management-row input {
+  flex: 0 0 auto;
+}
+
+.bot-custom-preset-selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bot-custom-preset-dialog .bot-custom-preset-delete-selection {
+  width: 100%;
+}
+
 .buff-on-trigger-config label {
   white-space: normal;
   line-height: 1.25;
