@@ -55,6 +55,7 @@
   "BOT.notifications.customPresetsExported": "{count} custom preset(s) exported.",
   "BOT.notifications.customPresetImportInvalid": "Invalid preset file.",
   "BOT.notifications.customPresetImportWrongModule": "This file does not belong to Buff on Trigger.",
+  "BOT.notifications.customPresetImportUnsupportedSchema": "This preset file uses an unsupported or invalid schema version.",
   "BOT.notifications.builtInPresetCannotDelete": "Built-in presets cannot be deleted.",
   "BOT.notifications.noCustomPresetsToExport": "No custom presets to export.",
   "BOT.notifications.targetRestrictionsMismatch": "The target does not match the buff restrictions.",

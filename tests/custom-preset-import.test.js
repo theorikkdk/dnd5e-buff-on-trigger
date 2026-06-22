@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  buildCustomPresetExportEnvelope,
+  CUSTOM_PRESET_SCHEMA_VERSION,
   isValidStoredCustomPreset,
   normalizeImportedPresetBatch,
   validateAndNormalizeImportedPreset,
@@ -381,18 +383,99 @@ test("stored presets with an unknown trigger are filtered without being mutated"
 });
 
 test("import envelope accepts the module or a legacy missing module", () => {
-  assert.equal(validateCustomPresetImportEnvelope({
+  const current = validateCustomPresetImportEnvelope({
     module: MODULE_ID,
+    schemaVersion: 1,
     presets: [],
-  }, MODULE_ID).valid, true);
-  assert.equal(validateCustomPresetImportEnvelope({
+  }, MODULE_ID);
+  assert.equal(current.valid, true);
+  assert.equal(current.schemaVersion, 1);
+  assert.equal(current.legacy, false);
+
+  const legacy = validateCustomPresetImportEnvelope({
     presets: [],
-  }, MODULE_ID).valid, true);
+  }, MODULE_ID);
+  assert.equal(legacy.valid, true);
+  assert.equal(legacy.schemaVersion, 1);
+  assert.equal(legacy.legacy, true);
+  assert.match(legacy.warnings.join("\n"), /schemaVersion/);
+});
+
+test("legacy envelope with only version remains accepted as schema 1", () => {
+  const result = validateCustomPresetImportEnvelope({
+    module: MODULE_ID,
+    version: "1",
+    presets: [],
+  }, MODULE_ID);
+
+  assert.equal(result.valid, true);
+  assert.equal(result.schemaVersion, CUSTOM_PRESET_SCHEMA_VERSION);
+  assert.equal(result.legacy, true);
+});
+
+test("unknown or non-numeric schema versions are rejected strictly", () => {
+  const unsupported = validateCustomPresetImportEnvelope({
+    module: MODULE_ID,
+    schemaVersion: 999,
+    presets: [],
+  }, MODULE_ID);
+  const stringVersion = validateCustomPresetImportEnvelope({
+    module: MODULE_ID,
+    schemaVersion: "1",
+    presets: [],
+  }, MODULE_ID);
+
+  assert.equal(unsupported.valid, false);
+  assert.match(unsupported.errors.join("\n"), /unsupported/);
+  assert.equal(stringVersion.valid, false);
+  assert.match(stringVersion.errors.join("\n"), /expected integer/);
+});
+
+test("export envelope includes explicit schemaVersion 1", () => {
+  const presets = [{ id: "custom-one", label: "One", flag: {} }];
+  const envelope = buildCustomPresetExportEnvelope(presets, MODULE_ID);
+
+  assert.deepEqual(envelope, {
+    module: MODULE_ID,
+    schemaVersion: 1,
+    version: "1",
+    presets,
+  });
+  assert.notEqual(envelope.presets, presets);
+});
+
+test("schemaVersion 1 envelope remains compatible with duplicate batch strategies", () => {
+  const data = {
+    module: MODULE_ID,
+    schemaVersion: 1,
+    version: "1",
+    presets: [{ id: "custom-first", label: "First", flag: { type: "damaged" } }],
+  };
+  const existing = {
+    "custom-first": {
+      id: "custom-first",
+      label: "First",
+      flag: { type: "passive" },
+      source: "custom",
+    },
+  };
+
+  assert.equal(validateCustomPresetImportEnvelope(data, MODULE_ID).valid, true);
+  const result = normalizeImportedPresetBatch(data.presets, {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: existing,
+    duplicateCandidates: existing,
+    duplicateStrategy: "replace",
+    createUniqueId,
+  });
+  assert.equal(result.replacedCount, 1);
+  assert.equal(result.customPresets["custom-first"].flag.type, "damaged");
 });
 
 test("import envelope rejects another module and malformed preset collections", () => {
   const wrongModule = validateCustomPresetImportEnvelope({
     module: "another-module",
+    schemaVersion: 1,
     presets: [],
   }, MODULE_ID);
   assert.equal(wrongModule.valid, false);
@@ -400,6 +483,7 @@ test("import envelope rejects another module and malformed preset collections", 
 
   const malformed = validateCustomPresetImportEnvelope({
     module: MODULE_ID,
+    schemaVersion: 1,
     presets: {},
   }, MODULE_ID);
   assert.equal(malformed.valid, false);

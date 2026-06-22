@@ -5,6 +5,7 @@ import {
   removeCustomPresetsByIds,
   selectCustomPresetsForExport,
 } from "../scripts/custom-preset-management.js";
+import { buildCustomPresetExportEnvelope } from "../scripts/custom-preset-import.js";
 
 function makeCustomPresets() {
   return {
@@ -72,6 +73,7 @@ test("exports all visible custom presets in visible order", () => {
   assert.equal(result.exportedCount, 2);
   assert.deepEqual(result.exportedIds, ["custom-second", "custom-first"]);
   assert.deepEqual(result.presets.map((preset) => preset.label), ["Second", "First"]);
+  assert.equal(buildCustomPresetExportEnvelope(result.presets, "dnd5e-buff-on-trigger").schemaVersion, 1);
 });
 
 test("exports only selected visible preset ids", () => {
@@ -83,6 +85,7 @@ test("exports only selected visible preset ids", () => {
 
   assert.equal(result.exportedCount, 1);
   assert.deepEqual(result.exportedIds, ["custom-second"]);
+  assert.equal(buildCustomPresetExportEnvelope(result.presets, "dnd5e-buff-on-trigger").schemaVersion, 1);
 });
 
 test("export ignores missing ids and presets excluded from the visible list", () => {

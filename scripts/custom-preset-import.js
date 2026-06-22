@@ -16,6 +16,7 @@ const TRIGGER_TYPES = new Set([
 ]);
 const STACKING_MODES = new Set(["normal", "alwaysStack", "sameEffect", "noStack"]);
 const TRIGGER_FREQUENCIES = new Set(["none", "turn", "round"]);
+export const CUSTOM_PRESET_SCHEMA_VERSION = 1;
 
 const TOP_LEVEL_OBJECT_FIELDS = [
   "multiTargetLimit",
@@ -126,14 +127,44 @@ function sanitizeKnownFlagTypes(flag, warnings) {
   }
 }
 
+export function buildCustomPresetExportEnvelope(presets, moduleId, { version = "1" } = {}) {
+  return {
+    module: moduleId,
+    schemaVersion: CUSTOM_PRESET_SCHEMA_VERSION,
+    version,
+    presets: clone(Array.isArray(presets) ? presets : []),
+  };
+}
+
 export function validateCustomPresetImportEnvelope(data, moduleId) {
   const errors = [];
+  const warnings = [];
+  let schemaVersion = CUSTOM_PRESET_SCHEMA_VERSION;
+  let legacy = false;
   if (!isPlainObject(data)) errors.push("import: expected object");
   else {
     if (data.module && data.module !== moduleId) errors.push("import: wrong module");
     if (!Array.isArray(data.presets)) errors.push("import.presets: expected array");
+    if (!Object.hasOwn(data, "schemaVersion")) {
+      legacy = true;
+      warnings.push(`import.schemaVersion: missing; assuming ${CUSTOM_PRESET_SCHEMA_VERSION}`);
+    } else if (!Number.isInteger(data.schemaVersion)) {
+      errors.push("import.schemaVersion: expected integer");
+      schemaVersion = null;
+    } else if (data.schemaVersion !== CUSTOM_PRESET_SCHEMA_VERSION) {
+      errors.push(`import.schemaVersion: unsupported value "${data.schemaVersion}"`);
+      schemaVersion = data.schemaVersion;
+    } else {
+      schemaVersion = data.schemaVersion;
+    }
   }
-  return { valid: errors.length === 0, errors };
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    schemaVersion,
+    legacy,
+  };
 }
 
 export function validateAndNormalizeImportedPreset(preset, { defaultConfig = {} } = {}) {

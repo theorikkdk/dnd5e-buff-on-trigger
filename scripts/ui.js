@@ -2,7 +2,7 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
-import { isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
+import { buildCustomPresetExportEnvelope, isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
 import { removeCustomPresetsByIds, selectCustomPresetsForExport } from "./custom-preset-management.js";
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
@@ -2500,11 +2500,11 @@ function exportManagedCustomPresets(visiblePresetIds, selectedPresetIds = null) 
       return;
     }
 
-    const payload = JSON.stringify({
-      module: MODULE_ID,
-      version: "1",
-      presets: result.presets,
-    }, null, 2);
+    const payload = JSON.stringify(
+      buildCustomPresetExportEnvelope(result.presets, MODULE_ID),
+      null,
+      2
+    );
     downloadPresetJson(payload);
     ui.notifications.info(game.i18n.format("BOT.notifications.customPresetsExported", {
       count: result.exportedCount,
@@ -2583,9 +2583,16 @@ window.botImportCustomPresets = function(buttonEl) {
         ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportWrongModule"));
         return;
       }
+      if (envelope.errors.some((error) => error.startsWith("import.schemaVersion:"))) {
+        ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportUnsupportedSchema"));
+        return;
+      }
       if (!envelope.valid) {
         ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));
         return;
+      }
+      if (envelope.legacy) {
+        debugLog(`[${MODULE_ID}] Import legacy sans schemaVersion accepte comme schema 1.`);
       }
 
       const existingPresets = foundry.utils.deepClone(getCustomPresets());
