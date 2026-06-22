@@ -15,6 +15,7 @@ import {
   clearDamagedTriggerCooldown
 } from "./active-buffs.js";
 import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
+import { cleanupExternalBuffArtifacts } from "./delete-token-cleanup.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -1561,42 +1562,16 @@ function collectActorsForLinkedStatusCleanup() {
 }
 
 export async function cleanupExternalBuffArtifactsForDeletedToken(snapshot) {
-  const ownerActorUuid = snapshot?.actorUuid ?? null;
-  const buffIds = new Set((snapshot?.buffIds ?? []).filter(Boolean));
-  if (!ownerActorUuid && !buffIds.size) {
-    return { storedTargetIndicators: 0, linkedStatuses: 0, targetIndicators: 0 };
-  }
-
-  const removed = {
-    storedTargetIndicators: 0,
-    linkedStatuses: 0,
-    targetIndicators: 0,
-  };
-
-  for (const actor of collectActorsForLinkedStatusCleanup()) {
-    if (ownerActorUuid && actor?.uuid === ownerActorUuid) continue;
-    const effects = [...(actor.effects ?? [])];
-    for (const effect of effects) {
-      const effectFlag = effect.flags?.[MODULE_ID] ?? {};
-      let artifactType = null;
-      if (ownerActorUuid && effectFlag.storedTargetIndicator === true && effectFlag.ownerActorUuid === ownerActorUuid) {
-        artifactType = "storedTargetIndicators";
-      } else if (ownerActorUuid && effectFlag.linkedStatus === true && effectFlag.ownerActorUuid === ownerActorUuid) {
-        artifactType = "linkedStatuses";
-      } else if (effectFlag.targetIndicator === true && effectFlag.buffId && buffIds.has(effectFlag.buffId)) {
-        artifactType = "targetIndicators";
-      }
-      if (!artifactType) continue;
-      if (await deleteDocumentIfExists(effect, `artefact externe ${artifactType}`)) {
-        removed[artifactType] += 1;
-      }
-    }
-  }
+  const removed = await cleanupExternalBuffArtifacts(
+    snapshot,
+    collectActorsForLinkedStatusCleanup(),
+    (effect, artifactType) => deleteDocumentIfExists(effect, `artefact externe ${artifactType}`)
+  );
 
   debugLog(`[${MODULE_ID}] Artefacts externes nettoyes apres suppression du token : ${JSON.stringify({
     tokenUuid: snapshot?.tokenUuid ?? null,
-    actorUuid: ownerActorUuid,
-    buffIds: [...buffIds],
+    actorUuid: snapshot?.actorUuid ?? null,
+    buffIds: [...new Set((snapshot?.buffIds ?? []).filter(Boolean))],
     removed,
   })}`);
   return removed;

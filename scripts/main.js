@@ -2,6 +2,7 @@ import { MODULE_ID, BUFF_ICON, STORED_TARGET_ICON, debugLog } from "./constants.
 import { syncItemDurationFlag } from "./duration.js";
 import { changeStoredTarget, collectActiveSceneActors, refreshActorBuffRuntime, registerTriggers } from "./triggers.js";
 import { cleanupExternalBuffArtifactsForDeletedToken } from "./effects.js";
+import { buildDeletedTokenBuffSnapshot } from "./delete-token-cleanup.js";
 import { registerItemSheetButton } from "./ui.js";
 import { getActiveBuffs, migrateLegacyActiveBuff } from "./active-buffs.js";
 
@@ -80,15 +81,11 @@ function captureDeletedTokenBuffSnapshot(tokenDocument) {
   if (!tokenUuid || !actor?.getFlag) return;
 
   const activeBuffs = foundry.utils.deepClone(getActiveBuffs(actor));
-  const buffIds = Object.entries(activeBuffs)
-    .map(([buffId, activeBuff]) => activeBuff?.buffId ?? buffId)
-    .filter(Boolean);
-  const snapshot = {
+  const snapshot = buildDeletedTokenBuffSnapshot({
     tokenUuid,
     actorUuid: actor.uuid ?? null,
     activeBuffs,
-    buffIds: [...new Set(buffIds)],
-  };
+  });
   pendingDeletedTokenBuffSnapshots.set(tokenUuid, snapshot);
   window.setTimeout(() => {
     if (pendingDeletedTokenBuffSnapshots.get(tokenUuid) === snapshot) {
