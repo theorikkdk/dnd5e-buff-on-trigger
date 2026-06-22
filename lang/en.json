@@ -548,7 +548,7 @@
   "BOT.presets.shield.label": "Shield",
   "BOT.presets.shield.description": "The bearer gains +5 AC. Reaction casting and the exact duration until the start of the next turn must be handled manually.",
   "BOT.presets.protectionFromPoison.label": "Protection from Poison",
-  "BOT.presets.protectionFromPoison.description": "The target gains protection against poison. Depending on the exact rules, parts such as neutralizing an existing poison or advantage on saves against poison may need to be handled manually.",
+  "BOT.presets.protectionFromPoison.description": "Grants resistance to poison damage. Neutralizing an existing poison and advantage on saving throws against poison must be handled manually.",
   "BOT.presets.freedomOfMovement.label": "Freedom of Movement",
   "BOT.presets.freedomOfMovement.description": "The target gains partial protection against restraints. Movement effects, difficult terrain, swimming, and automatic escape must be handled manually.",
   "BOT.presets.mindBlank.label": "Mind Blank",

@@ -1,3 +1,14 @@
+export const CORE_PRESET_IDS = Object.freeze([
+  "guidance",
+  "resistance",
+  "bless",
+  "bane",
+  "shieldOfFaith",
+  "heroism",
+  "protectionFromPoison",
+]);
+
+// Built-in presets available to players outside debug mode.
 export const BUFF_PRESETS = [
   {
     id: "bless",
@@ -1077,7 +1088,6 @@ export const BUFF_PRESETS = [
       type: "passive",
       buffs: {
         resistances: ["poison"],
-        conditionImmunities: ["poisoned"],
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",
@@ -1721,6 +1731,7 @@ export const BUFF_PRESETS = [
       triggerFrequency: "none",
     },
   },
+  // Development presets below remain available only while debug mode is enabled.
   {
     id: "testFallbackDamagedA",
     label: "BOT.presets.testFallbackDamagedA.label",

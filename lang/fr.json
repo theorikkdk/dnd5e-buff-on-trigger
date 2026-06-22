@@ -546,7 +546,7 @@
   "BOT.presets.shield.label": "Bouclier / Shield",
   "BOT.presets.shield.description": "Le porteur gagne +5 à la CA. Le lancement en réaction et la durée exacte jusqu’au début du prochain tour doivent être gérés manuellement.",
   "BOT.presets.protectionFromPoison.label": "Protection contre le poison / Protection from Poison",
-  "BOT.presets.protectionFromPoison.description": "La cible obtient une protection contre le poison. Selon les règles exactes, certaines parties comme neutraliser un poison existant ou l’avantage aux JS contre le poison peuvent devoir être gérées manuellement.",
+  "BOT.presets.protectionFromPoison.description": "Accorde la résistance aux dégâts de poison. Neutraliser un poison existant et appliquer l’avantage aux jets de sauvegarde contre le poison doivent être gérés manuellement.",
   "BOT.presets.freedomOfMovement.label": "Liberté de mouvement / Freedom of Movement",
   "BOT.presets.freedomOfMovement.description": "La cible bénéficie d’une protection partielle contre les entraves. Les effets de déplacement, terrain difficile, nage et libération automatique doivent être gérés manuellement.",
   "BOT.presets.mindBlank.label": "Esprit impénétrable / Mind Blank",
