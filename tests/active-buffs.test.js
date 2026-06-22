@@ -71,6 +71,10 @@ function makeBuff(buffId, overrides = {}) {
   };
 }
 
+function getReplacementCandidates(actor, newFlag) {
+  return findReplacementCandidateBuffIds(getActiveBuffs(actor), newFlag);
+}
+
 test("legacy migration does nothing when no legacy or modern flag exists", async () => {
   const actor = new MockActor("Actor.none");
 
@@ -200,6 +204,106 @@ test("replacement remains local to each target map", () => {
   assert.deepEqual(findReplacementCandidateBuffIds(targetB, reapplied), ["b"]);
   assert.deepEqual(findReplacementCandidateBuffIds(targetC, reapplied), []);
   assert.deepEqual(Object.keys(targetA), ["a"]);
+});
+
+test("normal multi-target A+B then B+C replaces only B", () => {
+  const actorA = new MockActor("Actor.target-a", {
+    activeBuffs: { a: makeBuff("a") },
+  });
+  const actorB = new MockActor("Actor.target-b", {
+    activeBuffs: { b: makeBuff("b") },
+  });
+  const actorC = new MockActor("Actor.target-c");
+  const plannedApplications = [
+    [actorB, makeBuff("b-new")],
+    [actorC, makeBuff("c-new")],
+  ];
+
+  const candidatesByTarget = Object.fromEntries(
+    plannedApplications.map(([actor, newFlag]) => [
+      actor.uuid,
+      getReplacementCandidates(actor, newFlag),
+    ]),
+  );
+
+  assert.deepEqual(candidatesByTarget, {
+    "Actor.target-b": ["b"],
+    "Actor.target-c": [],
+  });
+  assert.deepEqual(Object.keys(getActiveBuffs(actorA)), ["a"]);
+});
+
+test("sameEffect multi-target A+B then B+C keeps all existing instances", async () => {
+  const actorA = new MockActor("Actor.same-a", {
+    activeBuffs: { a: makeBuff("a", { stackingMode: "sameEffect" }) },
+  });
+  const actorB = new MockActor("Actor.same-b", {
+    activeBuffs: { b: makeBuff("b", { stackingMode: "sameEffect" }) },
+  });
+  const actorC = new MockActor("Actor.same-c");
+  const newB = makeBuff("b-new", { stackingMode: "sameEffect", appliedAt: 2 });
+  const newC = makeBuff("c-new", { stackingMode: "sameEffect", appliedAt: 2 });
+
+  assert.deepEqual(getReplacementCandidates(actorB, newB), []);
+  assert.deepEqual(getReplacementCandidates(actorC, newC), []);
+
+  await Promise.all([
+    upsertActiveBuff(actorB, newB),
+    upsertActiveBuff(actorC, newC),
+  ]);
+
+  assert.deepEqual(Object.keys(getActiveBuffs(actorA)), ["a"]);
+  assert.deepEqual(Object.keys(getActiveBuffs(actorB)).sort(), ["b", "b-new"]);
+  assert.deepEqual(Object.keys(getActiveBuffs(actorC)), ["c-new"]);
+});
+
+test("alwaysStack multi-target A+B then B+C keeps all existing instances", async () => {
+  const actorA = new MockActor("Actor.stack-a", {
+    activeBuffs: { a: makeBuff("a", { stackingMode: "alwaysStack" }) },
+  });
+  const actorB = new MockActor("Actor.stack-b", {
+    activeBuffs: { b: makeBuff("b", { stackingMode: "alwaysStack" }) },
+  });
+  const actorC = new MockActor("Actor.stack-c");
+  const newB = makeBuff("b-new", { stackingMode: "alwaysStack", appliedAt: 2 });
+  const newC = makeBuff("c-new", { stackingMode: "alwaysStack", appliedAt: 2 });
+
+  assert.deepEqual(getReplacementCandidates(actorB, newB), []);
+  assert.deepEqual(getReplacementCandidates(actorC, newC), []);
+
+  await Promise.all([
+    upsertActiveBuff(actorB, newB),
+    upsertActiveBuff(actorC, newC),
+  ]);
+
+  assert.deepEqual(Object.keys(getActiveBuffs(actorA)), ["a"]);
+  assert.deepEqual(Object.keys(getActiveBuffs(actorB)).sort(), ["b", "b-new"]);
+  assert.deepEqual(Object.keys(getActiveBuffs(actorC)), ["c-new"]);
+});
+
+test("noStack multi-target blocks an occupied target and allows a free target", () => {
+  const occupiedActor = new MockActor("Actor.no-stack-a", {
+    activeBuffs: {
+      existing: makeBuff("existing", {
+        stackingMode: "noStack",
+        originActorUuid: "Actor.first-caster",
+      }),
+    },
+  });
+  const freeActor = new MockActor("Actor.no-stack-b");
+  const incoming = makeBuff("incoming", {
+    stackingMode: "noStack",
+    originActorUuid: "Actor.second-caster",
+  });
+
+  const occupiedResult = classifyNoStackApplication(getActiveBuffs(occupiedActor), incoming);
+  const freeResult = classifyNoStackApplication(getActiveBuffs(freeActor), incoming);
+
+  assert.equal(occupiedResult.status, "blocked");
+  assert.equal(occupiedResult.blockingBuffId, "existing");
+  assert.equal(freeResult.status, "allowed");
+  assert.deepEqual(freeResult.replacementCandidateBuffIds, []);
+  assert.deepEqual(Object.keys(getActiveBuffs(occupiedActor)), ["existing"]);
 });
 
 test("alwaysStack and sameEffect never select replacement candidates", () => {
