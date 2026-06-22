@@ -48,6 +48,8 @@
   "BOT.notifications.moduleMacroAlreadyExists": "La macro existe déjà.",
   "BOT.notifications.customPresetSaved": "Preset enregistré.",
   "BOT.notifications.customPresetImported": "{count} preset(s) personnalisé(s) importé(s).",
+  "BOT.notifications.customPresetImportSummary": "Import des presets : {imported} importé(s), {corrected} corrigé(s), {rejected} refusé(s), {copies} ajouté(s) comme copie(s).",
+  "BOT.notifications.customPresetImportRejected": "Presets refusés : {names}{more}.",
   "BOT.notifications.customPresetDeleted": "Preset personnalisé supprimé : {name}.",
   "BOT.notifications.customPresetImportInvalid": "Fichier de presets invalide.",
   "BOT.notifications.customPresetImportWrongModule": "Ce fichier ne correspond pas à Buff on Trigger.",

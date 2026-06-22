@@ -89,6 +89,9 @@ test("real import batch never stores a preset with an unknown trigger", () => {
 
   const stored = Object.values(result.customPresets);
   assert.equal(result.importedCount, 3);
+  assert.equal(result.warningPresetCount, 1);
+  assert.equal(result.rejectedCount, 1);
+  assert.equal(result.copyCount, 0);
   assert.deepEqual(
     stored.map((preset) => preset.label),
     ["Import Test Minimal", "Import Test Bad Stacking", "[TEST] Import Test Hidden"],
@@ -97,6 +100,77 @@ test("real import batch never stores a preset with an unknown trigger", () => {
   assert.equal(stored.find((preset) => preset.label === "Import Test Bad Stacking").flag.stackingMode, "normal");
   assert.equal(stored.find((preset) => preset.label.startsWith("[TEST]")).isTestPreset, true);
   assert.match(result.errors.join("\n"), /trigger_inconnu/);
+});
+
+test("batch imports three valid presets with a clear empty report", () => {
+  const result = normalizeImportedPresetBatch([
+    { id: "first", label: "First", flag: {} },
+    { id: "second", label: "Second", flag: { type: "damaged" } },
+    { id: "third", label: "Third", flag: { stackingMode: "alwaysStack" } },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    createUniqueId: (base) => `custom-${base}`,
+  });
+
+  assert.equal(result.importedCount, 3);
+  assert.equal(result.warningPresetCount, 0);
+  assert.equal(result.rejectedCount, 0);
+  assert.equal(result.copyCount, 0);
+  assert.deepEqual(result.warningPresets, []);
+  assert.deepEqual(result.rejectedPresets, []);
+  assert.deepEqual(result.copiedPresets, []);
+});
+
+test("reimport creates unique copies and reports duplicate ids and labels", () => {
+  const source = [
+    { id: "custom-first", label: "First", flag: {} },
+    { id: "custom-second", label: "Second", flag: {} },
+  ];
+  const createUniqueId = (base, existing) => {
+    let id = String(base);
+    let index = 2;
+    while (existing[id]) id = `${base}-${index++}`;
+    return id;
+  };
+  const firstImport = normalizeImportedPresetBatch(source, {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    createUniqueId,
+  });
+  const secondImport = normalizeImportedPresetBatch(source, {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: firstImport.customPresets,
+    createUniqueId,
+  });
+
+  assert.equal(secondImport.importedCount, 2);
+  assert.equal(secondImport.copyCount, 2);
+  assert.deepEqual(
+    Object.keys(secondImport.customPresets).sort(),
+    ["custom-first", "custom-first-2", "custom-second", "custom-second-2"],
+  );
+  assert.ok(secondImport.copiedPresets.every((preset) =>
+    preset.reasons.includes("id") && preset.reasons.includes("label")
+  ));
+});
+
+test("batch of invalid presets does not crash and reports every rejection", () => {
+  const result = normalizeImportedPresetBatch([
+    null,
+    { label: "Missing flag" },
+    { label: "Bad trigger", flag: { type: "unknown" } },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    createUniqueId: (base) => `custom-${base}`,
+  });
+
+  assert.equal(result.importedCount, 0);
+  assert.equal(result.rejectedCount, 3);
+  assert.equal(result.copyCount, 0);
+  assert.equal(result.rejectedPresets.length, 3);
+  assert.deepEqual(result.customPresets, {});
 });
 
 test("known invalid nested types are sanitized without throwing", () => {

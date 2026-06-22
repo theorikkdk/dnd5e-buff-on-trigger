@@ -2420,7 +2420,23 @@ window.botImportCustomPresets = function(buttonEl) {
       }
       await game.settings.set(MODULE_ID, "customPresets", importResult.customPresets);
       refreshPresetSelect(form);
-      ui.notifications.info(game.i18n.format("BOT.notifications.customPresetImported", { count: importResult.importedCount }));
+      ui.notifications.info(game.i18n.format("BOT.notifications.customPresetImportSummary", {
+        imported: importResult.importedCount,
+        corrected: importResult.warningPresetCount,
+        rejected: importResult.rejectedCount,
+        copies: importResult.copyCount,
+      }));
+      if (importResult.rejectedPresets.length) {
+        const rejectedNames = importResult.rejectedPresets
+          .slice(0, 3)
+          .map((preset) => preset.label)
+          .join(", ");
+        const remaining = Math.max(0, importResult.rejectedPresets.length - 3);
+        ui.notifications.warn(game.i18n.format("BOT.notifications.customPresetImportRejected", {
+          names: rejectedNames,
+          more: remaining ? ` (+${remaining})` : "",
+        }));
+      }
     } catch (error) {
       console.warn(`[${MODULE_ID}] Import de presets invalide`, error);
       ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));

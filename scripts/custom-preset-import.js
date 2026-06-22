@@ -202,16 +202,37 @@ export function normalizeImportedPresetBatch(
   const customPresets = clone(existingPresets ?? {});
   const warnings = [];
   const errors = [];
+  const warningPresets = [];
+  const rejectedPresets = [];
+  const copiedPresets = [];
   let importedCount = 0;
 
   for (const [index, rawPreset] of (presets ?? []).entries()) {
     const result = validateAndNormalizeImportedPreset(rawPreset, { defaultConfig });
     warnings.push(...result.warnings.map((warning) => `preset[${index}]: ${warning}`));
+    const inputLabel = String(rawPreset?.label ?? "").trim() || `#${index + 1}`;
     if (!result.preset || result.errors.length) {
-      errors.push(...result.errors.map((error) => `preset[${index}]: ${error}`));
+      const presetErrors = result.errors.map((error) => `preset[${index}]: ${error}`);
+      errors.push(...presetErrors);
+      rejectedPresets.push({ index, label: inputLabel, errors: presetErrors });
       continue;
     }
+    if (result.warnings.length) {
+      warningPresets.push({ index, label: result.preset.label, warnings: [...result.warnings] });
+    }
 
+    const requestedId = String(rawPreset.id ?? "").trim();
+    const normalizedLabel = result.preset.label.toLocaleLowerCase();
+    const existingEntries = Object.entries(customPresets);
+    const duplicateReasons = [];
+    if (requestedId && existingEntries.some(([key, preset]) => key === requestedId || preset?.id === requestedId)) {
+      duplicateReasons.push("id");
+    }
+    if (existingEntries.some(([, preset]) =>
+      String(preset?.label ?? "").trim().toLocaleLowerCase() === normalizedLabel
+    )) {
+      duplicateReasons.push("label");
+    }
     const id = typeof createUniqueId === "function"
       ? createUniqueId(rawPreset.id ?? result.preset.label, customPresets)
       : String(rawPreset.id ?? result.preset.label);
@@ -228,8 +249,27 @@ export function normalizeImportedPresetBatch(
       flag,
       source: "custom",
     };
+    if (duplicateReasons.length) {
+      copiedPresets.push({
+        index,
+        label: result.preset.label,
+        id,
+        reasons: duplicateReasons,
+      });
+    }
     importedCount += 1;
   }
 
-  return { customPresets, importedCount, warnings, errors };
+  return {
+    customPresets,
+    importedCount,
+    warningPresetCount: warningPresets.length,
+    rejectedCount: rejectedPresets.length,
+    copyCount: copiedPresets.length,
+    warnings,
+    errors,
+    warningPresets,
+    rejectedPresets,
+    copiedPresets,
+  };
 }
