@@ -30,6 +30,13 @@ function validate(preset) {
   });
 }
 
+function createUniqueId(base, existing) {
+  let id = String(base);
+  let index = 2;
+  while (existing[id]) id = `${base}-${index++}`;
+  return id;
+}
+
 test("minimal preset is accepted and merged with defaults", () => {
   const result = validate({ label: "Minimal", flag: {} });
 
@@ -127,12 +134,6 @@ test("reimport creates unique copies and reports duplicate ids and labels", () =
     { id: "custom-first", label: "First", flag: {} },
     { id: "custom-second", label: "Second", flag: {} },
   ];
-  const createUniqueId = (base, existing) => {
-    let id = String(base);
-    let index = 2;
-    while (existing[id]) id = `${base}-${index++}`;
-    return id;
-  };
   const firstImport = normalizeImportedPresetBatch(source, {
     defaultConfig: DEFAULT_CONFIG,
     existingPresets: {},
@@ -153,6 +154,147 @@ test("reimport creates unique copies and reports duplicate ids and labels", () =
   assert.ok(secondImport.copiedPresets.every((preset) =>
     preset.reasons.includes("id") && preset.reasons.includes("label")
   ));
+});
+
+test("duplicate strategy skip keeps existing presets and imports new ones", () => {
+  const existing = {
+    "custom-first": {
+      id: "custom-first",
+      label: "First",
+      description: "Original",
+      flag: { type: "passive" },
+      source: "custom",
+    },
+  };
+  const result = normalizeImportedPresetBatch([
+    { id: "custom-first", label: "First", description: "Changed", flag: { type: "damaged" } },
+    { id: "custom-second", label: "Second", flag: {} },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: existing,
+    duplicateCandidates: existing,
+    duplicateStrategy: "skip",
+    createUniqueId,
+  });
+
+  assert.equal(result.importedCount, 1);
+  assert.equal(result.skippedCount, 1);
+  assert.equal(result.replacedCount, 0);
+  assert.equal(result.copyCount, 0);
+  assert.equal(result.customPresets["custom-first"].description, "Original");
+  assert.equal(result.customPresets["custom-first"].flag.type, "passive");
+  assert.equal(result.customPresets["custom-second"].label, "Second");
+});
+
+test("duplicate strategy replace preserves the existing custom id and updates content", () => {
+  const existing = {
+    "custom-existing-key": {
+      id: "custom-stable-id",
+      label: "First",
+      description: "Original",
+      flag: { type: "passive" },
+      source: "custom",
+    },
+  };
+  const result = normalizeImportedPresetBatch([
+    {
+      id: "different-import-id",
+      label: "FIRST",
+      description: "Replacement",
+      flag: { type: "damaged", stackingMode: "alwaysStack" },
+    },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: existing,
+    duplicateCandidates: existing,
+    duplicateStrategy: "replace",
+    createUniqueId,
+  });
+
+  assert.equal(result.importedCount, 0);
+  assert.equal(result.replacedCount, 1);
+  assert.equal(result.skippedCount, 0);
+  assert.equal(result.copyCount, 0);
+  assert.deepEqual(Object.keys(result.customPresets), ["custom-existing-key"]);
+  assert.equal(result.customPresets["custom-existing-key"].id, "custom-stable-id");
+  assert.equal(result.customPresets["custom-existing-key"].label, "FIRST");
+  assert.equal(result.customPresets["custom-existing-key"].description, "Replacement");
+  assert.equal(result.customPresets["custom-existing-key"].flag.type, "damaged");
+});
+
+test("built-in id collision is not treated as an existing custom duplicate", () => {
+  const result = normalizeImportedPresetBatch([
+    { id: "bless", label: "Bless", flag: {} },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    duplicateCandidates: {},
+    duplicateStrategy: "replace",
+    createUniqueId: (base) => `custom-${base}`,
+  });
+
+  assert.equal(result.duplicateCount, 0);
+  assert.equal(result.replacedCount, 0);
+  assert.equal(result.importedCount, 1);
+  assert.equal(result.customPresets["custom-bless"].label, "Bless");
+});
+
+test("duplicates inside one batch follow the selected strategy", () => {
+  const source = [
+    { id: "custom-shared", label: "Shared", description: "First", flag: {} },
+    { id: "custom-shared", label: "Shared", description: "Second", flag: { type: "damaged" } },
+  ];
+  const skipped = normalizeImportedPresetBatch(source, {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    duplicateCandidates: {},
+    duplicateStrategy: "skip",
+    createUniqueId,
+  });
+  const replaced = normalizeImportedPresetBatch(source, {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: {},
+    duplicateCandidates: {},
+    duplicateStrategy: "replace",
+    createUniqueId,
+  });
+
+  assert.equal(skipped.importedCount, 1);
+  assert.equal(skipped.skippedCount, 1);
+  assert.equal(skipped.customPresets["custom-shared"].description, "First");
+  assert.equal(replaced.importedCount, 1);
+  assert.equal(replaced.replacedCount, 1);
+  assert.equal(replaced.customPresets["custom-shared"].description, "Second");
+  assert.equal(replaced.customPresets["custom-shared"].flag.type, "damaged");
+});
+
+test("invalid preset in a duplicate batch remains rejected without affecting valid entries", () => {
+  const existing = {
+    "custom-first": {
+      id: "custom-first",
+      label: "First",
+      flag: {},
+      source: "custom",
+    },
+  };
+  const result = normalizeImportedPresetBatch([
+    { id: "custom-first", label: "First", flag: { type: "damaged" } },
+    { id: "invalid", label: "Invalid", flag: { type: "not-supported" } },
+    { id: "custom-new", label: "New", flag: {} },
+  ], {
+    defaultConfig: DEFAULT_CONFIG,
+    existingPresets: existing,
+    duplicateCandidates: existing,
+    duplicateStrategy: "replace",
+    createUniqueId,
+  });
+
+  assert.equal(result.replacedCount, 1);
+  assert.equal(result.rejectedCount, 1);
+  assert.equal(result.importedCount, 1);
+  assert.equal(result.customPresets["custom-first"].flag.type, "damaged");
+  assert.equal(result.customPresets["custom-new"].label, "New");
+  assert.equal(Object.values(result.customPresets).some((preset) => preset.label === "Invalid"), false);
 });
 
 test("batch of invalid presets does not crash and reports every rejection", () => {

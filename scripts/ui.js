@@ -1547,6 +1547,16 @@ function getAllPresets() {
   return [...getBuiltInPresets(), ...customPresets];
 }
 
+function getValidCustomPresetsMap() {
+  return Object.fromEntries(
+    Object.entries(getCustomPresets())
+      .filter(([, preset]) => preset?.label && isPlainObject(preset.flag))
+      .filter(([, preset]) => isValidStoredCustomPreset(preset, {
+        defaultConfig: buildDefaultBuffConfig(),
+      }))
+  );
+}
+
 function getPresetOptions() {
   const showTestPresets = isDebugEnabled();
   return getAllPresets().map((preset) => {
@@ -2512,6 +2522,47 @@ function readJsonFile(file) {
   });
 }
 
+function chooseCustomPresetDuplicateStrategy(duplicateCount) {
+  if (!duplicateCount) return Promise.resolve("copy");
+  if (!globalThis.Dialog) return Promise.resolve("copy");
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+    new Dialog({
+      title: game.i18n.localize("BOT.ui.presets.duplicateDialogTitle"),
+      content: `<p>${escapeCustomPresetManagementText(game.i18n.format(
+        "BOT.ui.presets.duplicateDialogMessage",
+        { count: duplicateCount }
+      ))}</p>`,
+      buttons: {
+        copy: {
+          label: game.i18n.localize("BOT.ui.presets.duplicateCopy"),
+          callback: () => finish("copy"),
+        },
+        skip: {
+          label: game.i18n.localize("BOT.ui.presets.duplicateSkip"),
+          callback: () => finish("skip"),
+        },
+        replace: {
+          label: game.i18n.localize("BOT.ui.presets.duplicateReplace"),
+          callback: () => finish("replace"),
+        },
+        cancel: {
+          label: game.i18n.localize("BOT.ui.presets.cancel"),
+          callback: () => finish(null),
+        },
+      },
+      default: "copy",
+      close: () => finish(null),
+    }).render(true);
+  });
+}
+
 window.botImportCustomPresets = function(buttonEl) {
   const form = buttonEl.closest("form");
   const input = document.createElement("input");
@@ -2537,11 +2588,26 @@ window.botImportCustomPresets = function(buttonEl) {
         return;
       }
 
-      const importResult = normalizeImportedPresetBatch(data.presets, {
+      const existingPresets = foundry.utils.deepClone(getCustomPresets());
+      const duplicateCandidates = foundry.utils.deepClone(getValidCustomPresetsMap());
+      const batchOptions = {
         defaultConfig: buildDefaultBuffConfig(),
-        existingPresets: foundry.utils.deepClone(getCustomPresets()),
+        existingPresets,
+        duplicateCandidates,
         createUniqueId: getUniqueCustomPresetId,
+      };
+      const preflightResult = normalizeImportedPresetBatch(data.presets, {
+        ...batchOptions,
+        duplicateStrategy: "copy",
       });
+      const duplicateStrategy = await chooseCustomPresetDuplicateStrategy(preflightResult.duplicateCount);
+      if (!duplicateStrategy) return;
+      const importResult = duplicateStrategy === "copy"
+        ? preflightResult
+        : normalizeImportedPresetBatch(data.presets, {
+          ...batchOptions,
+          duplicateStrategy,
+        });
       if (importResult.warnings.length || importResult.errors.length) {
         debugLog(`[${MODULE_ID}] Import de presets assaini :`, {
           warnings: importResult.warnings,
@@ -2555,6 +2621,8 @@ window.botImportCustomPresets = function(buttonEl) {
         corrected: importResult.warningPresetCount,
         rejected: importResult.rejectedCount,
         copies: importResult.copyCount,
+        skipped: importResult.skippedCount,
+        replaced: importResult.replacedCount,
       }));
       if (importResult.rejectedPresets.length) {
         const rejectedNames = importResult.rejectedPresets

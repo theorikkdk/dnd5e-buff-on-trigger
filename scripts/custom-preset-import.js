@@ -191,20 +191,50 @@ export function isValidStoredCustomPreset(preset, { defaultConfig = {} } = {}) {
   return validateAndNormalizeImportedPreset(preset, { defaultConfig }).preset !== null;
 }
 
+function findDuplicatePresetEntry(customPresets, requestedId, normalizedLabel) {
+  const entries = Object.entries(customPresets ?? {});
+  const idEntry = requestedId
+    ? entries.find(([key, preset]) => key === requestedId || preset?.id === requestedId)
+    : null;
+  const labelEntry = entries.find(([, preset]) =>
+    String(preset?.label ?? "").trim().toLocaleLowerCase() === normalizedLabel
+  );
+  const matchedEntry = idEntry ?? labelEntry ?? null;
+  if (!matchedEntry) return null;
+
+  const reasons = [];
+  if (idEntry) reasons.push("id");
+  if (labelEntry) reasons.push("label");
+  return {
+    key: matchedEntry[0],
+    preset: matchedEntry[1],
+    reasons,
+  };
+}
+
 export function normalizeImportedPresetBatch(
   presets,
   {
     defaultConfig = {},
     existingPresets = {},
+    duplicateCandidates = existingPresets,
+    duplicateStrategy = "copy",
     createUniqueId,
   } = {}
 ) {
+  const strategy = ["copy", "skip", "replace"].includes(duplicateStrategy)
+    ? duplicateStrategy
+    : "copy";
   const customPresets = clone(existingPresets ?? {});
+  const duplicatePresetMap = clone(duplicateCandidates ?? {});
   const warnings = [];
   const errors = [];
   const warningPresets = [];
   const rejectedPresets = [];
   const copiedPresets = [];
+  const skippedPresets = [];
+  const replacedPresets = [];
+  const duplicatePresets = [];
   let importedCount = 0;
 
   for (const [index, rawPreset] of (presets ?? []).entries()) {
@@ -223,16 +253,45 @@ export function normalizeImportedPresetBatch(
 
     const requestedId = String(rawPreset.id ?? "").trim();
     const normalizedLabel = result.preset.label.toLocaleLowerCase();
-    const existingEntries = Object.entries(customPresets);
-    const duplicateReasons = [];
-    if (requestedId && existingEntries.some(([key, preset]) => key === requestedId || preset?.id === requestedId)) {
-      duplicateReasons.push("id");
+    const duplicate = findDuplicatePresetEntry(duplicatePresetMap, requestedId, normalizedLabel);
+    if (duplicate) {
+      duplicatePresets.push({
+        index,
+        label: result.preset.label,
+        existingId: duplicate.preset?.id ?? duplicate.key,
+        reasons: [...duplicate.reasons],
+      });
+      if (strategy === "skip") {
+        skippedPresets.push({
+          index,
+          label: result.preset.label,
+          existingId: duplicate.preset?.id ?? duplicate.key,
+          reasons: [...duplicate.reasons],
+        });
+        continue;
+      }
+      if (strategy === "replace") {
+        const existingId = duplicate.preset?.id ?? duplicate.key;
+        const flag = clone(result.preset.flag);
+        delete flag.presetMeta;
+        const replacement = {
+          ...result.preset,
+          id: existingId,
+          flag,
+          source: "custom",
+        };
+        customPresets[duplicate.key] = replacement;
+        duplicatePresetMap[duplicate.key] = clone(replacement);
+        replacedPresets.push({
+          index,
+          label: result.preset.label,
+          id: existingId,
+          reasons: [...duplicate.reasons],
+        });
+        continue;
+      }
     }
-    if (existingEntries.some(([, preset]) =>
-      String(preset?.label ?? "").trim().toLocaleLowerCase() === normalizedLabel
-    )) {
-      duplicateReasons.push("label");
-    }
+
     const id = typeof createUniqueId === "function"
       ? createUniqueId(rawPreset.id ?? result.preset.label, customPresets)
       : String(rawPreset.id ?? result.preset.label);
@@ -249,12 +308,13 @@ export function normalizeImportedPresetBatch(
       flag,
       source: "custom",
     };
-    if (duplicateReasons.length) {
+    duplicatePresetMap[id] = clone(customPresets[id]);
+    if (duplicate) {
       copiedPresets.push({
         index,
         label: result.preset.label,
         id,
-        reasons: duplicateReasons,
+        reasons: [...duplicate.reasons],
       });
     }
     importedCount += 1;
@@ -266,10 +326,17 @@ export function normalizeImportedPresetBatch(
     warningPresetCount: warningPresets.length,
     rejectedCount: rejectedPresets.length,
     copyCount: copiedPresets.length,
+    skippedCount: skippedPresets.length,
+    replacedCount: replacedPresets.length,
+    duplicateCount: duplicatePresets.length,
     warnings,
     errors,
     warningPresets,
     rejectedPresets,
     copiedPresets,
+    skippedPresets,
+    replacedPresets,
+    duplicatePresets,
+    duplicateStrategy: strategy,
   };
 }
