@@ -2,6 +2,7 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
+import { isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
@@ -1539,6 +1540,9 @@ function getBuiltInPresets() {
 function getAllPresets() {
   const customPresets = Object.values(getCustomPresets())
     .filter((preset) => preset?.label && isPlainObject(preset.flag))
+    .filter((preset) => isValidStoredCustomPreset(preset, {
+      defaultConfig: buildDefaultBuffConfig(),
+    }))
     .map((preset) => ({ ...preset, source: "custom" }));
   return [...getBuiltInPresets(), ...customPresets];
 }
@@ -1558,8 +1562,11 @@ function getPresetOptions() {
       description,
       source: preset.source,
       presetType: getPresetType(preset),
-      isTestPreset: String(preset.id ?? "").startsWith("test") || label.startsWith("[TEST]"),
-      searchText: [preset.id, label, description, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", label.startsWith("[TEST]") || String(preset.id).startsWith("test") ? "[TEST]" : ""].join(" ").toLowerCase(),
+      isTestPreset: preset.isTestPreset === true
+        || String(preset.id ?? "").startsWith("test")
+        || String(preset.label ?? "").startsWith("[TEST]")
+        || label.startsWith("[TEST]"),
+      searchText: [preset.id, label, description, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", preset.isTestPreset === true || String(preset.label ?? "").startsWith("[TEST]") || label.startsWith("[TEST]") || String(preset.id).startsWith("test") ? "[TEST]" : ""].join(" ").toLowerCase(),
     };
   }).filter((preset) => showTestPresets || !preset.isTestPreset);
 }
@@ -2350,7 +2357,11 @@ function downloadPresetJson(payload) {
 
 window.botExportCustomPresets = function() {
   try {
-    const presets = Object.values(getCustomPresets()).filter((preset) => preset?.label && isPlainObject(preset.flag));
+    const presets = Object.values(getCustomPresets())
+      .filter((preset) => preset?.label && isPlainObject(preset.flag))
+      .filter((preset) => isValidStoredCustomPreset(preset, {
+        defaultConfig: buildDefaultBuffConfig(),
+      }));
     if (!presets.length) {
       ui.notifications.info(game.i18n.localize("BOT.notifications.noCustomPresetsToExport"));
       return;
@@ -2362,18 +2373,6 @@ window.botExportCustomPresets = function() {
     console.error(`[${MODULE_ID}] Erreur dans botExportCustomPresets :`, error);
   }
 };
-function normalizeImportedPreset(preset, existing) {
-  if (!preset?.label || !isPlainObject(preset.flag)) return null;
-  const id = getUniqueCustomPresetId(preset.id ?? preset.label, existing);
-  return {
-    id,
-    label: String(preset.label),
-    description: String(preset.description ?? ""),
-    flag: stripPresetMeta(mergeBuffConfig(buildDefaultBuffConfig(), preset.flag)),
-    source: "custom",
-  };
-}
-
 function readJsonFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2398,26 +2397,30 @@ window.botImportCustomPresets = function(buttonEl) {
     try {
       const text = await readJsonFile(file);
       const data = JSON.parse(text);
-      if (data.module && data.module !== MODULE_ID) {
+      const envelope = validateCustomPresetImportEnvelope(data, MODULE_ID);
+      if (envelope.errors.includes("import: wrong module")) {
         ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportWrongModule"));
         return;
       }
-      if (!Array.isArray(data.presets)) {
+      if (!envelope.valid) {
         ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));
         return;
       }
 
-      const customPresets = foundry.utils.deepClone(getCustomPresets());
-      let importedCount = 0;
-      for (const preset of data.presets) {
-        const normalized = normalizeImportedPreset(preset, customPresets);
-        if (!normalized) continue;
-        customPresets[normalized.id] = normalized;
-        importedCount += 1;
+      const importResult = normalizeImportedPresetBatch(data.presets, {
+        defaultConfig: buildDefaultBuffConfig(),
+        existingPresets: foundry.utils.deepClone(getCustomPresets()),
+        createUniqueId: getUniqueCustomPresetId,
+      });
+      if (importResult.warnings.length || importResult.errors.length) {
+        debugLog(`[${MODULE_ID}] Import de presets assaini :`, {
+          warnings: importResult.warnings,
+          errors: importResult.errors,
+        });
       }
-      await game.settings.set(MODULE_ID, "customPresets", customPresets);
+      await game.settings.set(MODULE_ID, "customPresets", importResult.customPresets);
       refreshPresetSelect(form);
-      ui.notifications.info(game.i18n.format("BOT.notifications.customPresetImported", { count: importedCount }));
+      ui.notifications.info(game.i18n.format("BOT.notifications.customPresetImported", { count: importResult.importedCount }));
     } catch (error) {
       console.warn(`[${MODULE_ID}] Import de presets invalide`, error);
       ui.notifications.warn(game.i18n.localize("BOT.notifications.customPresetImportInvalid"));
