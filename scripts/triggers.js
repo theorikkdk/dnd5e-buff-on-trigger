@@ -1,8 +1,12 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
+import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, getDominantRollModifiers, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
 import { classifyNoStackApplication, clearDamagedTriggerCooldown, findReplacementCandidateBuffIds, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
+import {
+  buildRollModifierPromptDecision,
+  createRollModifierPromptWrapper,
+} from "./roll-modifier-consumption.js";
 
 const recentConcentrationRolls = new Map();
 const recentDamagedRepeatedSaves = new Map();
@@ -15,6 +19,8 @@ const SAVE_ROLL_MODES = ["normal", "advantage", "disadvantage"];
 const INCOMING_ATTACK_CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", "rwak", "msak", "rsak"];
 const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
+const ROLL_MODIFIER_PROMPT_DECISION_KEY = "_botRollModifierPromptDecision";
+const ROLL_MODIFIER_PROMPT_WRAPPED = Symbol("botRollModifierPromptWrapped");
 const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
   "celestial": "celestial",
@@ -793,7 +799,10 @@ function handleRollModifierBuildHook(hookName, rollType, process, rollConfig) {
     debugLog(`[${MODULE_ID}] Modificateur de jet ignoré : type non compatible`);
     return;
   }
-  const applied = applyRollModifierToConfig(actor, rollType, rollConfig, { consume: false });
+  const applied = applyRollModifierToConfig(actor, rollType, rollConfig, {
+    consume: false,
+    promptDecision: process?.[ROLL_MODIFIER_PROMPT_DECISION_KEY] ?? null,
+  });
   if (applied) process._botRollModifier = rollConfig._botRollModifier;
 }
 
@@ -802,6 +811,97 @@ async function handleRollModifierFinalHook(hookName, rollType, rolls, process) {
   const metadata = process?._botRollModifier;
   if (!actor?.getFlag || !metadata) return;
   await finalizeRollModifierApplication(actor, rollType, metadata, rolls);
+}
+
+function escapeRollModifierPromptText(value) {
+  const text = String(value ?? "");
+  if (typeof globalThis.foundry?.utils?.escapeHTML === "function") {
+    return globalThis.foundry.utils.escapeHTML(text);
+  }
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function promptRollModifierUse(candidate) {
+  const name = candidate?.activeFlag?.itemName
+    ?? game.i18n.localize("BOT.fallback.effectName");
+  const message = game.i18n.format("BOT.ui.rollModifier.promptMessage", {
+    name,
+    formula: candidate?.formula ?? "",
+  });
+  if (!globalThis.Dialog) return Promise.resolve(window.confirm(message));
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+    new Dialog({
+      title: game.i18n.localize("BOT.ui.rollModifier.promptTitle"),
+      content: `<p>${escapeRollModifierPromptText(message)}</p>`,
+      buttons: {
+        yes: {
+          label: game.i18n.localize("BOT.ui.common.yes"),
+          callback: () => finish(true),
+        },
+        no: {
+          label: game.i18n.localize("BOT.ui.common.no"),
+          callback: () => finish(false),
+        },
+      },
+      default: "yes",
+      close: () => finish(false),
+    }).render(true);
+  });
+}
+
+async function resolveRollModifierPromptCandidates(candidates) {
+  const approvedBuffIds = [];
+  for (const candidate of candidates) {
+    if (await promptRollModifierUse(candidate)) approvedBuffIds.push(candidate.buffId);
+  }
+  return buildRollModifierPromptDecision(approvedBuffIds);
+}
+
+function registerRollModifierPromptWrappers() {
+  const actorPrototype = globalThis.CONFIG?.Actor?.documentClass?.prototype;
+  if (!actorPrototype || actorPrototype[ROLL_MODIFIER_PROMPT_WRAPPED]) return;
+
+  const methods = [
+    ["rollAbilityCheck", "ability"],
+    ["rollSkill", "skill"],
+    ["rollSavingThrow", "save"],
+  ];
+  for (const [methodName, rollType] of methods) {
+    const original = actorPrototype[methodName];
+    if (typeof original !== "function") continue;
+    actorPrototype[methodName] = createRollModifierPromptWrapper(original, {
+      rollType,
+      decisionKey: ROLL_MODIFIER_PROMPT_DECISION_KEY,
+      getCandidates: getDominantRollModifiers,
+      resolveDecision: resolveRollModifierPromptCandidates,
+      onPrompt: (actor, promptedRollType, candidates) => {
+        debugLog(`[${MODULE_ID}] Jet suspendu pour confirmation du modificateur`, {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType: promptedRollType,
+          buffIds: candidates.map((candidate) => candidate.buffId),
+        });
+      },
+    });
+  }
+
+  Object.defineProperty(actorPrototype, ROLL_MODIFIER_PROMPT_WRAPPED, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+  });
 }
 
 function getReceivedAttackCategories(workflow, item) {
@@ -2437,6 +2537,7 @@ export async function refreshActorBuffRuntime(actor) {
 
 export function registerTriggers() {
   registerLinkedStatusProtection();
+  registerRollModifierPromptWrappers();
   const runtimeActors = new Map();
   for (const actor of game.actors ?? []) {
     const key = actor?.uuid ?? actor?.id ?? null;

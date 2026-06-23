@@ -338,6 +338,41 @@ test("known invalid nested types are sanitized without throwing", () => {
   assert.equal(result.warnings.length, 5);
 });
 
+test("unknown roll modifier consumption mode is normalized to automatic", () => {
+  const result = validate({
+    label: "Optional roll modifier",
+    flag: {
+      rollModifier: {
+        enabled: true,
+        formula: "1d4",
+        rollTypes: ["save"],
+        consumptionMode: "sometimes",
+      },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.preset.flag.rollModifier.consumptionMode, "automatic");
+  assert.match(result.warnings.join("\n"), /consumptionMode/);
+});
+
+test("prompt roll modifier consumption mode survives import normalization", () => {
+  const result = validate({
+    label: "Prompt roll modifier",
+    flag: {
+      rollModifier: {
+        enabled: true,
+        formula: "1d4",
+        rollTypes: ["ability"],
+        consumptionMode: "prompt",
+      },
+    },
+  });
+
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.preset.flag.rollModifier.consumptionMode, "prompt");
+});
+
 test("preset without a plain flag object is rejected", () => {
   for (const flag of [undefined, null, "bad", [], 42]) {
     const result = validate({ label: "Invalid", flag });

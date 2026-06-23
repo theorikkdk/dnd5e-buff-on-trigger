@@ -16,6 +16,10 @@ import {
 } from "./active-buffs.js";
 import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
 import { cleanupExternalBuffArtifacts } from "./delete-token-cleanup.js";
+import {
+  getRollModifierConsumptionMode,
+  shouldApplyRollModifierCandidate,
+} from "./roll-modifier-consumption.js";
 
 const DAMAGE_LABEL_KEYS = {
   acid: "BOT.damageTypes.acid",
@@ -2331,6 +2335,8 @@ export function getRollModifierCandidates(actor, rollType) {
       stackingKey: getStackingKey(activeFlag) || buffId,
       formula: activeFlag.rollModifier.formula,
       rollType,
+      consumable: shouldUseRollModifierStackApplicationLock(activeFlag),
+      consumptionMode: getRollModifierConsumptionMode(activeFlag.rollModifier),
     }))
     .filter((candidate) => {
       const consumable = shouldUseRollModifierStackApplicationLock(candidate.activeFlag);
@@ -2411,6 +2417,17 @@ export function applyRollModifierToConfig(actor, rollType, config, options = {})
 
     const appliedModifiers = [];
     for (const candidate of candidates) {
+      if (!shouldApplyRollModifierCandidate(candidate, options.promptDecision)) {
+        rollModifierDebug("optional modifier declined", {
+          actor: actor?.name ?? null,
+          actorUuid: actor?.uuid ?? null,
+          rollType,
+          buffId: candidate.buffId,
+          stackingKey: candidate.stackingKey,
+          formula: candidate.formula,
+        });
+        continue;
+      }
       if (shouldUseRollModifierStackApplicationLock(candidate.activeFlag)
         && hasRecentConsumableRollStack(actor, candidate)) {
         rollModifierDebug("apply ignored by consumable stack lock", {
@@ -2459,6 +2476,7 @@ export function applyRollModifierToConfig(actor, rollType, config, options = {})
         buffId: candidate.buffId,
         stackingKey: candidate.stackingKey,
         consumableStackToken,
+        consumptionMode: candidate.consumptionMode,
       });
     }
     if (!appliedModifiers.length) return false;

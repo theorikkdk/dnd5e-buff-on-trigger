@@ -16,6 +16,7 @@ const TRIGGER_TYPES = new Set([
 ]);
 const STACKING_MODES = new Set(["normal", "alwaysStack", "sameEffect", "noStack"]);
 const TRIGGER_FREQUENCIES = new Set(["none", "turn", "round"]);
+const ROLL_MODIFIER_CONSUMPTION_MODES = new Set(["automatic", "prompt"]);
 export const CUSTOM_PRESET_SCHEMA_VERSION = 1;
 
 const TOP_LEVEL_OBJECT_FIELDS = [
@@ -115,6 +116,13 @@ function sanitizeKnownFlagTypes(flag, warnings) {
   }
   if (isPlainObject(flag.rollModifier)) {
     resetInvalidArray(flag.rollModifier, "rollTypes", warnings, "rollModifier.rollTypes");
+    const consumptionMode = String(flag.rollModifier.consumptionMode ?? "automatic").trim();
+    if (!ROLL_MODIFIER_CONSUMPTION_MODES.has(consumptionMode)) {
+      warnings.push(`rollModifier.consumptionMode: normalized "${consumptionMode}" to "automatic"`);
+      flag.rollModifier.consumptionMode = "automatic";
+    } else {
+      flag.rollModifier.consumptionMode = consumptionMode;
+    }
   }
   if (isPlainObject(flag.buffs)) {
     for (const field of BUFF_ARRAY_FIELDS) {

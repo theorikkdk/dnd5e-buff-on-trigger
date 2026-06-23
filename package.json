@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/active-buffs.test.js tests/custom-preset-import.test.js tests/custom-preset-management.test.js tests/delete-token-cleanup.test.js tests/preset-search.test.js tests/presets.test.js"
+    "test": "node --test tests/active-buffs.test.js tests/custom-preset-import.test.js tests/custom-preset-management.test.js tests/delete-token-cleanup.test.js tests/preset-search.test.js tests/presets.test.js tests/roll-modifier-consumption.test.js"
   }
 }

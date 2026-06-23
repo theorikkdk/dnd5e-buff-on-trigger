@@ -1386,6 +1386,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       rollModifierTypeSave:      (raw.rollModifier?.rollTypes ?? []).includes("save"),
       rollModifierTypeAbility:   (raw.rollModifier?.rollTypes ?? []).includes("ability"),
       rollModifierTypeSkill:     (raw.rollModifier?.rollTypes ?? []).includes("skill"),
+      rollModifierPromptBeforeUse: raw.rollModifier?.consumptionMode === "prompt",
       abilityCheckAdvantageOptions,
       abilityCheckDisadvantageOptions,
       savingThrowAdvantageOptions,
@@ -1826,6 +1827,7 @@ function buildBuffConfigFromForm(form) {
       enabled: true,
       formula: rollModifierFormula,
       rollTypes,
+      consumptionMode: readFormValue(form, "rollModifierPromptBeforeUse") ? "prompt" : "automatic",
     } : null,
     buffs: {
       ac: readNumberFormValue(form, "buffAC"),
@@ -2169,7 +2171,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "statusEndBuffWhenRemoved", "statusProtectWhileBuffActive", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "rollModifierPromptBeforeUse", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "statusEndBuffWhenRemoved", "statusProtectWhileBuffActive", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt", "endConditionOnDamageTaken", "endConditionOnDamageTakenTypesList", "endConditionOnTemporaryHpLost",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
@@ -2270,6 +2272,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "rollModifierSave", rollTypes.includes("save"));
   setFormValue(form, "rollModifierAbility", rollTypes.includes("ability"));
   setFormValue(form, "rollModifierSkill", rollTypes.includes("skill"));
+  setFormValue(form, "rollModifierPromptBeforeUse", flag.rollModifier?.consumptionMode === "prompt");
 
   setFormValue(form, "damageFormula", flag.damage?.formula ?? "");
   setFormValue(form, "damageType", flag.damage?.type ?? "");

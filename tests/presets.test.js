@@ -92,6 +92,7 @@ test("core preset mechanics match the supported module features", () => {
     enabled: true,
     formula: "1d4",
     rollTypes: ["ability", "skill"],
+    consumptionMode: "prompt",
   });
   assert.equal(getPreset("guidance").flag.charges, 1);
 
@@ -99,13 +100,16 @@ test("core preset mechanics match the supported module features", () => {
     enabled: true,
     formula: "1d4",
     rollTypes: ["save"],
+    consumptionMode: "prompt",
   });
   assert.equal(getPreset("resistance").flag.charges, 1);
 
   assert.equal(getPreset("bless").flag.rollModifier.formula, "1d4");
   assert.deepEqual(getPreset("bless").flag.rollModifier.rollTypes, ["attack", "save"]);
+  assert.equal(getPreset("bless").flag.rollModifier.consumptionMode, undefined);
   assert.equal(getPreset("bane").flag.rollModifier.formula, "-1d4");
   assert.deepEqual(getPreset("bane").flag.rollModifier.rollTypes, ["attack", "save"]);
+  assert.equal(getPreset("bane").flag.rollModifier.consumptionMode, undefined);
   assert.equal(getPreset("shieldOfFaith").flag.buffs.ac, 2);
 
   assert.equal(getPreset("heroism").flag.type, "turnStart");

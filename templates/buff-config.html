@@ -228,6 +228,11 @@
               <label><input type="checkbox" name="rollModifierAbility" {{#if flag.rollModifierTypeAbility}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.ability"}}</label>
               <label><input type="checkbox" name="rollModifierSkill" {{#if flag.rollModifierTypeSkill}}checked{{/if}} /> {{localize "BOT.ui.rollModifier.rollTypes.skill"}}</label>
             </div>
+            <div class="form-group">
+              <label>{{localize "BOT.ui.rollModifier.promptBeforeUse"}}</label>
+              <input type="checkbox" name="rollModifierPromptBeforeUse" {{#if flag.rollModifierPromptBeforeUse}}checked{{/if}} />
+              <p class="hint">{{localize "BOT.ui.rollModifier.promptBeforeUseHint"}}</p>
+            </div>
           </div>
         </div>
       </details>
