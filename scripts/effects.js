@@ -19,6 +19,7 @@ import { cleanupExternalBuffArtifacts } from "./delete-token-cleanup.js";
 import {
   getBardicInspirationDie,
   getRollModifierConsumptionMode,
+  getRollModifierPromptTiming,
   isRollModifierMetadataConsumed,
   shouldApplyRollModifierCandidate,
 } from "./roll-modifier-consumption.js";
@@ -2366,6 +2367,7 @@ export function getRollModifierCandidates(actor, rollType) {
         rollType,
         consumable: shouldUseRollModifierStackApplicationLock(activeFlag),
         consumptionMode: getRollModifierConsumptionMode(activeFlag.rollModifier),
+        promptTiming: getRollModifierPromptTiming(activeFlag.rollModifier),
       };
     })
     .filter((candidate) => {
@@ -2442,7 +2444,8 @@ export function getDominantRollModifiers(actor, rollType) {
 export function applyRollModifierToConfig(actor, rollType, config, options = {}) {
   try {
     if (!actor?.getFlag) return false;
-    const candidates = getDominantRollModifiers(actor, rollType);
+    const candidates = getDominantRollModifiers(actor, rollType)
+      .filter((candidate) => options.candidateFilter?.(candidate) !== false);
     if (!candidates.length) return false;
 
     const appliedModifiers = [];
@@ -2528,6 +2531,12 @@ export function applyRollModifierToConfig(actor, rollType, config, options = {})
     console.error(`[${MODULE_ID}] Erreur dans applyRollModifierToConfig :`, error);
     return false;
   }
+}
+
+export async function evaluateRollModifierBonus(actor, candidate) {
+  if (!actor || !candidate?.formula) return null;
+  const safeData = buildSafeRollModifierData(actor, candidate.activeFlag);
+  return new Roll(candidate.formula, safeData).evaluate();
 }
 
 function rollContainsModifierFormula(roll, formula) {

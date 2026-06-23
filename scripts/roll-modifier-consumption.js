@@ -3,16 +3,46 @@ export const ROLL_MODIFIER_CONSUMPTION_MODES = Object.freeze({
   PROMPT: "prompt",
 });
 
+export const ROLL_MODIFIER_PROMPT_TIMINGS = Object.freeze({
+  BEFORE_ROLL: "beforeRoll",
+  AFTER_ROLL: "afterRoll",
+});
+
 export function getRollModifierConsumptionMode(rollModifier) {
   return rollModifier?.consumptionMode === ROLL_MODIFIER_CONSUMPTION_MODES.PROMPT
     ? ROLL_MODIFIER_CONSUMPTION_MODES.PROMPT
     : ROLL_MODIFIER_CONSUMPTION_MODES.AUTOMATIC;
 }
 
+export function getRollModifierPromptTiming(rollModifier) {
+  return rollModifier?.promptTiming === ROLL_MODIFIER_PROMPT_TIMINGS.AFTER_ROLL
+    ? ROLL_MODIFIER_PROMPT_TIMINGS.AFTER_ROLL
+    : ROLL_MODIFIER_PROMPT_TIMINGS.BEFORE_ROLL;
+}
+
 export function isPromptableRollModifierCandidate(candidate) {
   return candidate?.consumable === true
     && getRollModifierConsumptionMode(candidate?.activeFlag?.rollModifier)
       === ROLL_MODIFIER_CONSUMPTION_MODES.PROMPT;
+}
+
+export function canUseAfterRollPrompt({
+  candidate,
+  rollType,
+  midiActive = false,
+  experimentalEnabled = false,
+  addRollAvailable = false,
+  workflow = null,
+} = {}) {
+  return rollType === "attack"
+    && isPromptableRollModifierCandidate(candidate)
+    && getRollModifierPromptTiming(candidate?.activeFlag?.rollModifier)
+      === ROLL_MODIFIER_PROMPT_TIMINGS.AFTER_ROLL
+    && midiActive === true
+    && experimentalEnabled === true
+    && addRollAvailable === true
+    && !!workflow?.actor
+    && typeof workflow?.setAttackRoll === "function";
 }
 
 export function buildRollModifierPromptDecision(approvedBuffIds = []) {
@@ -53,7 +83,12 @@ export function createRollModifierPromptWrapper(original, {
     }
 
     const actor = resolveActor(this);
-    const candidates = (getCandidates?.(actor, rollType) ?? [])
+    const candidates = (getCandidates?.(actor, rollType, {
+      context: this,
+      config,
+      dialog,
+      message,
+    }) ?? [])
       .filter(isPromptableRollModifierCandidate);
     if (!candidates.length) return original.call(this, config, dialog, message);
 
@@ -115,6 +150,69 @@ export function getRollModifierPromptDisplay(candidate, {
 }
 
 const finalizedMidiAttackWorkflows = new WeakSet();
+const afterRollPromptStates = new WeakMap();
+
+function getAfterRollPromptState(workflow) {
+  let state = afterRollPromptStates.get(workflow);
+  if (!state) {
+    state = new Map();
+    afterRollPromptStates.set(workflow, state);
+  }
+  return state;
+}
+
+export async function processAfterRollPromptCandidate(workflow, candidate, {
+  prompt,
+  evaluateBonus,
+  addRoll,
+  setAttackRoll = (newRoll) => workflow?.setAttackRoll?.(newRoll),
+  consume,
+} = {}) {
+  const buffId = candidate?.buffId;
+  if (!workflow?.attackRoll || !buffId) return { status: "ignored" };
+
+  const states = getAfterRollPromptState(workflow);
+  if (states.has(buffId)) return { status: "duplicate" };
+  states.set(buffId, "pending");
+
+  let accepted = false;
+  try {
+    accepted = await prompt(candidate, workflow);
+  } catch {
+    accepted = false;
+  }
+  if (!accepted) {
+    states.set(buffId, "declined");
+    return { status: "declined" };
+  }
+
+  let rollApplied = false;
+  try {
+    const bonusRoll = await evaluateBonus(candidate, workflow);
+    if (!bonusRoll) {
+      states.delete(buffId);
+      return { status: "failed" };
+    }
+    const newRoll = addRoll(workflow.attackRoll, bonusRoll);
+    if (!newRoll) {
+      states.delete(buffId);
+      return { status: "failed" };
+    }
+    await setAttackRoll(newRoll);
+    rollApplied = true;
+    states.set(buffId, "applied");
+    const consumed = await consume(candidate, workflow, newRoll);
+    states.set(buffId, consumed === false ? "applied" : "consumed");
+    return {
+      status: consumed === false ? "applied" : "consumed",
+      bonusRoll,
+      newRoll,
+    };
+  } catch (error) {
+    if (!rollApplied) states.delete(buffId);
+    return { status: "failed", error };
+  }
+}
 
 function hasPromptRollModifierMetadata(metadata) {
   const modifiers = Array.isArray(metadata?.modifiers) ? metadata.modifiers : [metadata];

@@ -233,6 +233,13 @@
               <input type="checkbox" name="rollModifierPromptBeforeUse" {{#if flag.rollModifierPromptBeforeUse}}checked{{/if}} />
               <p class="hint">{{localize "BOT.ui.rollModifier.promptBeforeUseHint"}}</p>
             </div>
+            <div class="form-group" id="bot-roll-modifier-prompt-timing">
+              <label>{{localize "BOT.ui.rollModifier.promptTimingLabel"}}</label>
+              <select name="rollModifierPromptTiming">
+                <option value="beforeRoll" {{#unless flag.rollModifierPromptTimingAfter}}selected{{/unless}}>{{localize "BOT.ui.rollModifier.promptTiming.beforeRoll"}}</option>
+                <option value="afterRoll" {{#if flag.rollModifierPromptTimingAfter}}selected{{/if}}>{{localize "BOT.ui.rollModifier.promptTiming.afterRoll"}}</option>
+              </select>
+            </div>
           </div>
         </div>
       </details>

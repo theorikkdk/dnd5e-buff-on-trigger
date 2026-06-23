@@ -97,6 +97,7 @@ test("core preset mechanics match the supported module features", () => {
     consumptionMode: "prompt",
   });
   assert.equal(getPreset("guidance").flag.charges, 1);
+  assert.equal(getPreset("guidance").flag.rollModifier.promptTiming, undefined);
 
   assert.deepEqual(getPreset("resistance").flag.rollModifier, {
     enabled: true,
@@ -105,12 +106,14 @@ test("core preset mechanics match the supported module features", () => {
     consumptionMode: "prompt",
   });
   assert.equal(getPreset("resistance").flag.charges, 1);
+  assert.equal(getPreset("resistance").flag.rollModifier.promptTiming, undefined);
 
   assert.deepEqual(getPreset("bardicInspiration").flag.rollModifier, {
     enabled: true,
     formula: "1d@origin.bardicInspirationDie",
     rollTypes: ["ability", "skill", "attack", "save"],
     consumptionMode: "prompt",
+    promptTiming: "afterRoll",
   });
   assert.equal(getPreset("bardicInspiration").flag.stackingMode, "noStack");
   assert.equal(getPreset("bardicInspiration").flag.stackingKey, "bardic-inspiration");

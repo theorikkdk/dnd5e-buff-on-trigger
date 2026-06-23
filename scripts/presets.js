@@ -114,6 +114,7 @@ export const BUFF_PRESETS = [
         formula: "1d@origin.bardicInspirationDie",
         rollTypes: ["ability", "skill", "attack", "save"],
         consumptionMode: "prompt",
+        promptTiming: "afterRoll",
       },
       charges: 1,
       consumeOnTrigger: false,

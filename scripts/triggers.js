@@ -1,13 +1,15 @@
 import { MODULE_ID, ATTACK_ACTION_TYPES, ATTACK_TRIGGER_TYPES, DAMAGE_TYPES, debugLog } from "./constants.js";
 import { buildItemDurationData } from "./duration.js";
-import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, finalizeRollModifierApplication, getDominantRollModifiers, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
+import { applyEffect, refreshBuffIndicator, refreshStackingMechanicalEffects, refreshStoredTargetIndicator, applyTargetIndicator, applyRollModifierToConfig, evaluateRollModifierBonus, finalizeRollModifierApplication, getDominantRollModifiers, resolveSaveDC, applyTemporaryHp, applyStatusEffect, ensureLinkedStatusesForActiveBuff, registerLinkedStatusProtection, showBuffReminder, consumeAllowedActiveBuffIndicatorDeletion, allowConcentrationDeletion, consumeAllowedConcentrationDeletion, hasConfiguredMechanicalBuffs } from "./effects.js";
 import { classifyNoStackApplication, clearDamagedTriggerCooldown, findReplacementCandidateBuffIds, getActiveBuff, getActiveBuffs, getDamagedTriggerCooldownKey, getStackingKey, getStackingMode, isDominantBuff, pruneStaleActiveBuffs, upsertActiveBuff, upsertNoStackActiveBuff, removeActiveBuff } from "./active-buffs.js";
 import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActorConcentrationEffects, getConcentrationEffectItemReferences, isConcentrationBuff } from "./concentration.js";
 import {
   buildRollModifierPromptDecision,
+  canUseAfterRollPrompt,
   createRollModifierPromptWrapper,
   finalizeMidiAttackRollModifierWorkflow,
   getRollModifierPromptDisplay,
+  processAfterRollPromptCandidate,
 } from "./roll-modifier-consumption.js";
 
 const recentConcentrationRolls = new Map();
@@ -23,6 +25,7 @@ const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", 
 const TARGET_FILTER_ABILITY_IDS = ["str", "dex", "con", "int", "wis", "cha"];
 const ROLL_MODIFIER_PROMPT_DECISION_KEY = "_botRollModifierPromptDecision";
 const ROLL_MODIFIER_PROMPT_WRAPPED = Symbol("botRollModifierPromptWrapped");
+const AFTER_ROLL_CANDIDATES_KEY = "_botAfterRollModifierCandidates";
 const CREATURE_TYPE_ALIASES = {
   "aberration": "aberration",
   "celestial": "celestial",
@@ -85,6 +88,37 @@ function getRollHookConfig(args) {
     || arg.advantage !== undefined
     || arg.disadvantage !== undefined
   )) ?? null;
+}
+
+function getMidiWorkflowFromRollConfig(config) {
+  return config?.workflow
+    ?? config?.config?.workflow
+    ?? config?.midiOptions?.workflow
+    ?? config?.subject?.workflow
+    ?? null;
+}
+
+function isMidiQolActive() {
+  return game.modules?.get?.("midi-qol")?.active === true;
+}
+
+function isExperimentalAfterRollPromptEnabled() {
+  try {
+    return game.settings?.get?.(MODULE_ID, "experimentalAfterRollPrompt") === true;
+  } catch {
+    return false;
+  }
+}
+
+function canCandidateUseAfterRoll(candidate, rollType, workflow) {
+  return canUseAfterRollPrompt({
+    candidate,
+    rollType,
+    midiActive: isMidiQolActive(),
+    experimentalEnabled: isExperimentalAfterRollPromptEnabled(),
+    addRollAvailable: typeof globalThis.MidiQOL?.addRollTo === "function",
+    workflow,
+  });
 }
 
 function summarizeRollHookArgs(args) {
@@ -801,9 +835,18 @@ function handleRollModifierBuildHook(hookName, rollType, process, rollConfig, wo
     debugLog(`[${MODULE_ID}] Modificateur de jet ignoré : type non compatible`);
     return;
   }
+  const afterRollCandidates = rollType === "attack"
+    ? getDominantRollModifiers(actor, rollType)
+      .filter((candidate) => canCandidateUseAfterRoll(candidate, rollType, workflow))
+    : [];
+  if (workflow && afterRollCandidates.length) {
+    workflow[AFTER_ROLL_CANDIDATES_KEY] = afterRollCandidates;
+  }
+  const afterRollBuffIds = new Set(afterRollCandidates.map((candidate) => candidate.buffId));
   const applied = applyRollModifierToConfig(actor, rollType, rollConfig, {
     consume: false,
     promptDecision: process?.[ROLL_MODIFIER_PROMPT_DECISION_KEY] ?? null,
+    candidateFilter: (candidate) => !afterRollBuffIds.has(candidate.buffId),
   });
   if (applied) {
     process._botRollModifier = rollConfig._botRollModifier;
@@ -875,6 +918,45 @@ function promptRollModifierUse(candidate) {
   });
 }
 
+function promptAfterRollModifierUse(candidate, workflow) {
+  const display = getRollModifierPromptDisplay(candidate, {
+    localize: (key) => game.i18n.localize(key),
+    fallbackName: game.i18n.localize("BOT.fallback.effectName"),
+    bardicDieFallback: game.i18n.localize("BOT.ui.rollModifier.bardicDieLabel"),
+  });
+  const message = game.i18n.format("BOT.ui.rollModifier.afterRollPromptMessage", {
+    total: workflow?.attackRoll?.total ?? "?",
+    name: display.name,
+    formula: display.formula,
+  });
+  if (!globalThis.Dialog) return Promise.resolve(window.confirm(message));
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+    new Dialog({
+      title: game.i18n.localize("BOT.ui.rollModifier.promptTitle"),
+      content: `<p>${escapeRollModifierPromptText(message)}</p>`,
+      buttons: {
+        yes: {
+          label: game.i18n.localize("BOT.ui.common.yes"),
+          callback: () => finish(true),
+        },
+        no: {
+          label: game.i18n.localize("BOT.ui.common.no"),
+          callback: () => finish(false),
+        },
+      },
+      default: "yes",
+      close: () => finish(false),
+    }).render(true);
+  });
+}
+
 async function resolveRollModifierPromptCandidates(candidates) {
   const approvedBuffIds = [];
   for (const candidate of candidates) {
@@ -896,7 +978,15 @@ function registerRollModifierPromptWrappers() {
       prototype[methodName] = createRollModifierPromptWrapper(original, {
         rollType,
         decisionKey: ROLL_MODIFIER_PROMPT_DECISION_KEY,
-        getCandidates: getDominantRollModifiers,
+        getCandidates: (actor, promptedRollType, context) => {
+          const workflow = getMidiWorkflowFromRollConfig(context?.config);
+          return getDominantRollModifiers(actor, promptedRollType)
+            .filter((candidate) => !canCandidateUseAfterRoll(
+              candidate,
+              promptedRollType,
+              workflow
+            ));
+        },
         resolveDecision: resolveRollModifierPromptCandidates,
         resolveActor,
         onPrompt: (actor, promptedRollType, candidates) => {
@@ -3120,14 +3210,8 @@ export function registerTriggers() {
 
   Hooks.on("dnd5e.postBuildAttackRollConfig", async (process, rollConfig) => {
     incomingFilterLog("postBuildAttackRollConfig called", summarizeIncomingRollConfig(process, rollConfig));
-    const workflow = process?.workflow
-      ?? process?.config?.workflow
-      ?? process?.midiOptions?.workflow
-      ?? process?.subject?.workflow
-      ?? rollConfig?.workflow
-      ?? rollConfig?.config?.workflow
-      ?? rollConfig?.midiOptions?.workflow
-      ?? null;
+    const workflow = getMidiWorkflowFromRollConfig(process)
+      ?? getMidiWorkflowFromRollConfig(rollConfig);
     const attacker = resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
     const fallbackTargets = rollConfig?.targets ?? process?.targets ?? process?.config?.targets ?? game.user?.targets ?? new Set();
     const fallbackWorkflow = workflow ?? (attacker ? { actor: attacker, targets: fallbackTargets, rollOptions: rollConfig?.midiOptions ?? {}, midiOptions: rollConfig?.midiOptions ?? {} } : null);
@@ -3175,6 +3259,37 @@ export function registerTriggers() {
 
   Hooks.on("dnd5e.postSkillRollConfiguration", async (rolls, process) => {
     await handleRollModifierFinalHook("dnd5e.postSkillRollConfiguration", "skill", rolls, process);
+  });
+
+  Hooks.on("midi-qol.preCheckHits", async (workflow) => {
+    const actor = workflow?.actor ?? workflow?.item?.actor ?? null;
+    const stagedCandidates = workflow?.[AFTER_ROLL_CANDIDATES_KEY];
+    if (!actor?.getFlag || !workflow?.attackRoll || !Array.isArray(stagedCandidates)) return;
+
+    const dominantById = new Map(
+      getDominantRollModifiers(actor, "attack")
+        .map((candidate) => [candidate.buffId, candidate])
+    );
+    for (const stagedCandidate of stagedCandidates) {
+      const candidate = dominantById.get(stagedCandidate.buffId);
+      if (!candidate || !canCandidateUseAfterRoll(candidate, "attack", workflow)) continue;
+
+      const result = await processAfterRollPromptCandidate(workflow, candidate, {
+        prompt: promptAfterRollModifierUse,
+        evaluateBonus: (currentCandidate) => evaluateRollModifierBonus(actor, currentCandidate),
+        addRoll: (attackRoll, bonusRoll) => globalThis.MidiQOL?.addRollTo?.(attackRoll, bonusRoll) ?? null,
+        consume: (currentCandidate, currentWorkflow, newRoll) =>
+          finalizeRollModifierApplication(actor, "attack", currentCandidate, [newRoll], {
+            injectionConfirmed: true,
+          }),
+      });
+      debugLog(`[${MODULE_ID}] Prompt après jet Midi-QOL traité`, {
+        workflowId: workflow?.id ?? workflow?.uuid ?? null,
+        actorUuid: actor.uuid ?? null,
+        buffId: candidate.buffId,
+        status: result.status,
+      });
+    }
   });
 
   Hooks.on("midi-qol.AttackRollComplete", async (workflow) => {

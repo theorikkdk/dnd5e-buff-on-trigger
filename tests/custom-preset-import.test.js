@@ -373,6 +373,53 @@ test("prompt roll modifier consumption mode survives import normalization", () =
   assert.equal(result.preset.flag.rollModifier.consumptionMode, "prompt");
 });
 
+test("roll modifier prompt timing defaults to beforeRoll and accepts afterRoll", () => {
+  const defaultTiming = validate({
+    label: "Default prompt timing",
+    flag: {
+      rollModifier: {
+        enabled: true,
+        formula: "1d4",
+        rollTypes: ["attack"],
+        consumptionMode: "prompt",
+      },
+    },
+  });
+  const afterRoll = validate({
+    label: "After roll timing",
+    flag: {
+      rollModifier: {
+        enabled: true,
+        formula: "1d4",
+        rollTypes: ["attack"],
+        consumptionMode: "prompt",
+        promptTiming: "afterRoll",
+      },
+    },
+  });
+
+  assert.equal(defaultTiming.preset.flag.rollModifier.promptTiming, "beforeRoll");
+  assert.equal(afterRoll.preset.flag.rollModifier.promptTiming, "afterRoll");
+});
+
+test("unknown roll modifier prompt timing is normalized to beforeRoll with a warning", () => {
+  const result = validate({
+    label: "Bad prompt timing",
+    flag: {
+      rollModifier: {
+        enabled: true,
+        formula: "1d4",
+        rollTypes: ["attack"],
+        consumptionMode: "prompt",
+        promptTiming: "later",
+      },
+    },
+  });
+
+  assert.equal(result.preset.flag.rollModifier.promptTiming, "beforeRoll");
+  assert.ok(result.warnings.some((warning) => warning.includes("rollModifier.promptTiming")));
+});
+
 test("preset without a plain flag object is rejected", () => {
   for (const flag of [undefined, null, "bad", [], 42]) {
     const result = validate({ label: "Invalid", flag });

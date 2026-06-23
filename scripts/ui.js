@@ -1133,6 +1133,10 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (temporaryHpEnabled) temporaryHpEnabled.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const rollModifierEnabled = this.element.querySelector?.('[name="rollModifierEnabled"]');
     if (rollModifierEnabled) rollModifierEnabled.addEventListener("change", () => window.botUpdateRollModifierUI(form));
+    const rollModifierPromptBeforeUse = this.element.querySelector?.('[name="rollModifierPromptBeforeUse"]');
+    if (rollModifierPromptBeforeUse) {
+      rollModifierPromptBeforeUse.addEventListener("change", () => window.botUpdateRollModifierUI(form));
+    }
     const statusInput = this.element.querySelector?.('[name="statusIdsList"]');
     if (statusInput) statusInput.addEventListener("change", () => window.botUpdateEffectSectionsUI(form));
     const targetModeSelect = this.element.querySelector?.('[name="targetMode"]');
@@ -1387,6 +1391,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       rollModifierTypeAbility:   (raw.rollModifier?.rollTypes ?? []).includes("ability"),
       rollModifierTypeSkill:     (raw.rollModifier?.rollTypes ?? []).includes("skill"),
       rollModifierPromptBeforeUse: raw.rollModifier?.consumptionMode === "prompt",
+      rollModifierPromptTimingAfter: raw.rollModifier?.promptTiming === "afterRoll",
       abilityCheckAdvantageOptions,
       abilityCheckDisadvantageOptions,
       savingThrowAdvantageOptions,
@@ -1828,6 +1833,9 @@ function buildBuffConfigFromForm(form) {
       formula: rollModifierFormula,
       rollTypes,
       consumptionMode: readFormValue(form, "rollModifierPromptBeforeUse") ? "prompt" : "automatic",
+      promptTiming: readFormValue(form, "rollModifierPromptTiming", "beforeRoll") === "afterRoll"
+        ? "afterRoll"
+        : "beforeRoll",
     } : null,
     buffs: {
       ac: readNumberFormValue(form, "buffAC"),
@@ -2171,7 +2179,7 @@ function formHasDraftConfiguration(form) {
   if (Object.keys(app?.item?.getFlag?.(MODULE_ID, "buffTrigger") ?? {}).length) return true;
   const relevantFields = [
     "enabled", "rememberTargetOnActivation", "fallbackToSelfIfNoTarget", "allowMultipleTargets", "multiTargetLimitEnabled", "multiTargetLimitBaseTargets", "multiTargetLimitBaseSpellLevel", "multiTargetLimitTargetsPerLevelAbove", "requireStoredTargetMatch", "requireBearerTemporaryHp", "targetFilterCreatureTypesList", "excludedTargetFilterCreatureTypesList", "damageFormula", "damageTargetCreatureTypesList", "healingFormula",
-    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "rollModifierPromptBeforeUse", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "statusEndBuffWhenRemoved", "statusProtectWhileBuffActive", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
+    "temporaryHpFormula", "rollModifierEnabled", "rollModifierFormula", "rollModifierPromptBeforeUse", "rollModifierPromptTiming", "statusId", "statusIdsList", "statusRemoveWhenBuffEnds", "statusEndBuffWhenRemoved", "statusProtectWhileBuffActive", "saveAbility", "saveRollMode", "saveRepeatEnabled", "saveRepeatRollMode", "saveRepeatOnDamaged", "saveRepeatOnDamagedRollMode", "charges",
     "endConditionOnAttack", "endConditionOnSpellCast", "endConditionOnDamageDealt", "endConditionOnDamageTaken", "endConditionOnDamageTakenTypesList", "endConditionOnTemporaryHpLost",
     "remindersEnabled", "remindersMessage", "remindersTimingActivation", "remindersTimingTurnStart", "remindersTimingTurnEnd", "remindersTimingBuffEnd", "remindersVisibility",
     "buffIncomingAttackMode",
@@ -2273,6 +2281,7 @@ function applyPresetFlagToForm(form, flag) {
   setFormValue(form, "rollModifierAbility", rollTypes.includes("ability"));
   setFormValue(form, "rollModifierSkill", rollTypes.includes("skill"));
   setFormValue(form, "rollModifierPromptBeforeUse", flag.rollModifier?.consumptionMode === "prompt");
+  setFormValue(form, "rollModifierPromptTiming", flag.rollModifier?.promptTiming === "afterRoll" ? "afterRoll" : "beforeRoll");
 
   setFormValue(form, "damageFormula", flag.damage?.formula ?? "");
   setFormValue(form, "damageType", flag.damage?.type ?? "");
@@ -2975,6 +2984,11 @@ window.botUpdateRollModifierUI = function(form) {
   const enabled = form.querySelector('[name="rollModifierEnabled"]');
   if (details && enabled) {
     details.style.display = enabled.checked ? "" : "none";
+  }
+  const promptEnabled = form.querySelector('[name="rollModifierPromptBeforeUse"]');
+  const promptTiming = form.querySelector('#bot-roll-modifier-prompt-timing');
+  if (promptTiming && promptEnabled) {
+    promptTiming.style.display = promptEnabled.checked ? "" : "none";
   }
   const app = Object.values(ui.windows).find(w => w.constructor.name === "BuffTriggerConfig")
     ?? Object.values(foundry.applications.instances ?? {}).find(w => w.constructor.name === "BuffTriggerConfig");

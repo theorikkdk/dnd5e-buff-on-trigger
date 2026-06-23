@@ -155,6 +155,15 @@ Hooks.once("init", () => {
     default: false,
   });
 
+  game.settings.register(MODULE_ID, "experimentalAfterRollPrompt", {
+    name: "BOT.settings.experimentalAfterRollPrompt.name",
+    hint: "BOT.settings.experimentalAfterRollPrompt.hint",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false,
+  });
+
   game.settings.register(MODULE_ID, "customPresets", {
     scope: "world",
     config: false,

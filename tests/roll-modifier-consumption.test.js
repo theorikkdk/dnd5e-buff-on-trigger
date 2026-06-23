@@ -3,14 +3,17 @@ import assert from "node:assert/strict";
 
 import {
   buildRollModifierPromptDecision,
+  canUseAfterRollPrompt,
   createRollModifierPromptWrapper,
   finalizeMidiAttackRollModifierWorkflow,
   getBardicInspirationDie,
   getMidiAttackRollModifierContext,
   getRollModifierConsumptionMode,
   getRollModifierPromptDisplay,
+  getRollModifierPromptTiming,
   isPromptableRollModifierCandidate,
   isRollModifierMetadataConsumed,
+  processAfterRollPromptCandidate,
   shouldApplyRollModifierCandidate,
 } from "../scripts/roll-modifier-consumption.js";
 
@@ -36,6 +39,54 @@ test("missing or unknown consumption mode remains automatic", () => {
   assert.equal(getRollModifierConsumptionMode({}), "automatic");
   assert.equal(getRollModifierConsumptionMode({ consumptionMode: "unknown" }), "automatic");
   assert.equal(shouldApplyRollModifierCandidate(candidate()), true);
+});
+
+test("missing or unknown prompt timing remains beforeRoll", () => {
+  assert.equal(getRollModifierPromptTiming({}), "beforeRoll");
+  assert.equal(getRollModifierPromptTiming({ promptTiming: "unknown" }), "beforeRoll");
+  assert.equal(getRollModifierPromptTiming({ promptTiming: "afterRoll" }), "afterRoll");
+});
+
+test("afterRoll requires the experimental setting and a standard Midi attack workflow", () => {
+  const optional = candidate({ consumptionMode: "prompt" });
+  optional.activeFlag.rollModifier.promptTiming = "afterRoll";
+  const workflow = {
+    actor: {},
+    setAttackRoll: async () => undefined,
+  };
+
+  assert.equal(canUseAfterRollPrompt({
+    candidate: optional,
+    rollType: "attack",
+    midiActive: true,
+    experimentalEnabled: false,
+    addRollAvailable: true,
+    workflow,
+  }), false);
+  assert.equal(canUseAfterRollPrompt({
+    candidate: optional,
+    rollType: "attack",
+    midiActive: true,
+    experimentalEnabled: true,
+    addRollAvailable: true,
+    workflow,
+  }), true);
+  assert.equal(canUseAfterRollPrompt({
+    candidate: optional,
+    rollType: "save",
+    midiActive: true,
+    experimentalEnabled: true,
+    addRollAvailable: true,
+    workflow,
+  }), false);
+  assert.equal(canUseAfterRollPrompt({
+    candidate: optional,
+    rollType: "attack",
+    midiActive: true,
+    experimentalEnabled: true,
+    addRollAvailable: false,
+    workflow,
+  }), false);
 });
 
 test("automatic mode applies without a prompt decision", () => {
@@ -302,6 +353,103 @@ test("prompt display preserves a custom item name as a coherent fallback", () =>
     name: "Coup de pouce héroïque",
     formula: "1d6",
   });
+});
+
+test("afterRoll decline leaves the attack roll unchanged and does not consume", async () => {
+  const attackRoll = { total: 14 };
+  const workflow = { attackRoll };
+  let consumed = 0;
+
+  const result = await processAfterRollPromptCandidate(workflow, {
+    buffId: "buff-inspiration",
+  }, {
+    prompt: async () => false,
+    evaluateBonus: async () => ({ total: 8 }),
+    addRoll: () => ({ total: 22 }),
+    setAttackRoll: async (roll) => { workflow.attackRoll = roll; },
+    consume: async () => { consumed += 1; },
+  });
+
+  assert.equal(result.status, "declined");
+  assert.equal(workflow.attackRoll, attackRoll);
+  assert.equal(consumed, 0);
+});
+
+test("afterRoll approval combines the roll then consumes the exact candidate", async () => {
+  const attackRoll = { total: 14, terms: ["d20"] };
+  const bonusRoll = { total: 8, terms: ["d8"] };
+  const newRoll = { total: 22, terms: ["d20", "d8"] };
+  const workflow = { attackRoll };
+  const calls = [];
+
+  const result = await processAfterRollPromptCandidate(workflow, {
+    buffId: "buff-inspiration",
+  }, {
+    prompt: async () => true,
+    evaluateBonus: async () => bonusRoll,
+    addRoll: (base, bonus) => {
+      calls.push(["add", base, bonus]);
+      return newRoll;
+    },
+    setAttackRoll: async (roll) => {
+      calls.push(["set", roll]);
+      workflow.attackRoll = roll;
+    },
+    consume: async (currentCandidate) => {
+      calls.push(["consume", currentCandidate.buffId]);
+      return true;
+    },
+  });
+
+  assert.equal(result.status, "consumed");
+  assert.equal(workflow.attackRoll, newRoll);
+  assert.deepEqual(newRoll.terms[0], "d20");
+  assert.deepEqual(calls.map(([type]) => type), ["add", "set", "consume"]);
+  assert.equal(calls[2][1], "buff-inspiration");
+});
+
+test("afterRoll setAttackRoll failure does not consume and can be retried", async () => {
+  const workflow = { attackRoll: { total: 14 } };
+  let consumed = 0;
+  const options = {
+    prompt: async () => true,
+    evaluateBonus: async () => ({ total: 8 }),
+    addRoll: () => ({ total: 22 }),
+    setAttackRoll: async () => { throw new Error("set failed"); },
+    consume: async () => { consumed += 1; },
+  };
+
+  assert.equal(
+    (await processAfterRollPromptCandidate(workflow, { buffId: "buff-failed" }, options)).status,
+    "failed"
+  );
+  assert.equal(consumed, 0);
+  assert.equal(
+    (await processAfterRollPromptCandidate(workflow, { buffId: "buff-failed" }, {
+      ...options,
+      prompt: async () => false,
+    })).status,
+    "declined"
+  );
+});
+
+test("afterRoll processing is idempotent per workflow and buffId", async () => {
+  const workflow = { attackRoll: { total: 14 } };
+  let prompts = 0;
+  let consumptions = 0;
+  const candidate = { buffId: "buff-once" };
+  const options = {
+    prompt: async () => { prompts += 1; return true; },
+    evaluateBonus: async () => ({ total: 4 }),
+    addRoll: () => ({ total: 18 }),
+    setAttackRoll: async (roll) => { workflow.attackRoll = roll; },
+    consume: async () => { consumptions += 1; return true; },
+  };
+
+  assert.equal((await processAfterRollPromptCandidate(workflow, candidate, options)).status, "consumed");
+  assert.equal((await processAfterRollPromptCandidate(workflow, candidate, options)).status, "duplicate");
+  assert.equal(prompts, 1);
+  assert.equal(consumptions, 1);
 });
 
 test("Midi attack completion exposes the exact approved prompt metadata and real roll", () => {

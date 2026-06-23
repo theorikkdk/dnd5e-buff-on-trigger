@@ -17,6 +17,7 @@ const TRIGGER_TYPES = new Set([
 const STACKING_MODES = new Set(["normal", "alwaysStack", "sameEffect", "noStack"]);
 const TRIGGER_FREQUENCIES = new Set(["none", "turn", "round"]);
 const ROLL_MODIFIER_CONSUMPTION_MODES = new Set(["automatic", "prompt"]);
+const ROLL_MODIFIER_PROMPT_TIMINGS = new Set(["beforeRoll", "afterRoll"]);
 export const CUSTOM_PRESET_SCHEMA_VERSION = 1;
 
 const TOP_LEVEL_OBJECT_FIELDS = [
@@ -122,6 +123,13 @@ function sanitizeKnownFlagTypes(flag, warnings) {
       flag.rollModifier.consumptionMode = "automatic";
     } else {
       flag.rollModifier.consumptionMode = consumptionMode;
+    }
+    const promptTiming = String(flag.rollModifier.promptTiming ?? "beforeRoll").trim();
+    if (!ROLL_MODIFIER_PROMPT_TIMINGS.has(promptTiming)) {
+      warnings.push(`rollModifier.promptTiming: normalized "${promptTiming}" to "beforeRoll"`);
+      flag.rollModifier.promptTiming = "beforeRoll";
+    } else {
+      flag.rollModifier.promptTiming = promptTiming;
     }
   }
   if (isPlainObject(flag.buffs)) {
