@@ -9,6 +9,14 @@ const CRITICAL_KEYS = [
   "BOT.ui.presets.title",
   "BOT.settings.experimentalAfterRollPrompt.name",
   "BOT.settings.experimentalAfterRollPrompt.hint",
+  "BOT.ui.rollModifier.promptTitle",
+  "BOT.ui.rollModifier.promptMessage",
+  "BOT.ui.rollModifier.afterRollPromptMessage",
+  "BOT.ui.rollModifier.bardicDieLabel",
+  "BOT.ui.rollModifier.promptEffect.bardicInspiration",
+  "BOT.ui.rollModifier.promptTimingLabel",
+  "BOT.ui.rollModifier.promptTiming.beforeRoll",
+  "BOT.ui.rollModifier.promptTiming.afterRoll",
 ];
 
 async function readLanguageFile(path) {
