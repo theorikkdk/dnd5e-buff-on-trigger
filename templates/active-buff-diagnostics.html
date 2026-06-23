@@ -89,6 +89,18 @@
                           <strong>{{localize "BOT.diagnostics.suggestionLabel"}}</strong>
                           {{suggestion}}
                         </div>
+                        {{#if repairAction}}
+                          <button
+                            type="button"
+                            class="bot-diagnostics-repair-button"
+                            data-row-action="repair-issue"
+                            data-diagnostic-index="{{../diagnosticIndex}}"
+                            data-issue-code="{{repairAction.issueCode}}"
+                          >
+                            <i class="fas fa-screwdriver-wrench"></i>
+                            {{localize repairAction.labelKey}}
+                          </button>
+                        {{/if}}
                       </li>
                     {{/each}}
                   </ul>

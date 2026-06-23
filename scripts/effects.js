@@ -691,6 +691,27 @@ export async function refreshStoredTargetIndicator(ownerActor, previousFlag = nu
   }
 }
 
+export async function ensureStoredTargetIndicatorForActiveBuff(ownerActor, activeBuff) {
+  const metadata = getStoredTargetIndicatorMetadata(ownerActor, activeBuff);
+  if (!metadata) return false;
+
+  const existing = metadata.targetActor.effects.find(
+    (effect) => effect.flags?.[MODULE_ID]?.storedTargetIndicator === true
+      && effect.flags?.[MODULE_ID]?.storedTargetIndicatorKey === metadata.key
+  );
+  if (existing) return false;
+
+  await metadata.targetActor.createEmbeddedDocuments("ActiveEffect", [{
+    name: metadata.effectName,
+    img: metadata.effectImg,
+    statuses: ["bot-stored-target"],
+    flags: { [MODULE_ID]: metadata.effectFlags },
+    duration: {},
+  }]);
+  debugLog(`[${MODULE_ID}] Indicateur de marque restaure sur ${metadata.targetActor.name}, origine ${metadata.originName}`);
+  return true;
+}
+
 function getActiveBuffStackEntries(actor, stackingKey) {
   const key = getStackingKey({ stackingKey });
   if (!key) return [];
@@ -734,6 +755,29 @@ async function createActiveBuffIndicator(actor, activeBuff, changes = []) {
     duration: durationRounds ? { rounds: durationRounds, startRound: game.combat?.round ?? 0 } : {},
     flags: { [MODULE_ID]: { indicator: true, buffId: activeBuff.buffId ?? null, ...getBuffStackingFlags(activeBuff) } },
   }]);
+}
+
+export async function ensureActiveBuffIndicatorForActiveBuff(actor, activeBuff, extraChanges = []) {
+  if (!actor?.effects || !activeBuff?.buffId) return false;
+  if (isActiveBuffRemovalPending(actor, activeBuff.buffId)) return false;
+
+  const existing = actor.effects.find((effect) =>
+    isActiveBuffIndicator(effect)
+    && effect.flags?.[MODULE_ID]?.buffId === activeBuff.buffId
+    && !effect.deleted
+  );
+  if (existing) {
+    const desiredName = getActiveBuffIndicatorName(activeBuff);
+    const desiredImg = activeBuff.itemImg ?? BUFF_ICON;
+    const updates = {};
+    if (existing.name !== desiredName) updates.name = desiredName;
+    if (existing.img !== desiredImg) updates.img = desiredImg;
+    if (Object.keys(updates).length) await existing.update(updates);
+    return Object.keys(updates).length > 0;
+  }
+
+  await createActiveBuffIndicator(actor, activeBuff, extraChanges);
+  return true;
 }
 
 export async function removeMechanicalEffectsForStack(actor, stackingKey) {
@@ -1744,6 +1788,39 @@ export async function ensureLinkedStatusesForActiveBuff(actorOrToken, flag = nul
     }
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans ensureLinkedStatusesForActiveBuff :`, error);
+  }
+}
+
+export async function repairLinkedStatusesForActiveBuff(actorOrToken, flag = null) {
+  try {
+    const actor = actorOrToken?.actor ?? actorOrToken;
+    if (!actor?.getFlag || !actor?.toggleStatusEffect || !flag) return false;
+    if (flag.status?.removeWhenBuffEnds !== true || flag.status?.protectWhileBuffActive !== true) return false;
+
+    const statusIds = getConfiguredStatusIds(flag);
+    if (!statusIds.length) return false;
+
+    let changed = false;
+    for (const statusId of statusIds) {
+      const linkedEffect = actor.effects?.find((effect) =>
+        linkedStatusMatchesBuff(effect, actor, flag)
+        && effect.flags?.[MODULE_ID]?.statusId === statusId
+        && !effect.disabled
+      ) ?? null;
+      if (linkedEffect) continue;
+
+      if (!actorHasActiveStatus(actor, statusId)) {
+        await actor.toggleStatusEffect(statusId, { active: true });
+        changed = true;
+      }
+      await markLinkedStatusEffect(actor, statusId, actor, flag);
+      changed = true;
+      debugLog(`[${MODULE_ID}] Statut lié restauré depuis le diagnostic : ${statusId}`);
+    }
+    return changed;
+  } catch (error) {
+    console.error(`[${MODULE_ID}] Erreur dans repairLinkedStatusesForActiveBuff :`, error);
+    throw error;
   }
 }
 

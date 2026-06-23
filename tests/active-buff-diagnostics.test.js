@@ -9,7 +9,9 @@ import {
   collectActiveSceneBuffActorContexts,
   filterActiveBuffDiagnosticReport,
   getActiveBuffDiagnosticNavigation,
+  getActiveBuffDiagnosticRepairActions,
   getActiveBuffDiagnosticSuggestion,
+  repairActiveBuffDiagnosticIssue,
 } from "../scripts/active-buff-diagnostics.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
@@ -657,4 +659,196 @@ test("collected diagnostic JSON carries suggestions without changing filters or 
   assert.equal(filtered.visibleCount, 1);
   assert.equal(filtered.inconsistentCount, 1);
   assert.ok(json.entries[0].issues.every((issue) => typeof issue.suggestion === "string"));
+});
+
+test("repairable diagnostic issues expose targeted GM repair actions", () => {
+  const actor = new MockActor({
+    uuid: "Actor.repairable",
+    name: "Repairable",
+    activeBuffs: {
+      buff1: activeBuff("buff1", {
+        status: {
+          id: "blinded",
+          ids: ["blinded"],
+          removeWhenBuffEnds: true,
+          protectWhileBuffActive: true,
+        },
+      }),
+    },
+  });
+  const entry = {
+    ...diagnosticEntry({
+      actorName: "Repairable",
+      buffName: "Guidance",
+      buffId: "buff1",
+    }),
+    issues: [
+      { code: "missingActiveIndicator", severity: "warning" },
+      { code: "missingLinkedStatus", severity: "warning" },
+      { code: "unresolvedSourceItem", severity: "warning" },
+    ],
+  };
+
+  const actions = getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: true });
+
+  assert.deepEqual(
+    actions.map((action) => action.issueCode),
+    ["missingActiveIndicator", "missingLinkedStatus"],
+  );
+});
+
+test("non-GM and insufficient source data do not expose repair actions", () => {
+  const actor = new MockActor({
+    uuid: "Actor.no-repair",
+    name: "No repair",
+    activeBuffs: {
+      buff1: activeBuff("buff1", {
+        status: {
+          id: "blinded",
+          ids: ["blinded"],
+          removeWhenBuffEnds: true,
+          protectWhileBuffActive: true,
+          targetMode: "storedTarget",
+        },
+      }),
+    },
+  });
+  const entry = {
+    ...diagnosticEntry({
+      actorName: "No repair",
+      buffName: "Guidance",
+      buffId: "buff1",
+    }),
+    issues: [
+      { code: "missingLinkedStatus", severity: "warning" },
+      { code: "duplicateNoStack", severity: "critical" },
+    ],
+  };
+
+  assert.deepEqual(getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: false }), []);
+  assert.deepEqual(getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: true }), []);
+});
+
+test("repairing a missing active indicator calls the targeted helper with the exact buffId", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.repair-indicator",
+    name: "Repair indicator",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "Repair indicator",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  const calls = [];
+
+  const result = await repairActiveBuffDiagnosticIssue(actor, entry, "missingActiveIndicator", {
+    ensureActiveIndicator: async (targetActor, activeBuff) => {
+      calls.push({ actorUuid: targetActor.uuid, buffId: activeBuff.buffId });
+      return true;
+    },
+  });
+
+  assert.deepEqual(calls, [{ actorUuid: "Actor.repair-indicator", buffId: "buff1" }]);
+  assert.deepEqual(result, { repaired: true, changed: true, issueCode: "missingActiveIndicator" });
+});
+
+test("repairing a linked status calls the targeted helper only when the status is clearly known", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.repair-status",
+    name: "Repair status",
+    activeBuffs: {
+      buff1: activeBuff("buff1", {
+        status: {
+          id: "deafened",
+          ids: ["deafened"],
+          removeWhenBuffEnds: true,
+          protectWhileBuffActive: true,
+        },
+      }),
+    },
+  });
+  const entry = diagnosticEntry({
+    actorName: "Repair status",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  const calls = [];
+
+  const result = await repairActiveBuffDiagnosticIssue(actor, entry, "missingLinkedStatus", {
+    repairLinkedStatuses: async (targetActor, activeBuff) => {
+      calls.push({ actorUuid: targetActor.uuid, buffId: activeBuff.buffId, statusId: activeBuff.status.id });
+      return true;
+    },
+  });
+
+  assert.deepEqual(calls, [{ actorUuid: "Actor.repair-status", buffId: "buff1", statusId: "deafened" }]);
+  assert.equal(result.repaired, true);
+});
+
+test("stored-target indicator diagnostics are repairable only when a stored target is known", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.repair-stored",
+    name: "Repair stored",
+    activeBuffs: {
+      buff1: activeBuff("buff1", {
+        rememberTargetOnActivation: true,
+        storedTargetActorUuid: "Actor.target",
+      }),
+    },
+  });
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: (uuid) => {
+      if (uuid === "Actor.target") return { uuid, name: "Stored target" };
+      return resolver(uuid);
+    },
+    concentrationPredicate: () => false,
+  });
+  const entry = report.entries[0];
+  const calls = [];
+
+  assert.ok(entry.warnings.includes("missingStoredTargetIndicator"));
+  assert.deepEqual(
+    getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: true }).map((action) => action.issueCode),
+    ["missingActiveIndicator", "missingStoredTargetIndicator"],
+  );
+
+  const result = await repairActiveBuffDiagnosticIssue(actor, entry, "missingStoredTargetIndicator", {
+    ensureStoredTargetIndicator: async (targetActor, activeBuff) => {
+      calls.push({ actorUuid: targetActor.uuid, buffId: activeBuff.buffId });
+      return true;
+    },
+  });
+
+  assert.deepEqual(calls, [{ actorUuid: "Actor.repair-stored", buffId: "buff1" }]);
+  assert.equal(result.repaired, true);
+});
+
+test("repair API refuses non-repairable issues and missing active buff data", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.refuse-repair",
+    name: "Refuse repair",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "Refuse repair",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  const missingEntry = { ...entry, buffId: "missing" };
+
+  assert.deepEqual(
+    await repairActiveBuffDiagnosticIssue(actor, entry, "duplicateNoStack"),
+    { repaired: false, reason: "not-repairable" },
+  );
+  assert.deepEqual(
+    await repairActiveBuffDiagnosticIssue(actor, missingEntry, "missingActiveIndicator"),
+    { repaired: false, reason: "missing-active-buff" },
+  );
+});
+
+test("diagnostic UI does not add a global repair-all action", async () => {
+  const template = await readFile("templates/active-buff-diagnostics.html", "utf8");
+  assert.equal(template.includes("repair-all"), false);
+  assert.equal(template.includes("data-action=\"repair\""), false);
 });

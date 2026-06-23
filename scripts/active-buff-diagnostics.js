@@ -1,6 +1,11 @@
 import { MODULE_ID } from "./constants.js";
 import { getActiveBuffs, getStackingKey, getStackingMode } from "./active-buffs.js";
 import { findConcentrationEffectForBuff, isConcentrationBuff } from "./concentration.js";
+import {
+  ensureActiveBuffIndicatorForActiveBuff,
+  repairLinkedStatusesForActiveBuff,
+  ensureStoredTargetIndicatorForActiveBuff,
+} from "./effects.js";
 
 const FormApplicationBase = globalThis.FormApplication ?? class {};
 const KNOWN_STACKING_MODES = new Set(["normal", "sameEffect", "noStack", "alwaysStack"]);
@@ -20,6 +25,7 @@ const DIAGNOSTIC_SEVERITIES = Object.freeze({
   missingStackingKey: "critical",
   duplicateNoStack: "critical",
   missingActiveIndicator: "warning",
+  missingStoredTargetIndicator: "warning",
   missingLinkedStatus: "warning",
   missingConcentration: "warning",
   invalidDuration: "warning",
@@ -41,11 +47,27 @@ const DIAGNOSTIC_SUGGESTION_FALLBACKS = Object.freeze({
   missingStackingKey: "Add a stable stackingKey to the preset or item.",
   duplicateNoStack: "Only one instance should remain active. Correct the duplicate manually for now.",
   missingActiveIndicator: "A refresh or repair action may be offered in a future version.",
+  missingStoredTargetIndicator: "A targeted repair may restore the stored-target indicator from this buff data.",
   missingLinkedStatus: "A refresh or repair action may be offered in a future version.",
   missingConcentration: "A refresh or repair action may be offered in a future version.",
   invalidDuration: "Check the configured duration or remove the buff manually if the effect has ended.",
   expiredDuration: "Check the duration and remove the buff manually if the effect has ended.",
   invalidAppliedAt: "Check the application timestamp in the buff data before editing it.",
+});
+
+const DIAGNOSTIC_REPAIR_ACTIONS = Object.freeze({
+  missingActiveIndicator: {
+    action: "restore-active-indicator",
+    labelKey: "BOT.diagnostics.repair.restoreActiveIndicator",
+  },
+  missingStoredTargetIndicator: {
+    action: "restore-stored-target-indicator",
+    labelKey: "BOT.diagnostics.repair.restoreStoredTargetIndicator",
+  },
+  missingLinkedStatus: {
+    action: "restore-linked-status",
+    labelKey: "BOT.diagnostics.repair.restoreLinkedStatus",
+  },
 });
 
 export function getActiveBuffDiagnosticSuggestion(code, {
@@ -161,6 +183,27 @@ function getConfiguredStatusIds(activeBuff) {
   )];
 }
 
+function resolveStoredTargetActorForDiagnostic(activeBuff, resolveUuid = globalThis.fromUuidSync) {
+  if (activeBuff?.rememberTargetOnActivation !== true) return null;
+  const tokenUuid = activeBuff?.storedTargetTokenUuid ?? null;
+  const tokenDocument = resolveDocument(tokenUuid, resolveUuid);
+  if (tokenDocument?.actor?.uuid) return tokenDocument.actor;
+  if (tokenDocument?.object?.actor?.uuid) return tokenDocument.object.actor;
+
+  const actorUuid = activeBuff?.storedTargetActorUuid ?? null;
+  const actor = resolveDocument(actorUuid, resolveUuid);
+  if (actor?.uuid) return actor;
+
+  const targetTokenId = activeBuff?.targetTokenId ?? null;
+  const token = targetTokenId ? globalThis.canvas?.tokens?.get?.(targetTokenId) ?? null : null;
+  return token?.actor ?? null;
+}
+
+function expectsStoredTargetIndicator(activeBuff, context, resolveUuid = globalThis.fromUuidSync) {
+  const storedTargetActor = resolveStoredTargetActorForDiagnostic(activeBuff, resolveUuid);
+  return Boolean(storedTargetActor?.uuid && storedTargetActor.uuid !== context?.actorUuid);
+}
+
 function formatDuration(activeBuff) {
   const rounds = Number(activeBuff?.duration?.rounds);
   const parts = [];
@@ -181,6 +224,7 @@ function buildDiagnosticIssues({
   indicators,
   activeIndicatorEffects,
   linkedStatuses,
+  storedTargetIndicatorExpected,
   concentrationExpected,
   concentrationEffect,
 }) {
@@ -203,6 +247,9 @@ function buildDiagnosticIssues({
   if (rawStackingMode && !KNOWN_STACKING_MODES.has(rawStackingMode)) addIssue("unknownStackingMode");
   if (STACKING_MODES_REQUIRING_KEY.has(stackingMode) && !stackingKey) addIssue("missingStackingKey");
   if (!indicators.active.length) addIssue("missingActiveIndicator");
+  if (storedTargetIndicatorExpected && !indicators.storedTarget.length) {
+    addIssue("missingStoredTargetIndicator");
+  }
   if (getConfiguredStatusIds(activeBuff).length && !linkedStatuses.length) {
     addIssue("missingLinkedStatus");
   }
@@ -310,6 +357,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         statusId: getEffectModuleFlag(effect).statusId ?? [...(effect.statuses ?? [])][0] ?? null,
         name: effect.name ?? null,
       }));
+      const storedTargetIndicatorExpected = expectsStoredTargetIndicator(activeBuff, context, resolveUuid);
       const readableBuffName = activeBuff.itemName ?? activeBuff.name ?? sourceItem?.name ?? null;
       const configuredStackingMode = String(activeBuff?.stackingMode ?? "").trim() || null;
       const stackingMode = getStackingMode(activeBuff);
@@ -325,6 +373,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         indicators,
         activeIndicatorEffects: activeIndicators.map(({ effect }) => effect),
         linkedStatuses,
+        storedTargetIndicatorExpected,
         concentrationExpected,
         concentrationEffect,
       });
@@ -360,6 +409,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         },
         linkedStatuses: statusDetails,
         indicators,
+        storedTargetIndicatorExpected,
         duration: {
           rounds: Number.isFinite(Number(activeBuff?.duration?.rounds))
             ? Number(activeBuff.duration.rounds)
@@ -523,6 +573,81 @@ export function getActiveBuffDiagnosticNavigation(entry, {
   };
 }
 
+function getActiveBuffForDiagnosticEntry(actor, entry) {
+  const buffId = String(entry?.buffId ?? "").trim();
+  if (!actor?.getFlag || !buffId) return null;
+  const activeBuff = getActiveBuffs(actor)?.[buffId] ?? null;
+  if (!activeBuff || typeof activeBuff !== "object" || Array.isArray(activeBuff)) return null;
+  return {
+    ...activeBuff,
+    buffId: activeBuff.buffId ?? buffId,
+  };
+}
+
+function canRepairIssueFromActiveBuff(issueCode, activeBuff) {
+  if (!activeBuff?.buffId) return false;
+  if (issueCode === "missingActiveIndicator") return true;
+  if (issueCode === "missingStoredTargetIndicator") {
+    return activeBuff.rememberTargetOnActivation === true
+      && Boolean(activeBuff.storedTargetActorUuid || activeBuff.storedTargetTokenUuid || activeBuff.targetTokenId);
+  }
+  if (issueCode === "missingLinkedStatus") {
+    return getConfiguredStatusIds(activeBuff).length > 0
+      && activeBuff.status?.removeWhenBuffEnds === true
+      && activeBuff.status?.protectWhileBuffActive === true
+      && !["storedTarget", "attacker"].includes(activeBuff.status?.targetMode ?? "triggerTarget");
+  }
+  return false;
+}
+
+export function getActiveBuffDiagnosticRepairActions(entry, {
+  actor = null,
+  isGM = globalThis.game?.user?.isGM === true,
+} = {}) {
+  if (!isGM || !entry?.buffId || !actor) return [];
+  const activeBuff = getActiveBuffForDiagnosticEntry(actor, entry);
+  if (!activeBuff) return [];
+  return (entry?.issues ?? [])
+    .map((issue) => {
+      const definition = DIAGNOSTIC_REPAIR_ACTIONS[issue?.code];
+      if (!definition) return null;
+      if (!canRepairIssueFromActiveBuff(issue.code, activeBuff)) return null;
+      return {
+        issueCode: issue.code,
+        action: definition.action,
+        labelKey: definition.labelKey,
+      };
+    })
+    .filter(Boolean);
+}
+
+export async function repairActiveBuffDiagnosticIssue(actor, entry, issueCode, {
+  ensureActiveIndicator = ensureActiveBuffIndicatorForActiveBuff,
+  ensureStoredTargetIndicator = ensureStoredTargetIndicatorForActiveBuff,
+  repairLinkedStatuses = repairLinkedStatusesForActiveBuff,
+} = {}) {
+  const activeBuff = getActiveBuffForDiagnosticEntry(actor, entry);
+  if (!activeBuff) return { repaired: false, reason: "missing-active-buff" };
+  if (!canRepairIssueFromActiveBuff(issueCode, activeBuff)) {
+    return { repaired: false, reason: "not-repairable" };
+  }
+
+  if (issueCode === "missingActiveIndicator") {
+    const changed = await ensureActiveIndicator(actor, activeBuff);
+    return { repaired: true, changed: changed !== false, issueCode };
+  }
+  if (issueCode === "missingStoredTargetIndicator") {
+    const changed = await ensureStoredTargetIndicator(actor, activeBuff);
+    return { repaired: true, changed: changed !== false, issueCode };
+  }
+  if (issueCode === "missingLinkedStatus") {
+    const changed = await repairLinkedStatuses(actor, activeBuff);
+    return { repaired: true, changed: changed !== false, issueCode };
+  }
+
+  return { repaired: false, reason: "not-repairable" };
+}
+
 export function buildActiveBuffDiagnosticEntrySummary(entry) {
   if (!entry) return "";
   const tokenNames = entry?.carrier?.tokenNames?.filter(Boolean) ?? [];
@@ -590,6 +715,7 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
 
   getData() {
     const contexts = collectActiveSceneBuffActorContexts();
+    const contextByActorUuid = new Map(contexts.map((context) => [context.actorUuid, context]));
     const report = collectActiveBuffDiagnostics(contexts);
     this._diagnosticReport = report;
     const filterState = this._filterState ?? { query: "", warningsOnly: false };
@@ -608,10 +734,15 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
       },
       rows: report.entries.map((entry, diagnosticIndex) => {
         const navigation = getActiveBuffDiagnosticNavigation(entry);
+        const repairActions = getActiveBuffDiagnosticRepairActions(entry, {
+          actor: contextByActorUuid.get(entry.carrier.actorUuid)?.actor ?? null,
+          isGM: game.user?.isGM === true,
+        });
         return {
           ...entry,
           diagnosticIndex,
           navigation,
+          repairActions,
           carrierLabel: [
             entry.carrier.actorName,
             entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
@@ -647,6 +778,7 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
             label: warningLabel(issue.code),
             suggestion: issue.suggestion ?? getActiveBuffDiagnosticSuggestion(issue.code),
             severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${issue.severity}`),
+            repairAction: repairActions.find((action) => action.issueCode === issue.code) ?? null,
           })),
         };
       }),
@@ -669,7 +801,9 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     for (const button of root?.querySelectorAll?.("[data-row-action]") ?? []) {
       button.addEventListener("click", () => {
         const entry = this._diagnosticReport?.entries?.[Number(button.dataset.diagnosticIndex)];
-        this._handleRowAction(button.dataset.rowAction, entry);
+        this._handleRowAction(button.dataset.rowAction, entry, {
+          issueCode: button.dataset.issueCode ?? null,
+        });
       });
     }
     const searchInput = root?.querySelector?.('[data-filter="search"]');
@@ -752,9 +886,13 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     };
   }
 
-  async _handleRowAction(action, entry) {
+  async _handleRowAction(action, entry, options = {}) {
     if (!game.user?.isGM || !entry) return;
     const targets = this._resolveRowTargets(entry);
+    if (action === "repair-issue") {
+      await this._repairDiagnosticIssue(entry, options.issueCode, targets.carrierActor);
+      return;
+    }
     if (action === "open-carrier") {
       targets.carrierActor?.sheet?.render?.(true);
       return;
@@ -787,6 +925,48 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     if (action === "copy-summary") {
       await this._copyText(buildActiveBuffDiagnosticEntrySummary(entry));
       ui.notifications.info(game.i18n.localize("BOT.diagnostics.summaryCopied"));
+    }
+  }
+
+  async _confirmRepair(entry, issueCode) {
+    const issueLabel = game.i18n.localize(`BOT.diagnostics.warning.${issueCode}`);
+    const title = game.i18n.localize("BOT.diagnostics.repair.confirmTitle");
+    const content = `<p>${game.i18n.format("BOT.diagnostics.repair.confirmContent", {
+      buff: entry?.buffName ?? entry?.buffId ?? game.i18n.localize("BOT.fallback.effectName"),
+      carrier: entry?.carrier?.actorName ?? entry?.carrier?.actorUuid ?? "—",
+      issue: issueLabel,
+    })}</p>`;
+    if (globalThis.Dialog?.confirm) {
+      return Dialog.confirm({
+        title,
+        content,
+        yes: () => true,
+        no: () => false,
+        defaultYes: false,
+      });
+    }
+    return globalThis.confirm?.(`${title}\n\n${content.replace(/<[^>]+>/g, "")}`) === true;
+  }
+
+  async _repairDiagnosticIssue(entry, issueCode, carrierActor) {
+    if (!issueCode || !carrierActor) {
+      ui.notifications.warn(game.i18n.localize("BOT.diagnostics.repair.unavailable"));
+      return;
+    }
+    const confirmed = await this._confirmRepair(entry, issueCode);
+    if (!confirmed) return;
+
+    try {
+      const result = await repairActiveBuffDiagnosticIssue(carrierActor, entry, issueCode);
+      if (!result.repaired) {
+        ui.notifications.warn(game.i18n.localize("BOT.diagnostics.repair.unavailable"));
+        return;
+      }
+      ui.notifications.info(game.i18n.localize("BOT.diagnostics.repair.success"));
+      this.render(false);
+    } catch (error) {
+      console.error(`[${MODULE_ID}] Erreur de réparation diagnostic :`, error);
+      ui.notifications.error(game.i18n.localize("BOT.diagnostics.repair.failed"));
     }
   }
 

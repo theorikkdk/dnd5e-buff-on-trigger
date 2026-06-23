@@ -808,6 +808,12 @@
   line-height: 1.25;
 }
 
+.bot-diagnostics-repair-button {
+  margin-top: 4px;
+  width: auto;
+  line-height: 1.2;
+}
+
 @media (max-width: 560px) {
   .bot-tabs {
     flex-wrap: wrap;
