@@ -3,6 +3,29 @@ import { getActiveBuffs, getStackingKey, getStackingMode } from "./active-buffs.
 import { findConcentrationEffectForBuff, isConcentrationBuff } from "./concentration.js";
 
 const FormApplicationBase = globalThis.FormApplication ?? class {};
+const KNOWN_STACKING_MODES = new Set(["normal", "sameEffect", "noStack", "alwaysStack"]);
+const STACKING_MODES_REQUIRING_KEY = new Set(["sameEffect", "noStack"]);
+
+const DIAGNOSTIC_SEVERITIES = Object.freeze({
+  missingBuffId: "critical",
+  missingBuffName: "warning",
+  missingTriggerType: "warning",
+  invalidActiveBuffsMap: "critical",
+  invalidActiveBuffEntry: "critical",
+  missingSourceActorUuid: "info",
+  unresolvedSourceActor: "warning",
+  missingSourceItem: "info",
+  unresolvedSourceItem: "warning",
+  unknownStackingMode: "critical",
+  missingStackingKey: "critical",
+  duplicateNoStack: "critical",
+  missingActiveIndicator: "warning",
+  missingLinkedStatus: "warning",
+  missingConcentration: "warning",
+  invalidDuration: "warning",
+  expiredDuration: "warning",
+  invalidAppliedAt: "info",
+});
 
 function toArray(value) {
   if (!value) return [];
@@ -106,31 +129,61 @@ function formatDuration(activeBuff) {
   return parts.join(", ");
 }
 
-function buildWarningCodes({
+function buildDiagnosticIssues({
   activeBuff,
-  buffId,
+  explicitBuffId,
+  buffName,
   sourceActor,
   sourceItem,
+  stackingMode,
+  stackingKey,
   indicators,
+  activeIndicatorEffects,
   linkedStatuses,
   concentrationExpected,
   concentrationEffect,
 }) {
-  const warnings = [];
-  if (!buffId) warnings.push("missingBuffId");
-  if (!activeBuff?.originActorUuid) warnings.push("missingSourceActorUuid");
-  else if (!sourceActor) warnings.push("unresolvedSourceActor");
+  const issues = [];
+  const addIssue = (code) => {
+    if (issues.some((issue) => issue.code === code)) return;
+    issues.push({ code, severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning" });
+  };
+  if (!explicitBuffId) addIssue("missingBuffId");
+  if (!buffName) addIssue("missingBuffName");
+  if (typeof activeBuff?.type !== "string" || !activeBuff.type.trim()) addIssue("missingTriggerType");
+  if (!activeBuff?.originActorUuid) addIssue("missingSourceActorUuid");
+  else if (!sourceActor) addIssue("unresolvedSourceActor");
   if (!(activeBuff?.originItemUuid ?? activeBuff?.itemUuid ?? activeBuff?.itemName)) {
-    warnings.push("missingSourceItem");
+    addIssue("missingSourceItem");
   } else if ((activeBuff?.originItemUuid ?? activeBuff?.itemUuid) && !sourceItem) {
-    warnings.push("unresolvedSourceItem");
+    addIssue("unresolvedSourceItem");
   }
-  if (!indicators.active.length) warnings.push("missingActiveIndicator");
+  const rawStackingMode = String(activeBuff?.stackingMode ?? "").trim();
+  if (rawStackingMode && !KNOWN_STACKING_MODES.has(rawStackingMode)) addIssue("unknownStackingMode");
+  if (STACKING_MODES_REQUIRING_KEY.has(stackingMode) && !stackingKey) addIssue("missingStackingKey");
+  if (!indicators.active.length) addIssue("missingActiveIndicator");
   if (getConfiguredStatusIds(activeBuff).length && !linkedStatuses.length) {
-    warnings.push("missingLinkedStatus");
+    addIssue("missingLinkedStatus");
   }
-  if (concentrationExpected && !concentrationEffect) warnings.push("missingConcentration");
-  return warnings;
+  if (concentrationExpected && !concentrationEffect) addIssue("missingConcentration");
+
+  const duration = activeBuff?.duration;
+  if (duration != null && (typeof duration !== "object" || Array.isArray(duration))) {
+    addIssue("invalidDuration");
+  } else if (duration && Object.hasOwn(duration, "rounds")) {
+    const rounds = Number(duration.rounds);
+    if (!Number.isFinite(rounds) || rounds <= 0) addIssue("invalidDuration");
+  }
+  if (activeBuff?.appliedAt != null && !Number.isFinite(Number(activeBuff.appliedAt))) {
+    addIssue("invalidAppliedAt");
+  }
+  if (activeIndicatorEffects.some((effect) => {
+    const remaining = Number(effect?.duration?.remaining);
+    return Number.isFinite(remaining) && remaining <= 0;
+  })) {
+    addIssue("expiredDuration");
+  }
+  return issues;
 }
 
 export function collectActiveBuffDiagnostics(contexts, {
@@ -158,6 +211,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         actorUuid: context.actorUuid,
         actorName: context.actorName,
         warning: "invalidActiveBuffsMap",
+        severity: DIAGNOSTIC_SEVERITIES.invalidActiveBuffsMap,
       });
       continue;
     }
@@ -170,6 +224,7 @@ export function collectActiveBuffDiagnostics(contexts, {
           actorName: context.actorName,
           buffId: mapBuffId,
           warning: "invalidActiveBuffEntry",
+          severity: DIAGNOSTIC_SEVERITIES.invalidActiveBuffEntry,
         });
         continue;
       }
@@ -212,16 +267,25 @@ export function collectActiveBuffDiagnostics(contexts, {
         statusId: getEffectModuleFlag(effect).statusId ?? [...(effect.statuses ?? [])][0] ?? null,
         name: effect.name ?? null,
       }));
-      const warnings = buildWarningCodes({
+      const readableBuffName = activeBuff.itemName ?? activeBuff.name ?? sourceItem?.name ?? null;
+      const configuredStackingMode = String(activeBuff?.stackingMode ?? "").trim() || null;
+      const stackingMode = getStackingMode(activeBuff);
+      const stackingKey = getStackingKey(activeBuff);
+      const issues = buildDiagnosticIssues({
         activeBuff,
-        buffId,
+        explicitBuffId: activeBuff.buffId,
+        buffName: readableBuffName,
         sourceActor,
         sourceItem,
+        stackingMode,
+        stackingKey,
         indicators,
+        activeIndicatorEffects: activeIndicators.map(({ effect }) => effect),
         linkedStatuses,
         concentrationExpected,
         concentrationEffect,
       });
+      const warnings = issues.map((issue) => issue.code);
 
       entries.push({
         carrier: {
@@ -232,7 +296,7 @@ export function collectActiveBuffDiagnostics(contexts, {
           actorLink: context.actorLink,
           synthetic: context.synthetic,
         },
-        buffName: activeBuff.itemName ?? activeBuff.name ?? sourceItem?.name ?? buffId ?? "Unknown buff",
+        buffName: readableBuffName ?? buffId ?? "Unknown buff",
         buffId,
         sourceActor: {
           name: sourceActor?.name ?? activeBuff.originTokenName ?? null,
@@ -242,8 +306,9 @@ export function collectActiveBuffDiagnostics(contexts, {
           name: sourceItem?.name ?? activeBuff.itemName ?? null,
           uuid: sourceItemUuid,
         },
-        stackingMode: getStackingMode(activeBuff),
-        stackingKey: getStackingKey(activeBuff),
+        configuredStackingMode,
+        stackingMode,
+        stackingKey,
         triggerType: activeBuff.type ?? null,
         concentration: {
           expected: concentrationExpected,
@@ -260,7 +325,30 @@ export function collectActiveBuffDiagnostics(contexts, {
           summary: formatDuration(activeBuff),
         },
         warnings,
+        issues,
       });
+    }
+  }
+
+  const noStackGroups = new Map();
+  for (const entry of entries) {
+    if (entry.stackingMode !== "noStack" || !entry.stackingKey) continue;
+    const carrierKey = entry.carrier.tokenUuids[0] ?? entry.carrier.actorUuid ?? entry.carrier.actorName;
+    const groupKey = `${carrierKey}|${entry.stackingKey}`;
+    const group = noStackGroups.get(groupKey) ?? [];
+    group.push(entry);
+    noStackGroups.set(groupKey, group);
+  }
+  for (const group of noStackGroups.values()) {
+    if (group.length < 2) continue;
+    for (const entry of group) {
+      if (!entry.warnings.includes("duplicateNoStack")) entry.warnings.push("duplicateNoStack");
+      if (!entry.issues.some((issue) => issue.code === "duplicateNoStack")) {
+        entry.issues.push({
+          code: "duplicateNoStack",
+          severity: DIAGNOSTIC_SEVERITIES.duplicateNoStack,
+        });
+      }
     }
   }
 
@@ -377,6 +465,9 @@ export function buildActiveBuffDiagnosticText(report) {
     lines.push(`concentration=${entry.concentration.expected ? (entry.concentration.linked ? "linked" : "missing") : "no"}; statuses=${entry.linkedStatuses.map((status) => status.statusId ?? status.name).filter(Boolean).join(", ") || "-"}`);
     lines.push(`indicators=active:${entry.indicators.active.length}, target:${entry.indicators.target.length}, stored:${entry.indicators.storedTarget.length}, mechanical:${entry.indicators.mechanical.length}; duration=${entry.duration.summary || "-"}`);
     if (entry.warnings.length) lines.push(`warnings=${entry.warnings.join(", ")}`);
+    if (entry.issues?.length) {
+      lines.push(`issues=${entry.issues.map((issue) => `${issue.severity}:${issue.code}`).join(", ")}`);
+    }
   }
   for (const warning of report?.actorWarnings ?? []) {
     lines.push("");
@@ -427,7 +518,9 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
         ].filter(Boolean).join(" "),
         sourceLabel: entry.sourceActor.name ?? entry.sourceActor.uuid ?? "—",
         itemLabel: entry.sourceItem.name ?? entry.sourceItem.uuid ?? "—",
-        stackingLabel: `${entry.stackingMode} / ${entry.stackingKey ?? "—"}`,
+        stackingLabel: `${entry.configuredStackingMode && entry.configuredStackingMode !== entry.stackingMode
+          ? `${entry.configuredStackingMode} → ${entry.stackingMode}`
+          : entry.stackingMode} / ${entry.stackingKey ?? "—"}`,
         concentrationLabel: entry.concentration.expected
           ? game.i18n.localize(entry.concentration.linked
             ? "BOT.diagnostics.concentrationLinked"
@@ -444,12 +537,20 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
           mechanical: entry.indicators.mechanical.length,
         }),
         durationLabel: entry.duration.summary || "—",
-        warningLabels: entry.warnings.map(warningLabel),
+        warningDetails: (entry.issues ?? entry.warnings.map((code) => ({
+          code,
+          severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning",
+        }))).map((issue) => ({
+          ...issue,
+          label: warningLabel(issue.code),
+          severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${issue.severity}`),
+        })),
       })),
       actorWarnings: report.actorWarnings.map((warning, diagnosticIndex) => ({
         ...warning,
         diagnosticIndex,
         label: warningLabel(warning.warning),
+        severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${warning.severity ?? "warning"}`),
       })),
     };
   }

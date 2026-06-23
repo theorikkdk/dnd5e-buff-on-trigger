@@ -54,7 +54,7 @@
         <tbody>
           {{#each rows}}
             <tr
-              class="{{#if warningLabels.length}}bot-diagnostics-warning-row{{/if}}"
+              class="{{#if warningDetails.length}}bot-diagnostics-warning-row{{/if}}"
               data-diagnostic-index="{{diagnosticIndex}}"
             >
               <td>
@@ -78,9 +78,14 @@
                 <div>{{localize "BOT.diagnostics.duration"}}: {{durationLabel}}</div>
               </td>
               <td>
-                {{#if warningLabels.length}}
+                {{#if warningDetails.length}}
                   <ul class="bot-diagnostics-warning-list">
-                    {{#each warningLabels}}<li>{{this}}</li>{{/each}}
+                    {{#each warningDetails}}
+                      <li class="bot-diagnostics-severity-{{severity}}">
+                        <span class="bot-diagnostics-severity">{{severityLabel}}</span>
+                        {{label}}
+                      </li>
+                    {{/each}}
                   </ul>
                 {{else}}
                   <span class="bot-diagnostics-ok">{{localize "BOT.diagnostics.ok"}}</span>
@@ -103,8 +108,12 @@
       <h3>{{localize "BOT.diagnostics.actorWarnings"}}</h3>
       <ul>
         {{#each actorWarnings}}
-          <li data-actor-warning-index="{{diagnosticIndex}}">
-            <strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}: {{label}}
+          <li
+            class="bot-diagnostics-severity-{{severity}}"
+            data-actor-warning-index="{{diagnosticIndex}}"
+          >
+            <strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}:
+            <span class="bot-diagnostics-severity">{{severityLabel}}</span> {{label}}
           </li>
         {{/each}}
       </ul>

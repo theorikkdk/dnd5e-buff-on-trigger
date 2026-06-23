@@ -742,6 +742,29 @@
   padding-left: 16px;
 }
 
+.bot-diagnostics-severity {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.bot-diagnostics-severity-info .bot-diagnostics-severity {
+  background: color-mix(in srgb, var(--color-level-info, #1d5d91) 18%, transparent);
+}
+
+.bot-diagnostics-severity-warning .bot-diagnostics-severity {
+  background: color-mix(in srgb, var(--color-level-warning, #c7931c) 22%, transparent);
+}
+
+.bot-diagnostics-severity-critical .bot-diagnostics-severity {
+  background: color-mix(in srgb, var(--color-level-error, #b62020) 22%, transparent);
+  color: var(--color-level-error, #8b0000);
+}
+
 .bot-diagnostics-ok {
   color: var(--color-level-success, #18520b);
   font-weight: 700;

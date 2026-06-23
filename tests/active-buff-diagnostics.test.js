@@ -141,6 +141,181 @@ test("invalid activeBuffs maps and partial entries do not crash", () => {
   assert.ok(report.entries[0].warnings.includes("missingSourceActorUuid"));
 });
 
+test("buff without embedded buffId, readable name, or trigger is detected", () => {
+  const actor = new MockActor({
+    uuid: "Actor.incomplete",
+    name: "Incomplete",
+    activeBuffs: {
+      mapKey: {
+        originActorUuid: "Actor.caster",
+        originItemUuid: "Actor.caster.Item.guidance",
+        stackingMode: "normal",
+      },
+    },
+    effects: [{
+      name: "Indicator",
+      flags: { [MODULE_ID]: { indicator: true, buffId: "mapKey" } },
+      statuses: new Set(["bot-active"]),
+    }],
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: (uuid) => uuid === "Actor.caster"
+      ? { uuid, name: "Caster" }
+      : (uuid === "Actor.caster.Item.guidance" ? { uuid } : null),
+    concentrationPredicate: () => false,
+  });
+
+  assert.ok(report.entries[0].warnings.includes("missingBuffId"));
+  assert.ok(report.entries[0].warnings.includes("missingBuffName"));
+  assert.ok(report.entries[0].warnings.includes("missingTriggerType"));
+  assert.equal(
+    report.entries[0].issues.find((issue) => issue.code === "missingBuffId")?.severity,
+    "critical",
+  );
+});
+
+test("unresolved source actor and item UUIDs are detected", () => {
+  const actor = new MockActor({
+    uuid: "Actor.sources",
+    name: "Sources",
+    activeBuffs: { buff1: activeBuff("buff1") },
+    effects: [{
+      name: "Guidance",
+      flags: { [MODULE_ID]: { indicator: true, buffId: "buff1" } },
+      statuses: new Set(["bot-active"]),
+    }],
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: () => null,
+    concentrationPredicate: () => false,
+  });
+
+  assert.ok(report.entries[0].warnings.includes("unresolvedSourceActor"));
+  assert.ok(report.entries[0].warnings.includes("unresolvedSourceItem"));
+});
+
+test("unknown stacking mode and missing required stacking key are detected", () => {
+  const actor = new MockActor({
+    uuid: "Actor.stacking",
+    name: "Stacking",
+    activeBuffs: {
+      unknown: activeBuff("unknown", { stackingMode: "mystery" }),
+      missingKey: activeBuff("missingKey", {
+        itemName: null,
+        originItemUuid: null,
+        stackingMode: "noStack",
+        stackingKey: null,
+      }),
+    },
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+  const unknown = report.entries.find((entry) => entry.buffId === "unknown");
+  const missingKey = report.entries.find((entry) => entry.buffId === "missingKey");
+
+  assert.ok(unknown.warnings.includes("unknownStackingMode"));
+  assert.ok(missingKey.warnings.includes("missingStackingKey"));
+});
+
+test("two noStack buffs with one key on the same carrier are critical", () => {
+  const actor = new MockActor({
+    uuid: "Actor.duplicate",
+    name: "Duplicate",
+    activeBuffs: {
+      first: activeBuff("first", { stackingKey: "bardic-inspiration" }),
+      second: activeBuff("second", { stackingKey: "bardic-inspiration" }),
+    },
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+
+  assert.equal(report.entries.length, 2);
+  for (const entry of report.entries) {
+    assert.ok(entry.warnings.includes("duplicateNoStack"));
+    assert.equal(
+      entry.issues.find((issue) => issue.code === "duplicateNoStack")?.severity,
+      "critical",
+    );
+  }
+});
+
+test("same noStack key on distinct unlinked tokens is not a collision", () => {
+  const first = new MockActor({
+    uuid: "Scene.scene.Token.a.Actor.synthetic",
+    name: "Goblin",
+    activeBuffs: { first: activeBuff("first", { stackingKey: "guidance" }) },
+  });
+  const second = new MockActor({
+    uuid: "Scene.scene.Token.b.Actor.synthetic",
+    name: "Goblin",
+    activeBuffs: { second: activeBuff("second", { stackingKey: "guidance" }) },
+  });
+
+  const report = collectActiveBuffDiagnostics([
+    context(first, {
+      key: "Scene.scene.Token.a",
+      tokenNames: ["Goblin A"],
+      tokenUuids: ["Scene.scene.Token.a"],
+      actorLink: false,
+      synthetic: true,
+    }),
+    context(second, {
+      key: "Scene.scene.Token.b",
+      tokenNames: ["Goblin B"],
+      tokenUuids: ["Scene.scene.Token.b"],
+      actorLink: false,
+      synthetic: true,
+    }),
+  ], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+
+  assert.equal(report.entries.length, 2);
+  assert.equal(report.entries.some((entry) => entry.warnings.includes("duplicateNoStack")), false);
+});
+
+test("invalid and explicitly expired duration data are detected", () => {
+  const actor = new MockActor({
+    uuid: "Actor.duration",
+    name: "Duration",
+    activeBuffs: {
+      invalid: activeBuff("invalid", { duration: { rounds: "later" } }),
+      expired: activeBuff("expired", { duration: { rounds: 2 } }),
+    },
+    effects: [
+      {
+        name: "Invalid duration",
+        flags: { [MODULE_ID]: { indicator: true, buffId: "invalid" } },
+        statuses: new Set(["bot-active"]),
+        duration: { remaining: 1 },
+      },
+      {
+        name: "Expired duration",
+        flags: { [MODULE_ID]: { indicator: true, buffId: "expired" } },
+        statuses: new Set(["bot-active"]),
+        duration: { remaining: 0 },
+      },
+    ],
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+
+  assert.ok(report.entries.find((entry) => entry.buffId === "invalid").warnings.includes("invalidDuration"));
+  assert.ok(report.entries.find((entry) => entry.buffId === "expired").warnings.includes("expiredDuration"));
+});
+
 test("scene contexts deduplicate linked actors and keep unlinked tokens separate", () => {
   const linkedActor = new MockActor({ uuid: "Actor.linked", name: "Linked", activeBuffs: {} });
   const syntheticA = new MockActor({ uuid: "Scene.scene.Token.a.Actor.synthetic", name: "Goblin", activeBuffs: {} });
@@ -349,4 +524,17 @@ test("copied text and JSON reports use the filtered view", () => {
   assert.equal(json.entries.length, 1);
   assert.equal(json.entries[0].buffId, "buff-guidance");
   assert.deepEqual(json.filters, { query: "Guidance", warningsOnly: false });
+});
+
+test("new diagnostic issues appear in text and JSON reports and drive filtering", () => {
+  const report = filterableReport();
+  report.entries[0].warnings = ["duplicateNoStack"];
+  report.entries[0].issues = [{ code: "duplicateNoStack", severity: "critical" }];
+  const filtered = filterActiveBuffDiagnosticReport(report, { warningsOnly: true });
+  const text = buildActiveBuffDiagnosticText(filtered.report);
+  const json = JSON.parse(JSON.stringify(filtered.report));
+
+  assert.match(text, /critical:duplicateNoStack/);
+  assert.equal(json.entries[0].issues[0].severity, "critical");
+  assert.ok(filtered.entries.some((entry) => entry.buffId === "buff-guidance"));
 });
