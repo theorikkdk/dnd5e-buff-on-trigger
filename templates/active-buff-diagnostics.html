@@ -85,6 +85,10 @@
                       <li class="bot-diagnostics-severity-{{severity}}">
                         <span class="bot-diagnostics-severity">{{severityLabel}}</span>
                         {{label}}
+                        <div class="bot-diagnostics-suggestion">
+                          <strong>{{localize "BOT.diagnostics.suggestionLabel"}}</strong>
+                          {{suggestion}}
+                        </div>
                       </li>
                     {{/each}}
                   </ul>
@@ -145,6 +149,10 @@
           >
             <strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}:
             <span class="bot-diagnostics-severity">{{severityLabel}}</span> {{label}}
+            <div class="bot-diagnostics-suggestion">
+              <strong>{{localize "BOT.diagnostics.suggestionLabel"}}</strong>
+              {{suggestion}}
+            </div>
           </li>
         {{/each}}
       </ul>

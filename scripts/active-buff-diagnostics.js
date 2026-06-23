@@ -27,6 +27,47 @@ const DIAGNOSTIC_SEVERITIES = Object.freeze({
   invalidAppliedAt: "info",
 });
 
+const DIAGNOSTIC_SUGGESTION_FALLBACKS = Object.freeze({
+  missingBuffId: "This buff cannot be repaired automatically with confidence. Remove it manually if necessary.",
+  missingBuffName: "Check the source item or buff data to restore a readable name.",
+  missingTriggerType: "Check the preset or item configuration and select a supported trigger type.",
+  invalidActiveBuffsMap: "Inspect this actor's module flags manually before changing or removing the invalid data.",
+  invalidActiveBuffEntry: "Inspect this activeBuffs entry manually; it cannot be repaired safely from the diagnostic.",
+  missingSourceActorUuid: "Check the original item or caster data; the source actor reference is missing.",
+  unresolvedSourceActor: "The source actor cannot be found. This buff may be orphaned.",
+  missingSourceItem: "Check the original item data; the source item reference is incomplete.",
+  unresolvedSourceItem: "The source appears to be missing. Check whether the source item was deleted.",
+  unknownStackingMode: "Check the preset or item configuration and choose a supported stacking mode.",
+  missingStackingKey: "Add a stable stackingKey to the preset or item.",
+  duplicateNoStack: "Only one instance should remain active. Correct the duplicate manually for now.",
+  missingActiveIndicator: "A refresh or repair action may be offered in a future version.",
+  missingLinkedStatus: "A refresh or repair action may be offered in a future version.",
+  missingConcentration: "A refresh or repair action may be offered in a future version.",
+  invalidDuration: "Check the configured duration or remove the buff manually if the effect has ended.",
+  expiredDuration: "Check the duration and remove the buff manually if the effect has ended.",
+  invalidAppliedAt: "Check the application timestamp in the buff data before editing it.",
+});
+
+export function getActiveBuffDiagnosticSuggestion(code, {
+  localize = (key) => globalThis.game?.i18n?.localize?.(key) ?? key,
+} = {}) {
+  const normalizedCode = String(code ?? "").trim();
+  if (!normalizedCode) return "";
+  const key = `BOT.diagnostics.suggestion.${normalizedCode}`;
+  const localized = typeof localize === "function" ? localize(key) : key;
+  if (localized && localized !== key) return localized;
+  return DIAGNOSTIC_SUGGESTION_FALLBACKS[normalizedCode]
+    ?? "Review this inconsistency manually before changing the buff.";
+}
+
+function createDiagnosticIssue(code) {
+  return {
+    code,
+    severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning",
+    suggestion: getActiveBuffDiagnosticSuggestion(code),
+  };
+}
+
 function toArray(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -146,7 +187,7 @@ function buildDiagnosticIssues({
   const issues = [];
   const addIssue = (code) => {
     if (issues.some((issue) => issue.code === code)) return;
-    issues.push({ code, severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning" });
+    issues.push(createDiagnosticIssue(code));
   };
   if (!explicitBuffId) addIssue("missingBuffId");
   if (!buffName) addIssue("missingBuffName");
@@ -212,6 +253,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         actorName: context.actorName,
         warning: "invalidActiveBuffsMap",
         severity: DIAGNOSTIC_SEVERITIES.invalidActiveBuffsMap,
+        suggestion: getActiveBuffDiagnosticSuggestion("invalidActiveBuffsMap"),
       });
       continue;
     }
@@ -225,6 +267,7 @@ export function collectActiveBuffDiagnostics(contexts, {
           buffId: mapBuffId,
           warning: "invalidActiveBuffEntry",
           severity: DIAGNOSTIC_SEVERITIES.invalidActiveBuffEntry,
+          suggestion: getActiveBuffDiagnosticSuggestion("invalidActiveBuffEntry"),
         });
         continue;
       }
@@ -344,10 +387,7 @@ export function collectActiveBuffDiagnostics(contexts, {
     for (const entry of group) {
       if (!entry.warnings.includes("duplicateNoStack")) entry.warnings.push("duplicateNoStack");
       if (!entry.issues.some((issue) => issue.code === "duplicateNoStack")) {
-        entry.issues.push({
-          code: "duplicateNoStack",
-          severity: DIAGNOSTIC_SEVERITIES.duplicateNoStack,
-        });
+        entry.issues.push(createDiagnosticIssue("duplicateNoStack"));
       }
     }
   }
@@ -521,11 +561,15 @@ export function buildActiveBuffDiagnosticText(report) {
     if (entry.warnings.length) lines.push(`warnings=${entry.warnings.join(", ")}`);
     if (entry.issues?.length) {
       lines.push(`issues=${entry.issues.map((issue) => `${issue.severity}:${issue.code}`).join(", ")}`);
+      for (const issue of entry.issues) {
+        lines.push(`suggestion[${issue.code}]=${issue.suggestion ?? getActiveBuffDiagnosticSuggestion(issue.code)}`);
+      }
     }
   }
   for (const warning of report?.actorWarnings ?? []) {
     lines.push("");
     lines.push(`${warning.actorName ?? warning.actorUuid ?? "Unknown actor"} — warning=${warning.warning}${warning.buffId ? `; buffId=${warning.buffId}` : ""}`);
+    lines.push(`suggestion[${warning.warning}]=${warning.suggestion ?? getActiveBuffDiagnosticSuggestion(warning.warning)}`);
   }
   return lines.join("\n");
 }
@@ -597,9 +641,11 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
           warningDetails: (entry.issues ?? entry.warnings.map((code) => ({
             code,
             severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning",
+            suggestion: getActiveBuffDiagnosticSuggestion(code),
           }))).map((issue) => ({
             ...issue,
             label: warningLabel(issue.code),
+            suggestion: issue.suggestion ?? getActiveBuffDiagnosticSuggestion(issue.code),
             severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${issue.severity}`),
           })),
         };
@@ -608,6 +654,7 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
         ...warning,
         diagnosticIndex,
         label: warningLabel(warning.warning),
+        suggestion: warning.suggestion ?? getActiveBuffDiagnosticSuggestion(warning.warning),
         severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${warning.severity ?? "warning"}`),
       })),
     };

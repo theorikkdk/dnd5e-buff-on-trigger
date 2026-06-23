@@ -801,6 +801,13 @@
   line-height: 1;
 }
 
+.bot-diagnostics-suggestion {
+  margin-top: 3px;
+  color: var(--color-text-dark-secondary);
+  font-size: 0.9em;
+  line-height: 1.25;
+}
+
 @media (max-width: 560px) {
   .bot-tabs {
     flex-wrap: wrap;

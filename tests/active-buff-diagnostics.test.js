@@ -9,6 +9,7 @@ import {
   collectActiveSceneBuffActorContexts,
   filterActiveBuffDiagnosticReport,
   getActiveBuffDiagnosticNavigation,
+  getActiveBuffDiagnosticSuggestion,
 } from "../scripts/active-buff-diagnostics.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
@@ -603,12 +604,57 @@ test("copied text and JSON reports use the filtered view", () => {
 test("new diagnostic issues appear in text and JSON reports and drive filtering", () => {
   const report = filterableReport();
   report.entries[0].warnings = ["duplicateNoStack"];
-  report.entries[0].issues = [{ code: "duplicateNoStack", severity: "critical" }];
+  report.entries[0].issues = [{
+    code: "duplicateNoStack",
+    severity: "critical",
+    suggestion: getActiveBuffDiagnosticSuggestion("duplicateNoStack"),
+  }];
   const filtered = filterActiveBuffDiagnosticReport(report, { warningsOnly: true });
   const text = buildActiveBuffDiagnosticText(filtered.report);
   const json = JSON.parse(JSON.stringify(filtered.report));
 
   assert.match(text, /critical:duplicateNoStack/);
+  assert.match(text, /suggestion\[duplicateNoStack\]=Only one instance should remain active/);
   assert.equal(json.entries[0].issues[0].severity, "critical");
+  assert.match(json.entries[0].issues[0].suggestion, /Only one instance should remain active/);
   assert.ok(filtered.entries.some((entry) => entry.buffId === "buff-guidance"));
+});
+
+test("every principal diagnostic inconsistency has a readable suggestion", () => {
+  for (const code of [
+    "missingBuffId",
+    "unresolvedSourceItem",
+    "unresolvedSourceActor",
+    "unknownStackingMode",
+    "missingStackingKey",
+    "duplicateNoStack",
+    "missingActiveIndicator",
+    "missingLinkedStatus",
+    "missingConcentration",
+    "invalidDuration",
+    "expiredDuration",
+  ]) {
+    const suggestion = getActiveBuffDiagnosticSuggestion(code, { localize: (key) => key });
+    assert.ok(suggestion.length > 20, `${code} should have a readable suggestion`);
+    assert.doesNotMatch(suggestion, /^BOT\./);
+  }
+});
+
+test("collected diagnostic JSON carries suggestions without changing filters or counters", () => {
+  const actor = new MockActor({
+    uuid: "Actor.suggestions",
+    name: "Suggestions",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: () => null,
+    concentrationPredicate: () => false,
+  });
+  const filtered = filterActiveBuffDiagnosticReport(report, { warningsOnly: true });
+  const json = JSON.parse(JSON.stringify(filtered.report));
+
+  assert.equal(filtered.totalCount, 1);
+  assert.equal(filtered.visibleCount, 1);
+  assert.equal(filtered.inconsistentCount, 1);
+  assert.ok(json.entries[0].issues.every((issue) => typeof issue.suggestion === "string"));
 });
