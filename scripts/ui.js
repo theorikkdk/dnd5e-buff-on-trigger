@@ -2,6 +2,7 @@ import { MODULE_ID, ABILITY_IDS, SKILL_IDS, DAMAGE_TYPES, CONDITION_IDS, ARMOR_P
 
 import { buildItemDurationData, getItemDurationInRounds } from "./duration.js";
 import { BUFF_PRESETS } from "./presets.js";
+import { buildPresetSearchView } from "./preset-search.js";
 import { buildCustomPresetExportEnvelope, isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
 import { removeCustomPresetsByIds, selectCustomPresetsForExport } from "./custom-preset-management.js";
 
@@ -1197,10 +1198,11 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     const movementTypeOptions = getMovementTypeOptions(configuredMovement.types);
     const statusOptions = getStatusOptions(configuredStatusIds);
     const rawPresetMeta = raw.presetMeta ?? null;
-    const presets = getPresetOptions().map((preset) => ({
+    const presetOptions = getPresetOptions().map((preset) => ({
       ...preset,
       selected: preset.id === rawPresetMeta?.presetId,
     }));
+    const presetGroups = localizePresetGroups(buildPresetSearchView(presetOptions).groups);
     const statusLabels = Object.fromEntries(statusOptions.map((option) => [option.value, option.label]));
     const abilityLabels = getAbilityLabels();
     const conditionImmunityOptions = getConditionImmunityOptions(raw.buffs?.conditionImmunities ?? []);
@@ -1500,7 +1502,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     return {
       ...await super._prepareContext(options),
       flag,
-      presets,
+      presetGroups,
       formulaVariables: FORMULA_VARIABLES.map((value) => ({ value })),
     };
   }
@@ -1566,19 +1568,34 @@ function getPresetOptions() {
     const description = preset.source === "custom"
       ? (preset.description ?? "")
       : game.i18n.localize(preset.description);
+    const triggerType = String(preset.flag?.type ?? "");
+    const triggerLabel = triggerType ? game.i18n.localize(`BOT.ui.trigger.${triggerType}`) : "";
+    const isTestPreset = preset.isTestPreset === true
+      || String(preset.id ?? "").startsWith("test")
+      || String(preset.label ?? "").startsWith("[TEST]")
+      || label.startsWith("[TEST]");
     return {
       id: preset.id,
       label,
       description,
       source: preset.source,
       presetType: getPresetType(preset),
-      isTestPreset: preset.isTestPreset === true
-        || String(preset.id ?? "").startsWith("test")
-        || String(preset.label ?? "").startsWith("[TEST]")
-        || label.startsWith("[TEST]"),
-      searchText: [preset.id, label, description, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", preset.isTestPreset === true || String(preset.label ?? "").startsWith("[TEST]") || label.startsWith("[TEST]") || String(preset.id).startsWith("test") ? "[TEST]" : ""].join(" ").toLowerCase(),
+      triggerType,
+      isTestPreset,
+      searchText: [preset.id, label, description, triggerType, triggerLabel, preset.source === "custom" ? game.i18n.localize("BOT.ui.presets.customMarker") : "", isTestPreset ? "[TEST]" : ""].join(" ").toLowerCase(),
     };
   }).filter((preset) => showTestPresets || !preset.isTestPreset);
+}
+
+function getPresetGroupLabel(groupKey) {
+  return game.i18n.localize(`BOT.ui.presets.group.${groupKey}`);
+}
+
+function localizePresetGroups(groups) {
+  return groups.map((group) => ({
+    ...group,
+    label: getPresetGroupLabel(group.key),
+  }));
 }
 
 function getPresetType(preset) {
@@ -1855,26 +1872,40 @@ function buildBuffConfigFromForm(form) {
 function refreshPresetSelect(form, selectedId = "") {
   const select = form?.querySelector?.('[name="presetId"]');
   if (!select) return;
-  selectedId ||= select.value;
+  select.dataset.preferredPresetId = selectedId || select.dataset.preferredPresetId || select.value;
+  window.botFilterPresets(form?.querySelector?.('[name="presetSearch"]'));
+  window.botUpdatePresetDescription(select);
+  window.botUpdatePresetActions(select);
+}
+
+function createPresetOption(preset) {
+  const option = document.createElement("option");
+  option.value = preset.id;
+  option.dataset.description = preset.description ?? "";
+  option.dataset.source = preset.source ?? "builtIn";
+  option.dataset.search = preset.searchText ?? "";
+  option.dataset.presetType = preset.presetType ?? preset.source ?? "builtIn";
+  option.textContent = preset.label;
+  return option;
+}
+
+function renderPresetSearchView(select, view, preferredPresetId = "") {
   select.replaceChildren();
   const empty = document.createElement("option");
   empty.value = "";
   empty.textContent = game.i18n.localize("BOT.ui.presets.none");
   select.appendChild(empty);
-  for (const preset of getPresetOptions()) {
-    const option = document.createElement("option");
-    option.value = preset.id;
-    option.dataset.description = preset.description ?? "";
-    option.dataset.source = preset.source ?? "builtIn";
-    option.dataset.search = preset.searchText ?? "";
-    option.dataset.presetType = preset.presetType ?? preset.source ?? "builtIn";
-    option.textContent = preset.label;
-    select.appendChild(option);
+
+  for (const group of localizePresetGroups(view.groups)) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    optgroup.dataset.presetGroup = group.key;
+    for (const preset of group.presets) optgroup.appendChild(createPresetOption(preset));
+    select.appendChild(optgroup);
   }
-  select.value = selectedId;
-  window.botFilterPresets(form?.querySelector?.('[name="presetSearch"]'));
-  window.botUpdatePresetDescription(select);
-  window.botUpdatePresetActions(select);
+
+  select.value = preferredPresetId;
+  if (select.value !== preferredPresetId) select.value = "";
 }
 
 function escapeCustomPresetManagementText(value) {
@@ -2376,15 +2407,25 @@ window.botFilterPresets = function(inputEl) {
   const form = inputEl?.closest?.("form");
   const select = form?.querySelector?.('[name="presetId"]');
   if (!select) return;
-  const query = String(inputEl?.value ?? "").trim().toLowerCase();
-  for (const option of select.options ?? []) {
-    if (!option.value) {
-      option.hidden = false;
-      continue;
-    }
-    const text = [option.textContent, option.dataset.description, option.dataset.search, option.dataset.source, option.dataset.presetType].join(" ").toLowerCase();
-    option.hidden = query ? !text.includes(query) : false;
+  const preferredPresetId = select.dataset.preferredPresetId || select.value;
+  select.dataset.preferredPresetId = preferredPresetId;
+  const view = buildPresetSearchView(getPresetOptions(), {
+    query: inputEl?.value ?? "",
+  });
+  renderPresetSearchView(select, view, preferredPresetId);
+
+  const count = form?.querySelector?.(".bot-preset-count");
+  if (count) {
+    count.textContent = game.i18n.format("BOT.ui.presets.searchCount", {
+      visible: view.visibleCount,
+      hidden: view.hiddenCount,
+    });
+    count.hidden = view.visibleCount === 0;
   }
+  const noResults = form?.querySelector?.(".bot-preset-no-results");
+  if (noResults) noResults.hidden = view.visibleCount !== 0;
+  window.botUpdatePresetDescription(select);
+  window.botUpdatePresetActions(select);
 };
 
 window.botUpdatePresetActions = function(selectEl) {
@@ -2686,7 +2727,10 @@ window.botApplyPreset = function(buttonEl) {
 
   applyPresetFlagToForm(form, buildPresetConfig(preset));
   setPresetMetaOnForm(form, buildPresetMeta(preset));
-  if (select) select.value = preset.id;
+  if (select) {
+    select.value = preset.id;
+    select.dataset.preferredPresetId = preset.id;
+  }
   window.botUpdatePresetDescription(select);
   window.botUpdatePresetActions(select);
   debugLog(`[${MODULE_ID}] Preset applied: ${preset.id}`);
@@ -2704,6 +2748,7 @@ window.botResetBuffConfig = function(buttonEl) {
   const presetSelect = form.querySelector?.('[name="presetId"]');
   if (presetSelect) {
     presetSelect.value = "";
+    presetSelect.dataset.preferredPresetId = "";
     window.botUpdatePresetDescription(presetSelect);
     window.botUpdatePresetActions(presetSelect);
   }

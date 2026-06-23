@@ -90,6 +90,21 @@
   font-weight: 700;
 }
 
+.bot-preset-search-feedback {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 1.25em;
+  margin-top: 3px;
+}
+
+.bot-preset-search-feedback .hint {
+  margin: 0;
+}
+
+.bot-preset-no-results {
+  color: var(--color-level-error, #a00);
+}
+
 .bot-preset-description {
   margin: 8px 0 0;
   max-height: 3.5em;

@@ -20,12 +20,20 @@
     </div>
     <div class="bot-preset-select-row">
       <label>{{localize "BOT.ui.presets.shortLabel"}}</label>
-      <select name="presetId" onchange="botUpdatePresetDescription(this); botUpdatePresetActions(this)">
+      <select name="presetId" onchange="this.dataset.preferredPresetId = this.value; botUpdatePresetDescription(this); botUpdatePresetActions(this)">
         <option value="">{{localize "BOT.ui.presets.none"}}</option>
-        {{#each presets}}
-          <option value="{{id}}" data-description="{{description}}" data-source="{{source}}" data-search="{{searchText}}" data-preset-type="{{presetType}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{#each presetGroups}}
+        <optgroup label="{{label}}" data-preset-group="{{key}}">
+          {{#each presets}}
+            <option value="{{id}}" data-description="{{description}}" data-source="{{source}}" data-search="{{searchText}}" data-preset-type="{{presetType}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </optgroup>
         {{/each}}
       </select>
+    </div>
+    <div class="bot-preset-search-feedback" aria-live="polite">
+      <span class="hint bot-preset-count"></span>
+      <span class="hint bot-preset-no-results" hidden>{{localize "BOT.ui.presets.noResults"}}</span>
     </div>
     <div class="bot-preset-actions bot-preset-main-actions">
       <button type="button" data-bot-preset-action="apply" title="{{localize "BOT.ui.presets.applyTitle"}}">{{localize "BOT.ui.presets.apply"}}</button>
