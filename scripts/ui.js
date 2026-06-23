@@ -1151,7 +1151,6 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
     if (presetSelect) {
       window.botFilterPresets(this.element.querySelector?.('[name="presetSearch"]'));
       window.botUpdatePresetDescription(presetSelect);
-      window.botUpdatePresetActions(presetSelect);
     }
     this.element.querySelectorAll?.('[data-bot-preset-action]')?.forEach((button) => {
       button.addEventListener("click", (event) => {
@@ -1875,7 +1874,6 @@ function refreshPresetSelect(form, selectedId = "") {
   select.dataset.preferredPresetId = selectedId || select.dataset.preferredPresetId || select.value;
   window.botFilterPresets(form?.querySelector?.('[name="presetSearch"]'));
   window.botUpdatePresetDescription(select);
-  window.botUpdatePresetActions(select);
 }
 
 function createPresetOption(preset) {
@@ -2425,14 +2423,6 @@ window.botFilterPresets = function(inputEl) {
   const noResults = form?.querySelector?.(".bot-preset-no-results");
   if (noResults) noResults.hidden = view.visibleCount !== 0;
   window.botUpdatePresetDescription(select);
-  window.botUpdatePresetActions(select);
-};
-
-window.botUpdatePresetActions = function(selectEl) {
-  const form = selectEl?.closest?.("form");
-  const deleteButton = form?.querySelector?.(".bot-delete-preset-btn");
-  if (!deleteButton) return;
-  deleteButton.disabled = selectEl?.selectedOptions?.[0]?.dataset?.source !== "custom";
 };
 
 async function promptCustomPresetData() {
@@ -2690,26 +2680,6 @@ window.botImportCustomPresets = function(buttonEl) {
   }, { once: true });
   input.click();
 };
-window.botDeleteCustomPreset = async function(buttonEl) {
-  const form = buttonEl.closest("form");
-  const select = form?.querySelector?.('[name="presetId"]');
-  const id = select?.value;
-  const preset = getPresetById(id);
-  if (!preset) return;
-  if (preset.source !== "custom") {
-    ui.notifications.warn(game.i18n.localize("BOT.notifications.builtInPresetCannotDelete"));
-    return;
-  }
-  const confirmed = window.confirm(game.i18n.format("BOT.ui.presets.confirmDelete", { name: preset.label }));
-  if (!confirmed) return;
-
-  const customPresets = foundry.utils.deepClone(getCustomPresets());
-  delete customPresets[id];
-  await game.settings.set(MODULE_ID, "customPresets", customPresets);
-  refreshPresetSelect(form);
-  ui.notifications.info(game.i18n.format("BOT.notifications.customPresetDeleted", { name: preset.label }));
-};
-
 window.botManageCustomPresets = function(buttonEl) {
   const form = buttonEl.closest("form");
   openCustomPresetManagementDialog(form);
@@ -2732,7 +2702,6 @@ window.botApplyPreset = function(buttonEl) {
     select.dataset.preferredPresetId = preset.id;
   }
   window.botUpdatePresetDescription(select);
-  window.botUpdatePresetActions(select);
   debugLog(`[${MODULE_ID}] Preset applied: ${preset.id}`);
 };
 
@@ -2750,7 +2719,6 @@ window.botResetBuffConfig = function(buttonEl) {
     presetSelect.value = "";
     presetSelect.dataset.preferredPresetId = "";
     window.botUpdatePresetDescription(presetSelect);
-    window.botUpdatePresetActions(presetSelect);
   }
   debugLog(`[${MODULE_ID}] Buff configuration reset`);
 };

@@ -20,7 +20,7 @@
     </div>
     <div class="bot-preset-select-row">
       <label>{{localize "BOT.ui.presets.shortLabel"}}</label>
-      <select name="presetId" onchange="this.dataset.preferredPresetId = this.value; botUpdatePresetDescription(this); botUpdatePresetActions(this)">
+      <select name="presetId" onchange="this.dataset.preferredPresetId = this.value; botUpdatePresetDescription(this)">
         <option value="">{{localize "BOT.ui.presets.none"}}</option>
         {{#each presetGroups}}
         <optgroup label="{{label}}" data-preset-group="{{key}}">

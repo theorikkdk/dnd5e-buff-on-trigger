@@ -36,6 +36,27 @@ test("multiple deletion preserves unselected custom presets", () => {
   assert.deepEqual(Object.keys(result.customPresets), ["custom-second"]);
 });
 
+test("deletion accepts a stored preset id when it differs from the setting key", () => {
+  const source = {
+    "custom-setting-key": {
+      id: "custom-stable-id",
+      label: "Replaced preset",
+      source: "custom",
+    },
+    "custom-other": {
+      id: "custom-other",
+      label: "Other",
+      source: "custom",
+    },
+  };
+  const result = removeCustomPresetsByIds(source, ["custom-stable-id"]);
+
+  assert.equal(result.removedCount, 1);
+  assert.deepEqual(result.removedIds, ["custom-stable-id"]);
+  assert.deepEqual(Object.keys(result.customPresets), ["custom-other"]);
+  assert.deepEqual(Object.keys(source), ["custom-setting-key", "custom-other"]);
+});
+
 test("missing ids and duplicate selections are ignored cleanly", () => {
   const result = removeCustomPresetsByIds(
     makeCustomPresets(),

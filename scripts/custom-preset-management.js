@@ -9,8 +9,10 @@ export function removeCustomPresetsByIds(customPresets, presetIds) {
   const removedIds = [];
 
   for (const id of requestedIds) {
-    if (!Object.hasOwn(remainingPresets, id)) continue;
-    delete remainingPresets[id];
+    const settingKey = Object.entries(remainingPresets)
+      .find(([key, preset]) => key === id || preset?.id === id)?.[0];
+    if (!settingKey) continue;
+    delete remainingPresets[settingKey];
     removedIds.push(id);
   }
 
