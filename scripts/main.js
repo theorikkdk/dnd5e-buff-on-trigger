@@ -5,6 +5,7 @@ import { cleanupExternalBuffArtifactsForDeletedToken } from "./effects.js";
 import { buildDeletedTokenBuffSnapshot } from "./delete-token-cleanup.js";
 import { registerItemSheetButton } from "./ui.js";
 import { getActiveBuffs, migrateLegacyActiveBuff } from "./active-buffs.js";
+import { ActiveBuffDiagnosticsApplication } from "./active-buff-diagnostics.js";
 
 const pendingDeletedTokenBuffSnapshots = new Map();
 
@@ -204,6 +205,15 @@ Hooks.once("init", () => {
     hint: "BOT.settings.moduleMacros.hint",
     icon: "fas fa-scroll",
     type: ModuleMacrosConfig,
+    restricted: true,
+  });
+
+  game.settings.registerMenu(MODULE_ID, "activeBuffDiagnostics", {
+    name: "BOT.diagnostics.menuName",
+    label: "BOT.diagnostics.menuLabel",
+    hint: "BOT.diagnostics.menuHint",
+    icon: "fas fa-magnifying-glass-chart",
+    type: ActiveBuffDiagnosticsApplication,
     restricted: true,
   });
 

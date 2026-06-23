@@ -1,0 +1,88 @@
+<form class="dnd5e-buff-on-trigger bot-active-buff-diagnostics">
+  <header class="bot-diagnostics-toolbar">
+    <p class="hint">{{localize "BOT.diagnostics.help"}}</p>
+    <div class="bot-diagnostics-actions">
+      <button type="button" data-action="refresh">
+        <i class="fas fa-rotate"></i> {{localize "BOT.diagnostics.refresh"}}
+      </button>
+      <button type="button" data-action="copy-text">
+        <i class="fas fa-copy"></i> {{localize "BOT.diagnostics.copyText"}}
+      </button>
+      <button type="button" data-action="copy-json">
+        <i class="fas fa-code"></i> {{localize "BOT.diagnostics.copyJson"}}
+      </button>
+    </div>
+  </header>
+
+  <p class="bot-diagnostics-summary">
+    {{localize "BOT.diagnostics.actors"}}: {{report.actorCount}}
+    · {{localize "BOT.diagnostics.buffs"}}: {{report.buffCount}}
+    · {{localize "BOT.diagnostics.warnings"}}: {{report.warningCount}}
+  </p>
+
+  {{#if hasEntries}}
+    <div class="bot-diagnostics-table-wrap">
+      <table class="bot-diagnostics-table">
+        <thead>
+          <tr>
+            <th>{{localize "BOT.diagnostics.carrier"}}</th>
+            <th>{{localize "BOT.diagnostics.buff"}}</th>
+            <th>{{localize "BOT.diagnostics.source"}}</th>
+            <th>{{localize "BOT.diagnostics.stacking"}}</th>
+            <th>{{localize "BOT.diagnostics.trigger"}}</th>
+            <th>{{localize "BOT.diagnostics.runtime"}}</th>
+            <th>{{localize "BOT.diagnostics.warnings"}}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each rows}}
+            <tr class="{{#if warningLabels.length}}bot-diagnostics-warning-row{{/if}}">
+              <td>
+                <strong>{{carrierLabel}}</strong>
+                <code>{{carrier.actorUuid}}</code>
+              </td>
+              <td>
+                <strong>{{buffName}}</strong>
+                <code>{{buffId}}</code>
+              </td>
+              <td>
+                <div>{{sourceLabel}}</div>
+                <div class="hint">{{itemLabel}}</div>
+              </td>
+              <td><code>{{stackingLabel}}</code></td>
+              <td>{{triggerType}}</td>
+              <td>
+                <div>{{localize "BOT.diagnostics.concentration"}}: {{concentrationLabel}}</div>
+                <div>{{localize "BOT.diagnostics.statuses"}}: {{statusesLabel}}</div>
+                <div>{{indicatorsLabel}}</div>
+                <div>{{localize "BOT.diagnostics.duration"}}: {{durationLabel}}</div>
+              </td>
+              <td>
+                {{#if warningLabels.length}}
+                  <ul class="bot-diagnostics-warning-list">
+                    {{#each warningLabels}}<li>{{this}}</li>{{/each}}
+                  </ul>
+                {{else}}
+                  <span class="bot-diagnostics-ok">{{localize "BOT.diagnostics.ok"}}</span>
+                {{/if}}
+              </td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </div>
+  {{else}}
+    <p class="notification info">{{localize "BOT.diagnostics.empty"}}</p>
+  {{/if}}
+
+  {{#if hasActorWarnings}}
+    <section class="bot-diagnostics-actor-warnings">
+      <h3>{{localize "BOT.diagnostics.actorWarnings"}}</h3>
+      <ul>
+        {{#each actorWarnings}}
+          <li><strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}: {{label}}</li>
+        {{/each}}
+      </ul>
+    </section>
+  {{/if}}
+</form>

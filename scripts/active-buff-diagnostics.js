@@ -1,0 +1,391 @@
+import { MODULE_ID } from "./constants.js";
+import { getActiveBuffs, getStackingKey, getStackingMode } from "./active-buffs.js";
+import { findConcentrationEffectForBuff, isConcentrationBuff } from "./concentration.js";
+
+const FormApplicationBase = globalThis.FormApplication ?? class {};
+
+function toArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value.values === "function") return [...value.values()];
+  if (typeof value[Symbol.iterator] === "function") return [...value];
+  return [];
+}
+
+function getTokenDocument(token) {
+  return token?.document ?? token ?? null;
+}
+
+function getDiagnosticActorKey(actor, tokenDocument) {
+  if (!actor) return null;
+  if (tokenDocument?.actorLink === false) {
+    return tokenDocument.uuid
+      ?? (tokenDocument.id && tokenDocument.parent?.id
+        ? `${tokenDocument.parent.id}.${tokenDocument.id}`
+        : null)
+      ?? actor.uuid
+      ?? actor.id
+      ?? null;
+  }
+  return actor.uuid ?? actor.id ?? tokenDocument?.uuid ?? tokenDocument?.id ?? null;
+}
+
+export function collectActiveSceneBuffActorContexts({
+  tokenPlaceables = globalThis.canvas?.tokens?.placeables ?? [],
+  tokenDocuments = globalThis.canvas?.scene?.tokens ?? [],
+} = {}) {
+  const contexts = new Map();
+
+  const addToken = (token) => {
+    const tokenDocument = getTokenDocument(token);
+    const actor = token?.actor ?? tokenDocument?.actor ?? null;
+    if (!actor?.getFlag) return;
+    const key = getDiagnosticActorKey(actor, tokenDocument);
+    if (!key) return;
+
+    const tokenName = token?.name ?? tokenDocument?.name ?? null;
+    const tokenUuid = tokenDocument?.uuid ?? null;
+    const existing = contexts.get(key);
+    if (existing) {
+      if (tokenName && !existing.tokenNames.includes(tokenName)) existing.tokenNames.push(tokenName);
+      if (tokenUuid && !existing.tokenUuids.includes(tokenUuid)) existing.tokenUuids.push(tokenUuid);
+      return;
+    }
+
+    contexts.set(key, {
+      key,
+      actor,
+      actorUuid: actor.uuid ?? actor.id ?? null,
+      actorName: actor.name ?? null,
+      tokenNames: tokenName ? [tokenName] : [],
+      tokenUuids: tokenUuid ? [tokenUuid] : [],
+      actorLink: tokenDocument?.actorLink !== false,
+      synthetic: tokenDocument?.actorLink === false,
+    });
+  };
+
+  for (const token of tokenPlaceables ?? []) addToken(token);
+  for (const tokenDocument of tokenDocuments ?? []) addToken(tokenDocument);
+  return [...contexts.values()];
+}
+
+function resolveDocument(uuid, resolver) {
+  if (!uuid || typeof resolver !== "function") return null;
+  try {
+    return resolver(uuid) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getEffectModuleFlag(effect) {
+  return effect?.flags?.[MODULE_ID] ?? {};
+}
+
+function effectMatchesBuff(effect, context, buffId) {
+  const flag = getEffectModuleFlag(effect);
+  if (flag.buffId !== buffId) return false;
+  return !flag.ownerActorUuid || flag.ownerActorUuid === context.actorUuid;
+}
+
+function getConfiguredStatusIds(activeBuff) {
+  const configured = activeBuff?.status?.ids ?? activeBuff?.status?.id ?? [];
+  return [...new Set(
+    (Array.isArray(configured) ? configured : [configured])
+      .map((statusId) => String(statusId ?? "").trim())
+      .filter(Boolean)
+  )];
+}
+
+function formatDuration(activeBuff) {
+  const rounds = Number(activeBuff?.duration?.rounds);
+  const parts = [];
+  if (Number.isFinite(rounds) && rounds > 0) parts.push(`${rounds} round${rounds === 1 ? "" : "s"}`);
+  if (activeBuff?.duration?.concentration === true) parts.push("concentration");
+  if (activeBuff?.appliedAt) parts.push(`appliedAt=${activeBuff.appliedAt}`);
+  return parts.join(", ");
+}
+
+function buildWarningCodes({
+  activeBuff,
+  buffId,
+  sourceActor,
+  sourceItem,
+  indicators,
+  linkedStatuses,
+  concentrationExpected,
+  concentrationEffect,
+}) {
+  const warnings = [];
+  if (!buffId) warnings.push("missingBuffId");
+  if (!activeBuff?.originActorUuid) warnings.push("missingSourceActorUuid");
+  else if (!sourceActor) warnings.push("unresolvedSourceActor");
+  if (!(activeBuff?.originItemUuid ?? activeBuff?.itemUuid ?? activeBuff?.itemName)) {
+    warnings.push("missingSourceItem");
+  } else if ((activeBuff?.originItemUuid ?? activeBuff?.itemUuid) && !sourceItem) {
+    warnings.push("unresolvedSourceItem");
+  }
+  if (!indicators.active.length) warnings.push("missingActiveIndicator");
+  if (getConfiguredStatusIds(activeBuff).length && !linkedStatuses.length) {
+    warnings.push("missingLinkedStatus");
+  }
+  if (concentrationExpected && !concentrationEffect) warnings.push("missingConcentration");
+  return warnings;
+}
+
+export function collectActiveBuffDiagnostics(contexts, {
+  resolveUuid = globalThis.fromUuidSync,
+  findConcentration = findConcentrationEffectForBuff,
+  concentrationPredicate = isConcentrationBuff,
+} = {}) {
+  const safeContexts = Array.isArray(contexts) ? contexts.filter((context) => context?.actor) : [];
+  const allEffects = safeContexts.flatMap((context) =>
+    toArray(context.actor.effects).map((effect) => ({ context, effect }))
+  );
+  const entries = [];
+  const actorWarnings = [];
+
+  for (const context of safeContexts) {
+    let rawActiveBuffs;
+    try {
+      rawActiveBuffs = context.actor.getFlag(MODULE_ID, "activeBuffs");
+    } catch {
+      rawActiveBuffs = null;
+    }
+    if (rawActiveBuffs != null
+      && (typeof rawActiveBuffs !== "object" || Array.isArray(rawActiveBuffs))) {
+      actorWarnings.push({
+        actorUuid: context.actorUuid,
+        actorName: context.actorName,
+        warning: "invalidActiveBuffsMap",
+      });
+      continue;
+    }
+
+    const activeBuffs = getActiveBuffs(context.actor);
+    for (const [mapBuffId, rawActiveBuff] of Object.entries(activeBuffs)) {
+      if (!rawActiveBuff || typeof rawActiveBuff !== "object" || Array.isArray(rawActiveBuff)) {
+        actorWarnings.push({
+          actorUuid: context.actorUuid,
+          actorName: context.actorName,
+          buffId: mapBuffId,
+          warning: "invalidActiveBuffEntry",
+        });
+        continue;
+      }
+
+      const activeBuff = rawActiveBuff;
+      const buffId = activeBuff.buffId ?? mapBuffId ?? null;
+      const sourceActorUuid = activeBuff.originActorUuid ?? null;
+      const sourceItemUuid = activeBuff.originItemUuid ?? activeBuff.itemUuid ?? null;
+      const sourceActor = resolveDocument(sourceActorUuid, resolveUuid);
+      const sourceItem = resolveDocument(sourceItemUuid, resolveUuid);
+      const matchingEffects = allEffects
+        .filter(({ effect }) => effectMatchesBuff(effect, context, buffId));
+      const activeIndicators = matchingEffects
+        .filter(({ effect }) => getEffectModuleFlag(effect).indicator === true
+          || effect?.statuses?.has?.("bot-active") === true);
+      const targetIndicators = matchingEffects
+        .filter(({ effect }) => getEffectModuleFlag(effect).targetIndicator === true);
+      const storedTargetIndicators = matchingEffects
+        .filter(({ effect }) => getEffectModuleFlag(effect).storedTargetIndicator === true);
+      const mechanicalEffects = matchingEffects
+        .filter(({ effect }) => getEffectModuleFlag(effect).mechanicalBuff === true);
+      const linkedStatuses = matchingEffects
+        .filter(({ effect }) => getEffectModuleFlag(effect).linkedStatus === true);
+      const concentrationExpected = Boolean(concentrationPredicate?.(activeBuff));
+      const concentrationEffect = concentrationExpected
+        ? findConcentration?.(activeBuff, context.actor) ?? null
+        : null;
+      const indicators = {
+        active: activeIndicators.map(({ effect }) => effect.name ?? effect.id ?? "indicator"),
+        target: targetIndicators.map(({ context: targetContext, effect }) =>
+          `${targetContext.actorName ?? targetContext.actorUuid}: ${effect.name ?? effect.id ?? "indicator"}`
+        ),
+        storedTarget: storedTargetIndicators.map(({ context: targetContext, effect }) =>
+          `${targetContext.actorName ?? targetContext.actorUuid}: ${effect.name ?? effect.id ?? "indicator"}`
+        ),
+        mechanical: mechanicalEffects.map(({ effect }) => effect.name ?? effect.id ?? "effect"),
+      };
+      const statusDetails = linkedStatuses.map(({ context: statusContext, effect }) => ({
+        actor: statusContext.actorName ?? statusContext.actorUuid,
+        statusId: getEffectModuleFlag(effect).statusId ?? [...(effect.statuses ?? [])][0] ?? null,
+        name: effect.name ?? null,
+      }));
+      const warnings = buildWarningCodes({
+        activeBuff,
+        buffId,
+        sourceActor,
+        sourceItem,
+        indicators,
+        linkedStatuses,
+        concentrationExpected,
+        concentrationEffect,
+      });
+
+      entries.push({
+        carrier: {
+          actorName: context.actorName ?? context.actorUuid ?? "Unknown actor",
+          actorUuid: context.actorUuid,
+          tokenNames: [...context.tokenNames],
+          tokenUuids: [...context.tokenUuids],
+          actorLink: context.actorLink,
+          synthetic: context.synthetic,
+        },
+        buffName: activeBuff.itemName ?? activeBuff.name ?? sourceItem?.name ?? buffId ?? "Unknown buff",
+        buffId,
+        sourceActor: {
+          name: sourceActor?.name ?? activeBuff.originTokenName ?? null,
+          uuid: sourceActorUuid,
+        },
+        sourceItem: {
+          name: sourceItem?.name ?? activeBuff.itemName ?? null,
+          uuid: sourceItemUuid,
+        },
+        stackingMode: getStackingMode(activeBuff),
+        stackingKey: getStackingKey(activeBuff),
+        triggerType: activeBuff.type ?? null,
+        concentration: {
+          expected: concentrationExpected,
+          linked: Boolean(concentrationEffect),
+          effectName: concentrationEffect?.name ?? null,
+        },
+        linkedStatuses: statusDetails,
+        indicators,
+        duration: {
+          rounds: Number.isFinite(Number(activeBuff?.duration?.rounds))
+            ? Number(activeBuff.duration.rounds)
+            : null,
+          appliedAt: activeBuff.appliedAt ?? null,
+          summary: formatDuration(activeBuff),
+        },
+        warnings,
+      });
+    }
+  }
+
+  entries.sort((left, right) =>
+    String(left.carrier.actorName).localeCompare(String(right.carrier.actorName))
+      || String(left.buffName).localeCompare(String(right.buffName))
+      || String(left.buffId).localeCompare(String(right.buffId))
+  );
+  return {
+    generatedAt: new Date().toISOString(),
+    sceneName: globalThis.canvas?.scene?.name ?? null,
+    actorCount: safeContexts.length,
+    buffCount: entries.length,
+    warningCount: entries.reduce((total, entry) => total + entry.warnings.length, actorWarnings.length),
+    actorWarnings,
+    entries,
+  };
+}
+
+export function buildActiveBuffDiagnosticText(report) {
+  const lines = [
+    `Active Buff Diagnostics${report?.sceneName ? ` — ${report.sceneName}` : ""}`,
+    `Actors: ${report?.actorCount ?? 0}; Buffs: ${report?.buffCount ?? 0}; Warnings: ${report?.warningCount ?? 0}`,
+  ];
+  for (const entry of report?.entries ?? []) {
+    const tokens = entry.carrier.tokenNames.length ? ` [${entry.carrier.tokenNames.join(", ")}]` : "";
+    lines.push("");
+    lines.push(`${entry.carrier.actorName}${tokens} — ${entry.buffName}`);
+    lines.push(`buffId=${entry.buffId ?? "-"}; stack=${entry.stackingMode}/${entry.stackingKey ?? "-"}; trigger=${entry.triggerType ?? "-"}`);
+    lines.push(`source=${entry.sourceActor.name ?? entry.sourceActor.uuid ?? "-"}; item=${entry.sourceItem.name ?? entry.sourceItem.uuid ?? "-"}`);
+    lines.push(`concentration=${entry.concentration.expected ? (entry.concentration.linked ? "linked" : "missing") : "no"}; statuses=${entry.linkedStatuses.map((status) => status.statusId ?? status.name).filter(Boolean).join(", ") || "-"}`);
+    lines.push(`indicators=active:${entry.indicators.active.length}, target:${entry.indicators.target.length}, stored:${entry.indicators.storedTarget.length}, mechanical:${entry.indicators.mechanical.length}; duration=${entry.duration.summary || "-"}`);
+    if (entry.warnings.length) lines.push(`warnings=${entry.warnings.join(", ")}`);
+  }
+  for (const warning of report?.actorWarnings ?? []) {
+    lines.push("");
+    lines.push(`${warning.actorName ?? warning.actorUuid ?? "Unknown actor"} — warning=${warning.warning}${warning.buffId ? `; buffId=${warning.buffId}` : ""}`);
+  }
+  return lines.join("\n");
+}
+
+export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
+  static get defaultOptions() {
+    return foundry.utils.mergeObject(super.defaultOptions, {
+      id: "bot-active-buff-diagnostics",
+      title: game.i18n.localize("BOT.diagnostics.title"),
+      template: `modules/${MODULE_ID}/templates/active-buff-diagnostics.html`,
+      width: 980,
+      height: 680,
+      resizable: true,
+      closeOnSubmit: false,
+      submitOnChange: false,
+    });
+  }
+
+  getData() {
+    const contexts = collectActiveSceneBuffActorContexts();
+    const report = collectActiveBuffDiagnostics(contexts);
+    this._diagnosticReport = report;
+    const warningLabel = (code) => game.i18n.localize(`BOT.diagnostics.warning.${code}`);
+    return {
+      report,
+      hasEntries: report.entries.length > 0,
+      hasActorWarnings: report.actorWarnings.length > 0,
+      rows: report.entries.map((entry) => ({
+        ...entry,
+        carrierLabel: [
+          entry.carrier.actorName,
+          entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
+          entry.carrier.synthetic ? game.i18n.localize("BOT.diagnostics.synthetic") : null,
+        ].filter(Boolean).join(" "),
+        sourceLabel: entry.sourceActor.name ?? entry.sourceActor.uuid ?? "—",
+        itemLabel: entry.sourceItem.name ?? entry.sourceItem.uuid ?? "—",
+        stackingLabel: `${entry.stackingMode} / ${entry.stackingKey ?? "—"}`,
+        concentrationLabel: entry.concentration.expected
+          ? game.i18n.localize(entry.concentration.linked
+            ? "BOT.diagnostics.concentrationLinked"
+            : "BOT.diagnostics.concentrationMissing")
+          : game.i18n.localize("BOT.diagnostics.no"),
+        statusesLabel: entry.linkedStatuses
+          .map((status) => status.statusId ?? status.name)
+          .filter(Boolean)
+          .join(", ") || "—",
+        indicatorsLabel: game.i18n.format("BOT.diagnostics.indicatorCounts", {
+          active: entry.indicators.active.length,
+          target: entry.indicators.target.length,
+          stored: entry.indicators.storedTarget.length,
+          mechanical: entry.indicators.mechanical.length,
+        }),
+        durationLabel: entry.duration.summary || "—",
+        warningLabels: entry.warnings.map(warningLabel),
+      })),
+      actorWarnings: report.actorWarnings.map((warning) => ({
+        ...warning,
+        label: warningLabel(warning.warning),
+      })),
+    };
+  }
+
+  activateListeners(html) {
+    super.activateListeners(html);
+    const root = html?.[0] ?? html;
+    root?.querySelector?.('[data-action="refresh"]')?.addEventListener("click", () => this.render(false));
+    root?.querySelector?.('[data-action="copy-text"]')?.addEventListener("click", () => this._copyReport("text"));
+    root?.querySelector?.('[data-action="copy-json"]')?.addEventListener("click", () => this._copyReport("json"));
+  }
+
+  async _copyReport(format) {
+    if (!game.user?.isGM) return;
+    const report = this._diagnosticReport ?? collectActiveBuffDiagnostics(collectActiveSceneBuffActorContexts());
+    const content = format === "json"
+      ? JSON.stringify(report, null, 2)
+      : buildActiveBuffDiagnosticText(report);
+    try {
+      if (game.clipboard?.copyPlainText) await game.clipboard.copyPlainText(content);
+      else if (globalThis.navigator?.clipboard?.writeText) {
+        await globalThis.navigator.clipboard.writeText(content);
+      } else {
+        throw new Error("Clipboard API unavailable");
+      }
+      ui.notifications.info(game.i18n.localize("BOT.diagnostics.copied"));
+    } catch {
+      ui.notifications.error(game.i18n.localize("BOT.diagnostics.copyFailed"));
+    }
+  }
+
+  async _updateObject() {}
+}
