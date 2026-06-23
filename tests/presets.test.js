@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import { validateAndNormalizeImportedPreset } from "../scripts/custom-preset-import.js";
+import { classifyNoStackApplication } from "../scripts/active-buffs.js";
 import { BUFF_PRESETS, CORE_PRESET_IDS } from "../scripts/presets.js";
 
 const DEFAULT_CONFIG = {
@@ -45,6 +46,7 @@ test("the core preset pack contains the supported useful presets", () => {
   assert.deepEqual(CORE_PRESET_IDS, [
     "guidance",
     "resistance",
+    "bardicInspiration",
     "bless",
     "bane",
     "shieldOfFaith",
@@ -104,6 +106,17 @@ test("core preset mechanics match the supported module features", () => {
   });
   assert.equal(getPreset("resistance").flag.charges, 1);
 
+  assert.deepEqual(getPreset("bardicInspiration").flag.rollModifier, {
+    enabled: true,
+    formula: "1d@origin.bardicInspirationDie",
+    rollTypes: ["ability", "skill", "attack", "save"],
+    consumptionMode: "prompt",
+  });
+  assert.equal(getPreset("bardicInspiration").flag.stackingMode, "noStack");
+  assert.equal(getPreset("bardicInspiration").flag.stackingKey, "bardic-inspiration");
+  assert.equal(getPreset("bardicInspiration").flag.charges, 1);
+  assert.equal(isTestPreset(getPreset("bardicInspiration")), false);
+
   assert.equal(getPreset("bless").flag.rollModifier.formula, "1d4");
   assert.deepEqual(getPreset("bless").flag.rollModifier.rollTypes, ["attack", "save"]);
   assert.equal(getPreset("bless").flag.rollModifier.consumptionMode, undefined);
@@ -118,6 +131,30 @@ test("core preset mechanics match the supported module features", () => {
 
   assert.deepEqual(getPreset("protectionFromPoison").flag.buffs.resistances, ["poison"]);
   assert.equal(getPreset("protectionFromPoison").flag.buffs.conditionImmunities, undefined);
+});
+
+test("bardic inspiration blocks a second caster through existing noStack rules", () => {
+  const presetFlag = getPreset("bardicInspiration").flag;
+  const firstInspiration = {
+    ...structuredClone(presetFlag),
+    buffId: "inspiration-t1",
+    originActorUuid: "Actor.T1",
+    originItemUuid: "Actor.T1.Item.inspiration",
+  };
+  const secondInspiration = {
+    ...structuredClone(presetFlag),
+    buffId: "inspiration-t2",
+    originActorUuid: "Actor.T2",
+    originItemUuid: "Actor.T2.Item.inspiration",
+  };
+
+  const result = classifyNoStackApplication({
+    [firstInspiration.buffId]: firstInspiration,
+  }, secondInspiration);
+
+  assert.equal(result.status, "blocked");
+  assert.equal(result.blockingBuffId, firstInspiration.buffId);
+  assert.deepEqual(result.replacementCandidateBuffIds, []);
 });
 
 test("core preset labels and descriptions exist in English and French", async () => {

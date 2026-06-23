@@ -6,6 +6,8 @@ import { concentrationEffectMatchesBuff, findConcentrationEffectForBuff, getActo
 import {
   buildRollModifierPromptDecision,
   createRollModifierPromptWrapper,
+  finalizeMidiAttackRollModifierWorkflow,
+  getRollModifierPromptDisplay,
 } from "./roll-modifier-consumption.js";
 
 const recentConcentrationRolls = new Map();
@@ -787,7 +789,7 @@ async function handleRollModifierHook(hookName, rollType, ...args) {
   await applyRollModifierToConfig(actor, rollType, config);
 }
 
-function handleRollModifierBuildHook(hookName, rollType, process, rollConfig) {
+function handleRollModifierBuildHook(hookName, rollType, process, rollConfig, workflow = null) {
   const actor = resolveRollHookActor(process);
   if (!actor?.getFlag || !rollConfig) {
     console.warn(`[${MODULE_ID}] Modificateur de jet non appliqué : configuration dnd5e incompatible (${hookName})`);
@@ -803,13 +805,22 @@ function handleRollModifierBuildHook(hookName, rollType, process, rollConfig) {
     consume: false,
     promptDecision: process?.[ROLL_MODIFIER_PROMPT_DECISION_KEY] ?? null,
   });
-  if (applied) process._botRollModifier = rollConfig._botRollModifier;
+  if (applied) {
+    process._botRollModifier = rollConfig._botRollModifier;
+    if (rollType === "attack" && workflow) {
+      workflow._botRollModifier = rollConfig._botRollModifier;
+    }
+  }
 }
 
 async function handleRollModifierFinalHook(hookName, rollType, rolls, process) {
   const actor = resolveRollHookActor(process);
   const metadata = process?._botRollModifier;
   if (!actor?.getFlag || !metadata) return;
+  if (rollType === "attack" && game.modules?.get?.("midi-qol")?.active === true) {
+    debugLog(`[${MODULE_ID}] Finalisation native du modificateur d'attaque différée à Midi-QOL`);
+    return;
+  }
   await finalizeRollModifierApplication(actor, rollType, metadata, rolls);
 }
 
@@ -827,11 +838,14 @@ function escapeRollModifierPromptText(value) {
 }
 
 function promptRollModifierUse(candidate) {
-  const name = candidate?.activeFlag?.itemName
-    ?? game.i18n.localize("BOT.fallback.effectName");
+  const display = getRollModifierPromptDisplay(candidate, {
+    localize: (key) => game.i18n.localize(key),
+    fallbackName: game.i18n.localize("BOT.fallback.effectName"),
+    bardicDieFallback: game.i18n.localize("BOT.ui.rollModifier.bardicDieLabel"),
+  });
   const message = game.i18n.format("BOT.ui.rollModifier.promptMessage", {
-    name,
-    formula: candidate?.formula ?? "",
+    name: display.name,
+    formula: display.formula,
   });
   if (!globalThis.Dialog) return Promise.resolve(window.confirm(message));
 
@@ -871,37 +885,50 @@ async function resolveRollModifierPromptCandidates(candidates) {
 
 function registerRollModifierPromptWrappers() {
   const actorPrototype = globalThis.CONFIG?.Actor?.documentClass?.prototype;
-  if (!actorPrototype || actorPrototype[ROLL_MODIFIER_PROMPT_WRAPPED]) return;
+  const attackActivityPrototype = globalThis.CONFIG?.DND5E?.activityTypes?.attack?.documentClass?.prototype;
+  const wrapPrototypeMethods = (prototype, methods) => {
+    if (!prototype || prototype[ROLL_MODIFIER_PROMPT_WRAPPED]) return;
 
-  const methods = [
-    ["rollAbilityCheck", "ability"],
-    ["rollSkill", "skill"],
-    ["rollSavingThrow", "save"],
-  ];
-  for (const [methodName, rollType] of methods) {
-    const original = actorPrototype[methodName];
-    if (typeof original !== "function") continue;
-    actorPrototype[methodName] = createRollModifierPromptWrapper(original, {
-      rollType,
-      decisionKey: ROLL_MODIFIER_PROMPT_DECISION_KEY,
-      getCandidates: getDominantRollModifiers,
-      resolveDecision: resolveRollModifierPromptCandidates,
-      onPrompt: (actor, promptedRollType, candidates) => {
-        debugLog(`[${MODULE_ID}] Jet suspendu pour confirmation du modificateur`, {
-          actor: actor?.name ?? null,
-          actorUuid: actor?.uuid ?? null,
-          rollType: promptedRollType,
-          buffIds: candidates.map((candidate) => candidate.buffId),
-        });
-      },
+    let wrapped = false;
+    for (const { methodName, rollType, resolveActor } of methods) {
+      const original = prototype[methodName];
+      if (typeof original !== "function") continue;
+      prototype[methodName] = createRollModifierPromptWrapper(original, {
+        rollType,
+        decisionKey: ROLL_MODIFIER_PROMPT_DECISION_KEY,
+        getCandidates: getDominantRollModifiers,
+        resolveDecision: resolveRollModifierPromptCandidates,
+        resolveActor,
+        onPrompt: (actor, promptedRollType, candidates) => {
+          debugLog(`[${MODULE_ID}] Jet suspendu pour confirmation du modificateur`, {
+            actor: actor?.name ?? null,
+            actorUuid: actor?.uuid ?? null,
+            rollType: promptedRollType,
+            buffIds: candidates.map((candidate) => candidate.buffId),
+          });
+        },
+      });
+      wrapped = true;
+    }
+
+    if (!wrapped) return;
+    Object.defineProperty(prototype, ROLL_MODIFIER_PROMPT_WRAPPED, {
+      configurable: false,
+      enumerable: false,
+      value: true,
     });
-  }
+  };
 
-  Object.defineProperty(actorPrototype, ROLL_MODIFIER_PROMPT_WRAPPED, {
-    configurable: false,
-    enumerable: false,
-    value: true,
-  });
+  wrapPrototypeMethods(actorPrototype, [
+    { methodName: "rollAbilityCheck", rollType: "ability", resolveActor: (actor) => actor },
+    { methodName: "rollSkill", rollType: "skill", resolveActor: (actor) => actor },
+    { methodName: "rollSavingThrow", rollType: "save", resolveActor: (actor) => actor },
+  ]);
+  wrapPrototypeMethods(attackActivityPrototype, [{
+    methodName: "rollAttack",
+    rollType: "attack",
+    resolveActor: (activity) => activity?.actor ?? activity?.item?.actor ?? null,
+  }]);
 }
 
 function getReceivedAttackCategories(workflow, item) {
@@ -3093,7 +3120,14 @@ export function registerTriggers() {
 
   Hooks.on("dnd5e.postBuildAttackRollConfig", async (process, rollConfig) => {
     incomingFilterLog("postBuildAttackRollConfig called", summarizeIncomingRollConfig(process, rollConfig));
-    const workflow = process?.workflow ?? process?.midiOptions?.workflow ?? process?.subject?.workflow ?? rollConfig?.workflow ?? rollConfig?.midiOptions?.workflow ?? null;
+    const workflow = process?.workflow
+      ?? process?.config?.workflow
+      ?? process?.midiOptions?.workflow
+      ?? process?.subject?.workflow
+      ?? rollConfig?.workflow
+      ?? rollConfig?.config?.workflow
+      ?? rollConfig?.midiOptions?.workflow
+      ?? null;
     const attacker = resolveRollHookActor(process) ?? resolveRollHookActor(rollConfig) ?? null;
     const fallbackTargets = rollConfig?.targets ?? process?.targets ?? process?.config?.targets ?? game.user?.targets ?? new Set();
     const fallbackWorkflow = workflow ?? (attacker ? { actor: attacker, targets: fallbackTargets, rollOptions: rollConfig?.midiOptions ?? {}, midiOptions: rollConfig?.midiOptions ?? {} } : null);
@@ -3106,7 +3140,13 @@ export function registerTriggers() {
       attackBonusApplied,
       rollConfig: summarizeIncomingRollConfig(process, rollConfig),
     });
-    handleRollModifierBuildHook("dnd5e.postBuildAttackRollConfig", "attack", process, rollConfig);
+    handleRollModifierBuildHook(
+      "dnd5e.postBuildAttackRollConfig",
+      "attack",
+      process,
+      rollConfig,
+      workflow
+    );
   });
 
   Hooks.on("dnd5e.postBuildSavingThrowRollConfig", async (process, rollConfig) => {
@@ -3136,6 +3176,26 @@ export function registerTriggers() {
   Hooks.on("dnd5e.postSkillRollConfiguration", async (rolls, process) => {
     await handleRollModifierFinalHook("dnd5e.postSkillRollConfiguration", "skill", rolls, process);
   });
+
+  Hooks.on("midi-qol.AttackRollComplete", async (workflow) => {
+    try {
+      const consumed = await finalizeMidiAttackRollModifierWorkflow(workflow, ({ actor, metadata, rolls }) =>
+        finalizeRollModifierApplication(actor, "attack", metadata, rolls, {
+          injectionConfirmed: true,
+        })
+      );
+      debugLog(`[${MODULE_ID}] Finalisation Midi-QOL du modificateur d'attaque`, {
+        workflowId: workflow?.id ?? workflow?.uuid ?? null,
+        actorUuid: workflow?.actor?.uuid ?? workflow?.item?.actor?.uuid ?? null,
+        hasAttackRoll: Boolean(workflow?.attackRoll ?? workflow?.attackRolls?.[0]),
+        hasMetadata: Boolean(workflow?._botRollModifier),
+        consumed,
+      });
+    } catch (error) {
+      console.error(`[${MODULE_ID}] Erreur de consommation du modificateur d'attaque Midi-QOL :`, error);
+    }
+  });
+
   Hooks.on("dnd5e.preRollConcentration", (rollConfig, dialogConfig, messageConfig) => {
     try {
       const actor = rollConfig?.subject ?? null;

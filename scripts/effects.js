@@ -17,7 +17,9 @@ import {
 import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
 import { cleanupExternalBuffArtifacts } from "./delete-token-cleanup.js";
 import {
+  getBardicInspirationDie,
   getRollModifierConsumptionMode,
+  isRollModifierMetadataConsumed,
   shouldApplyRollModifierCandidate,
 } from "./roll-modifier-consumption.js";
 
@@ -1022,9 +1024,28 @@ function readItemBaseSpellLevel(item) {
   return Number.isFinite(level) && level >= 0 ? level : null;
 }
 
+function readClassLevel(actor, identifier) {
+  if (!actor) return 0;
+  const directClass = actor.classes?.[identifier];
+  const directLevel = Number(directClass?.system?.levels ?? directClass?.levels);
+  if (Number.isFinite(directLevel) && directLevel > 0) return directLevel;
+
+  const classItem = (actor.items ?? []).find?.((item) => {
+    if (item?.type !== "class") return false;
+    const itemIdentifier = String(item.system?.identifier ?? "").trim().toLowerCase();
+    const itemName = String(item.name ?? "").trim().toLowerCase();
+    return itemIdentifier === identifier
+      || (identifier === "bard" && ["bard", "barde"].includes(itemName));
+  });
+  const itemLevel = Number(classItem?.system?.levels ?? classItem?.system?.level);
+  return Number.isFinite(itemLevel) && itemLevel > 0 ? itemLevel : 0;
+}
+
 function buildActorFormulaSource(actor) {
+  const bardLevel = readClassLevel(actor, "bard");
   return {
     prof: readProfBonus(actor),
+    bardicInspirationDie: getBardicInspirationDie(bardLevel),
     str: { mod: readAbilityModifier(actor, "str") },
     dex: { mod: readAbilityModifier(actor, "dex") },
     con: { mod: readAbilityModifier(actor, "con") },
@@ -2329,15 +2350,24 @@ export function getRollModifierCandidates(actor, rollType) {
       if (shouldBlockTriggerFrequency(actor, activeFlag)) return false;
       return true;
     })
-    .map(({ buffId, activeFlag }) => ({
-      activeFlag,
-      buffId,
-      stackingKey: getStackingKey(activeFlag) || buffId,
-      formula: activeFlag.rollModifier.formula,
-      rollType,
-      consumable: shouldUseRollModifierStackApplicationLock(activeFlag),
-      consumptionMode: getRollModifierConsumptionMode(activeFlag.rollModifier),
-    }))
+    .map(({ buffId, activeFlag }) => {
+      const formula = activeFlag.rollModifier.formula;
+      const safeData = buildSafeRollModifierData(actor, activeFlag);
+      const bardicDie = Number(safeData?.origin?.bardicInspirationDie);
+      const displayFormula = Number.isFinite(bardicDie) && bardicDie > 0
+        ? String(formula).replaceAll("@origin.bardicInspirationDie", String(bardicDie))
+        : formula;
+      return {
+        activeFlag,
+        buffId,
+        stackingKey: getStackingKey(activeFlag) || buffId,
+        formula,
+        displayFormula,
+        rollType,
+        consumable: shouldUseRollModifierStackApplicationLock(activeFlag),
+        consumptionMode: getRollModifierConsumptionMode(activeFlag.rollModifier),
+      };
+    })
     .filter((candidate) => {
       const consumable = shouldUseRollModifierStackApplicationLock(candidate.activeFlag);
       const lock = consumable ? getConsumableRollStackDebug(actor, candidate) : null;
@@ -2512,9 +2542,9 @@ function rollContainsModifierFormula(roll, formula) {
   return candidates.some((value) => value.includes(expected));
 }
 
-export async function finalizeRollModifierApplication(actor, rollType, metadata, rolls = []) {
+export async function finalizeRollModifierApplication(actor, rollType, metadata, rolls = [], options = {}) {
   try {
-    if (!actor?.getFlag || !metadata || metadata.consumed) return false;
+    if (!actor?.getFlag || !metadata || isRollModifierMetadataConsumed(metadata)) return false;
     const rollList = Array.isArray(rolls) ? rolls : [];
     const modifiers = Array.isArray(metadata.modifiers) ? metadata.modifiers : [metadata];
     let applied = false;
@@ -2553,7 +2583,9 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
         });
         continue;
       }
-      if (!rollList.some((roll) => rollContainsModifierFormula(roll, modifier.formula))) {
+      const formulaConfirmed = options.injectionConfirmed === true
+        || rollList.some((roll) => rollContainsModifierFormula(roll, modifier.formula));
+      if (!formulaConfirmed) {
         console.warn(`[${MODULE_ID}] Modificateur de jet non applique : configuration dnd5e incompatible`);
         rollModifierDebug("finalize ignored: formula not found in roll", {
           actor: actor?.name ?? null,
@@ -2631,7 +2663,7 @@ export async function finalizeRollModifierApplication(actor, rollType, metadata,
       applied = true;
     }
 
-    metadata.consumed = true;
+    metadata.consumed = isRollModifierMetadataConsumed(metadata);
     return applied;
   } catch (error) {
     console.error(`[${MODULE_ID}] Erreur dans finalizeRollModifierApplication :`, error);
