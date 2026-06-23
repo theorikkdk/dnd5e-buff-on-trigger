@@ -782,6 +782,25 @@
   margin: 0;
 }
 
+.bot-diagnostics-actions-column {
+  width: 108px;
+}
+
+.bot-diagnostics-row-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 30px);
+  gap: 4px;
+  justify-content: center;
+}
+
+.bot-diagnostics-row-actions button {
+  width: 30px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  line-height: 1;
+}
+
 @media (max-width: 560px) {
   .bot-tabs {
     flex-wrap: wrap;

@@ -451,6 +451,60 @@ export function filterActiveBuffDiagnosticReport(report, {
   };
 }
 
+function resolveCarrierToken(entry, resolver, tokenLookup) {
+  for (const tokenUuid of entry?.carrier?.tokenUuids ?? []) {
+    const tokenDocument = resolveDocument(tokenUuid, resolver);
+    if (tokenDocument) return tokenDocument;
+    const tokenId = String(tokenUuid ?? "").split(".").at(-1);
+    const token = tokenId && typeof tokenLookup === "function" ? tokenLookup(tokenId) : null;
+    if (token) return token?.document ?? token;
+  }
+  return null;
+}
+
+export function getActiveBuffDiagnosticNavigation(entry, {
+  resolveUuid = globalThis.fromUuidSync,
+  tokenLookup = (tokenId) => globalThis.canvas?.tokens?.get?.(tokenId) ?? null,
+} = {}) {
+  const carrierToken = resolveCarrierToken(entry, resolveUuid, tokenLookup);
+  const carrierActor = resolveDocument(entry?.carrier?.actorUuid, resolveUuid)
+    ?? carrierToken?.actor
+    ?? carrierToken?.object?.actor
+    ?? null;
+  const sourceActor = resolveDocument(entry?.sourceActor?.uuid, resolveUuid);
+  const sourceItem = resolveDocument(entry?.sourceItem?.uuid, resolveUuid);
+  return {
+    carrierActorAvailable: Boolean(carrierActor),
+    carrierTokenAvailable: Boolean(carrierToken),
+    sourceActorAvailable: Boolean(sourceActor),
+    sourceItemAvailable: Boolean(sourceItem),
+    buffIdAvailable: Boolean(String(entry?.buffId ?? "").trim()),
+    summaryAvailable: Boolean(entry),
+  };
+}
+
+export function buildActiveBuffDiagnosticEntrySummary(entry) {
+  if (!entry) return "";
+  const tokenNames = entry?.carrier?.tokenNames?.filter(Boolean) ?? [];
+  const carrier = `${entry?.carrier?.actorName ?? entry?.carrier?.actorUuid ?? "Unknown actor"}${tokenNames.length
+    ? ` [${tokenNames.join(", ")}]`
+    : ""}`;
+  const source = entry?.sourceActor?.name
+    ?? entry?.sourceActor?.uuid
+    ?? "unknown source";
+  const item = entry?.sourceItem?.name
+    ?? entry?.sourceItem?.uuid
+    ?? "unknown item";
+  const issues = entry?.issues?.length
+    ? entry.issues.map((issue) => `${issue.severity}:${issue.code}`).join(", ")
+    : (entry?.warnings?.length ? entry.warnings.join(", ") : "none");
+  return [
+    `${carrier} — ${entry?.buffName ?? "Unknown buff"} (${entry?.buffId ?? "no buffId"})`,
+    `source=${source}; item=${item}; trigger=${entry?.triggerType ?? "-"}; stack=${entry?.stackingMode ?? "-"}/${entry?.stackingKey ?? "-"}`,
+    `issues=${issues}`,
+  ].join("\n");
+}
+
 export function buildActiveBuffDiagnosticText(report) {
   const lines = [
     `Active Buff Diagnostics${report?.sceneName ? ` — ${report.sceneName}` : ""}`,
@@ -508,44 +562,48 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
         visible: filtered.visibleCount,
         inconsistent: filtered.inconsistentCount,
       },
-      rows: report.entries.map((entry, diagnosticIndex) => ({
-        ...entry,
-        diagnosticIndex,
-        carrierLabel: [
-          entry.carrier.actorName,
-          entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
-          entry.carrier.synthetic ? game.i18n.localize("BOT.diagnostics.synthetic") : null,
-        ].filter(Boolean).join(" "),
-        sourceLabel: entry.sourceActor.name ?? entry.sourceActor.uuid ?? "—",
-        itemLabel: entry.sourceItem.name ?? entry.sourceItem.uuid ?? "—",
-        stackingLabel: `${entry.configuredStackingMode && entry.configuredStackingMode !== entry.stackingMode
-          ? `${entry.configuredStackingMode} → ${entry.stackingMode}`
-          : entry.stackingMode} / ${entry.stackingKey ?? "—"}`,
-        concentrationLabel: entry.concentration.expected
-          ? game.i18n.localize(entry.concentration.linked
-            ? "BOT.diagnostics.concentrationLinked"
-            : "BOT.diagnostics.concentrationMissing")
-          : game.i18n.localize("BOT.diagnostics.no"),
-        statusesLabel: entry.linkedStatuses
-          .map((status) => status.statusId ?? status.name)
-          .filter(Boolean)
-          .join(", ") || "—",
-        indicatorsLabel: game.i18n.format("BOT.diagnostics.indicatorCounts", {
-          active: entry.indicators.active.length,
-          target: entry.indicators.target.length,
-          stored: entry.indicators.storedTarget.length,
-          mechanical: entry.indicators.mechanical.length,
-        }),
-        durationLabel: entry.duration.summary || "—",
-        warningDetails: (entry.issues ?? entry.warnings.map((code) => ({
-          code,
-          severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning",
-        }))).map((issue) => ({
-          ...issue,
-          label: warningLabel(issue.code),
-          severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${issue.severity}`),
-        })),
-      })),
+      rows: report.entries.map((entry, diagnosticIndex) => {
+        const navigation = getActiveBuffDiagnosticNavigation(entry);
+        return {
+          ...entry,
+          diagnosticIndex,
+          navigation,
+          carrierLabel: [
+            entry.carrier.actorName,
+            entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
+            entry.carrier.synthetic ? game.i18n.localize("BOT.diagnostics.synthetic") : null,
+          ].filter(Boolean).join(" "),
+          sourceLabel: entry.sourceActor.name ?? entry.sourceActor.uuid ?? "—",
+          itemLabel: entry.sourceItem.name ?? entry.sourceItem.uuid ?? "—",
+          stackingLabel: `${entry.configuredStackingMode && entry.configuredStackingMode !== entry.stackingMode
+            ? `${entry.configuredStackingMode} → ${entry.stackingMode}`
+            : entry.stackingMode} / ${entry.stackingKey ?? "—"}`,
+          concentrationLabel: entry.concentration.expected
+            ? game.i18n.localize(entry.concentration.linked
+              ? "BOT.diagnostics.concentrationLinked"
+              : "BOT.diagnostics.concentrationMissing")
+            : game.i18n.localize("BOT.diagnostics.no"),
+          statusesLabel: entry.linkedStatuses
+            .map((status) => status.statusId ?? status.name)
+            .filter(Boolean)
+            .join(", ") || "—",
+          indicatorsLabel: game.i18n.format("BOT.diagnostics.indicatorCounts", {
+            active: entry.indicators.active.length,
+            target: entry.indicators.target.length,
+            stored: entry.indicators.storedTarget.length,
+            mechanical: entry.indicators.mechanical.length,
+          }),
+          durationLabel: entry.duration.summary || "—",
+          warningDetails: (entry.issues ?? entry.warnings.map((code) => ({
+            code,
+            severity: DIAGNOSTIC_SEVERITIES[code] ?? "warning",
+          }))).map((issue) => ({
+            ...issue,
+            label: warningLabel(issue.code),
+            severityLabel: game.i18n.localize(`BOT.diagnostics.severity.${issue.severity}`),
+          })),
+        };
+      }),
       actorWarnings: report.actorWarnings.map((warning, diagnosticIndex) => ({
         ...warning,
         diagnosticIndex,
@@ -561,6 +619,12 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     root?.querySelector?.('[data-action="refresh"]')?.addEventListener("click", () => this.render(false));
     root?.querySelector?.('[data-action="copy-text"]')?.addEventListener("click", () => this._copyReport("text"));
     root?.querySelector?.('[data-action="copy-json"]')?.addEventListener("click", () => this._copyReport("json"));
+    for (const button of root?.querySelectorAll?.("[data-row-action]") ?? []) {
+      button.addEventListener("click", () => {
+        const entry = this._diagnosticReport?.entries?.[Number(button.dataset.diagnosticIndex)];
+        this._handleRowAction(button.dataset.rowAction, entry);
+      });
+    }
     const searchInput = root?.querySelector?.('[data-filter="search"]');
     const warningsOnlyInput = root?.querySelector?.('[data-filter="warnings-only"]');
     const applyFilters = () => {
@@ -573,7 +637,7 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
       const visibleEntries = new Set(filtered.entries);
       const visibleActorWarnings = new Set(filtered.actorWarnings);
 
-      for (const row of root?.querySelectorAll?.("[data-diagnostic-index]") ?? []) {
+      for (const row of root?.querySelectorAll?.("tr[data-diagnostic-index]") ?? []) {
         const entry = this._diagnosticReport?.entries?.[Number(row.dataset.diagnosticIndex)];
         row.hidden = !visibleEntries.has(entry);
       }
@@ -609,15 +673,73 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
       ? JSON.stringify(report, null, 2)
       : buildActiveBuffDiagnosticText(report);
     try {
-      if (game.clipboard?.copyPlainText) await game.clipboard.copyPlainText(content);
-      else if (globalThis.navigator?.clipboard?.writeText) {
-        await globalThis.navigator.clipboard.writeText(content);
-      } else {
-        throw new Error("Clipboard API unavailable");
-      }
+      await this._copyText(content);
       ui.notifications.info(game.i18n.localize("BOT.diagnostics.copied"));
     } catch {
       ui.notifications.error(game.i18n.localize("BOT.diagnostics.copyFailed"));
+    }
+  }
+
+  async _copyText(content) {
+    if (game.clipboard?.copyPlainText) return game.clipboard.copyPlainText(content);
+    if (globalThis.navigator?.clipboard?.writeText) {
+      return globalThis.navigator.clipboard.writeText(content);
+    }
+    throw new Error("Clipboard API unavailable");
+  }
+
+  _resolveRowTargets(entry) {
+    const tokenDocument = resolveCarrierToken(
+      entry,
+      globalThis.fromUuidSync,
+      (tokenId) => canvas?.tokens?.get?.(tokenId) ?? null,
+    );
+    return {
+      carrierToken: tokenDocument,
+      carrierActor: resolveDocument(entry?.carrier?.actorUuid, globalThis.fromUuidSync)
+        ?? tokenDocument?.actor
+        ?? tokenDocument?.object?.actor
+        ?? null,
+      sourceActor: resolveDocument(entry?.sourceActor?.uuid, globalThis.fromUuidSync),
+      sourceItem: resolveDocument(entry?.sourceItem?.uuid, globalThis.fromUuidSync),
+    };
+  }
+
+  async _handleRowAction(action, entry) {
+    if (!game.user?.isGM || !entry) return;
+    const targets = this._resolveRowTargets(entry);
+    if (action === "open-carrier") {
+      targets.carrierActor?.sheet?.render?.(true);
+      return;
+    }
+    if (action === "focus-token") {
+      const tokenDocument = targets.carrierToken?.document ?? targets.carrierToken;
+      const token = targets.carrierToken?.object
+        ?? canvas?.tokens?.get?.(tokenDocument?.id)
+        ?? null;
+      if (!token) return;
+      token.control?.({ releaseOthers: true });
+      const center = token.center ?? tokenDocument?.getCenterPoint?.();
+      if (center) await canvas?.animatePan?.({ x: center.x, y: center.y });
+      return;
+    }
+    if (action === "open-source-actor") {
+      targets.sourceActor?.sheet?.render?.(true);
+      return;
+    }
+    if (action === "open-source-item") {
+      targets.sourceItem?.sheet?.render?.(true);
+      return;
+    }
+    if (action === "copy-buff-id") {
+      if (!entry.buffId) return;
+      await this._copyText(String(entry.buffId));
+      ui.notifications.info(game.i18n.localize("BOT.diagnostics.buffIdCopied"));
+      return;
+    }
+    if (action === "copy-summary") {
+      await this._copyText(buildActiveBuffDiagnosticEntrySummary(entry));
+      ui.notifications.info(game.i18n.localize("BOT.diagnostics.summaryCopied"));
     }
   }
 

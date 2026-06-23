@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 import {
+  buildActiveBuffDiagnosticEntrySummary,
   buildActiveBuffDiagnosticText,
   collectActiveBuffDiagnostics,
   collectActiveSceneBuffActorContexts,
   filterActiveBuffDiagnosticReport,
+  getActiveBuffDiagnosticNavigation,
 } from "../scripts/active-buff-diagnostics.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
@@ -468,6 +470,78 @@ function filterableReport() {
     ],
   };
 }
+
+test("diagnostic navigation exposes the available carrier actor and token", () => {
+  const entry = diagnosticEntry({
+    actorName: "Target",
+    tokenName: "Target Token",
+    buffName: "Guidance",
+    buffId: "buff-guidance",
+  });
+  const documents = new Map([
+    [entry.carrier.actorUuid, { uuid: entry.carrier.actorUuid, name: "Target" }],
+    [entry.carrier.tokenUuids[0], {
+      uuid: entry.carrier.tokenUuids[0],
+      actor: { uuid: entry.carrier.actorUuid, name: "Target" },
+    }],
+    [entry.sourceActor.uuid, { uuid: entry.sourceActor.uuid, name: "Caster" }],
+    [entry.sourceItem.uuid, { uuid: entry.sourceItem.uuid, name: "Spell" }],
+  ]);
+
+  const navigation = getActiveBuffDiagnosticNavigation(entry, {
+    resolveUuid: (uuid) => documents.get(uuid) ?? null,
+    tokenLookup: () => null,
+  });
+
+  assert.equal(navigation.carrierActorAvailable, true);
+  assert.equal(navigation.carrierTokenAvailable, true);
+  assert.equal(navigation.sourceActorAvailable, true);
+  assert.equal(navigation.sourceItemAvailable, true);
+  assert.equal(navigation.buffIdAvailable, true);
+  assert.equal(navigation.summaryAvailable, true);
+});
+
+test("diagnostic navigation hides an unresolved source item action", () => {
+  const entry = diagnosticEntry({
+    actorName: "Target",
+    buffName: "Guidance",
+    buffId: "buff-guidance",
+  });
+
+  const navigation = getActiveBuffDiagnosticNavigation(entry, {
+    resolveUuid: (uuid) => uuid === entry.carrier.actorUuid
+      ? { uuid, name: "Target" }
+      : null,
+    tokenLookup: () => null,
+  });
+
+  assert.equal(navigation.carrierActorAvailable, true);
+  assert.equal(navigation.carrierTokenAvailable, false);
+  assert.equal(navigation.sourceItemAvailable, false);
+});
+
+test("short diagnostic summary is stable and contains useful row identifiers", () => {
+  const entry = diagnosticEntry({
+    actorName: "Target",
+    tokenName: "Target Token",
+    buffName: "Bardic Inspiration",
+    buffId: "buff-inspiration",
+    sourceActor: "Bard",
+    sourceItem: "Bardic Inspiration Feature",
+    stackingMode: "noStack",
+    stackingKey: "bardic-inspiration",
+    warnings: ["missingActiveIndicator"],
+  });
+
+  assert.equal(
+    buildActiveBuffDiagnosticEntrySummary(entry),
+    [
+      "Target [Target Token] — Bardic Inspiration (buff-inspiration)",
+      "source=Bard; item=Bardic Inspiration Feature; trigger=passive; stack=noStack/bardic-inspiration",
+      "issues=missingActiveIndicator",
+    ].join("\n"),
+  );
+});
 
 test("diagnostic search matches buff names", () => {
   const filtered = filterActiveBuffDiagnosticReport(filterableReport(), { query: "inspiration" });

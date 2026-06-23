@@ -49,6 +49,7 @@
             <th>{{localize "BOT.diagnostics.trigger"}}</th>
             <th>{{localize "BOT.diagnostics.runtime"}}</th>
             <th>{{localize "BOT.diagnostics.warnings"}}</th>
+            <th class="bot-diagnostics-actions-column">{{localize "BOT.diagnostics.rowActions"}}</th>
           </tr>
         </thead>
         <tbody>
@@ -90,6 +91,36 @@
                 {{else}}
                   <span class="bot-diagnostics-ok">{{localize "BOT.diagnostics.ok"}}</span>
                 {{/if}}
+              </td>
+              <td class="bot-diagnostics-row-actions">
+                {{#if navigation.carrierActorAvailable}}
+                  <button type="button" data-row-action="open-carrier" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.openCarrier"}}" aria-label="{{localize "BOT.diagnostics.openCarrier"}}">
+                    <i class="fas fa-user"></i>
+                  </button>
+                {{/if}}
+                {{#if navigation.carrierTokenAvailable}}
+                  <button type="button" data-row-action="focus-token" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.focusToken"}}" aria-label="{{localize "BOT.diagnostics.focusToken"}}">
+                    <i class="fas fa-crosshairs"></i>
+                  </button>
+                {{/if}}
+                {{#if navigation.sourceActorAvailable}}
+                  <button type="button" data-row-action="open-source-actor" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.openSourceActor"}}" aria-label="{{localize "BOT.diagnostics.openSourceActor"}}">
+                    <i class="fas fa-hat-wizard"></i>
+                  </button>
+                {{/if}}
+                {{#if navigation.sourceItemAvailable}}
+                  <button type="button" data-row-action="open-source-item" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.openSourceItem"}}" aria-label="{{localize "BOT.diagnostics.openSourceItem"}}">
+                    <i class="fas fa-book-open"></i>
+                  </button>
+                {{/if}}
+                {{#if navigation.buffIdAvailable}}
+                  <button type="button" data-row-action="copy-buff-id" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.copyBuffId"}}" aria-label="{{localize "BOT.diagnostics.copyBuffId"}}">
+                    <i class="fas fa-fingerprint"></i>
+                  </button>
+                {{/if}}
+                <button type="button" data-row-action="copy-summary" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.copySummary"}}" aria-label="{{localize "BOT.diagnostics.copySummary"}}">
+                  <i class="fas fa-clipboard-list"></i>
+                </button>
               </td>
             </tr>
           {{/each}}
