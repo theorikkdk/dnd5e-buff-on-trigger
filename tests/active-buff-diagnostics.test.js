@@ -6,6 +6,7 @@ import {
   buildActiveBuffDiagnosticText,
   collectActiveBuffDiagnostics,
   collectActiveSceneBuffActorContexts,
+  filterActiveBuffDiagnosticReport,
 } from "../scripts/active-buff-diagnostics.js";
 
 const MODULE_ID = "dnd5e-buff-on-trigger";
@@ -208,4 +209,144 @@ test("diagnostic implementation contains no document mutation calls", async () =
   ]) {
     assert.equal(source.includes(forbiddenCall), false, `unexpected mutation call ${forbiddenCall}`);
   }
+});
+
+function diagnosticEntry({
+  actorName,
+  tokenName,
+  buffName,
+  buffId,
+  sourceActor = "Caster",
+  sourceItem = "Spell",
+  triggerType = "passive",
+  stackingMode = "normal",
+  stackingKey = "spell",
+  warnings = [],
+}) {
+  return {
+    carrier: {
+      actorName,
+      actorUuid: `Actor.${actorName}`,
+      tokenNames: tokenName ? [tokenName] : [],
+      tokenUuids: tokenName ? [`Scene.scene.Token.${tokenName}`] : [],
+      actorLink: true,
+      synthetic: false,
+    },
+    buffName,
+    buffId,
+    sourceActor: { name: sourceActor, uuid: `Actor.${sourceActor}` },
+    sourceItem: { name: sourceItem, uuid: `Item.${sourceItem}` },
+    stackingMode,
+    stackingKey,
+    triggerType,
+    concentration: { expected: false, linked: false, effectName: null },
+    linkedStatuses: [],
+    indicators: { active: [], target: [], storedTarget: [], mechanical: [] },
+    duration: { rounds: null, appliedAt: null, summary: "" },
+    warnings,
+  };
+}
+
+function filterableReport() {
+  return {
+    generatedAt: "2026-06-23T00:00:00.000Z",
+    sceneName: "Test Scene",
+    actorCount: 3,
+    buffCount: 3,
+    warningCount: 2,
+    actorWarnings: [],
+    entries: [
+      diagnosticEntry({
+        actorName: "Élodie",
+        tokenName: "Hero Token",
+        buffName: "Guidance",
+        buffId: "buff-guidance",
+        sourceActor: "Cleric",
+        sourceItem: "Guidance Spell",
+        stackingMode: "noStack",
+        stackingKey: "guidance",
+      }),
+      diagnosticEntry({
+        actorName: "Target",
+        tokenName: "Target Token",
+        buffName: "Bardic Inspiration",
+        buffId: "buff-inspiration",
+        sourceActor: "Bard",
+        sourceItem: "Bardic Inspiration Feature",
+        triggerType: "passive",
+        stackingMode: "noStack",
+        stackingKey: "bardic-inspiration",
+        warnings: ["missingActiveIndicator"],
+      }),
+      diagnosticEntry({
+        actorName: "Enemy",
+        tokenName: "Goblin",
+        buffName: "Bane",
+        buffId: "buff-bane",
+        sourceActor: "Warlock",
+        sourceItem: "Bane Spell",
+        triggerType: "damaged",
+        stackingMode: "sameEffect",
+        stackingKey: "bane",
+        warnings: ["unresolvedSourceItem"],
+      }),
+    ],
+  };
+}
+
+test("diagnostic search matches buff names", () => {
+  const filtered = filterActiveBuffDiagnosticReport(filterableReport(), { query: "inspiration" });
+  assert.deepEqual(filtered.entries.map((entry) => entry.buffId), ["buff-inspiration"]);
+});
+
+test("diagnostic search matches actor and token names without case or accent sensitivity", () => {
+  const byActor = filterActiveBuffDiagnosticReport(filterableReport(), { query: "ELODIE" });
+  const byToken = filterActiveBuffDiagnosticReport(filterableReport(), { query: "goblin" });
+  assert.deepEqual(byActor.entries.map((entry) => entry.buffId), ["buff-guidance"]);
+  assert.deepEqual(byToken.entries.map((entry) => entry.buffId), ["buff-bane"]);
+});
+
+test("diagnostic search matches source items and stacking metadata", () => {
+  const byItem = filterActiveBuffDiagnosticReport(filterableReport(), { query: "Guidance Spell" });
+  const byStack = filterActiveBuffDiagnosticReport(filterableReport(), { query: "sameEffect" });
+  assert.deepEqual(byItem.entries.map((entry) => entry.buffId), ["buff-guidance"]);
+  assert.deepEqual(byStack.entries.map((entry) => entry.buffId), ["buff-bane"]);
+});
+
+test("diagnostic inconsistencies-only filter keeps warning rows", () => {
+  const filtered = filterActiveBuffDiagnosticReport(filterableReport(), { warningsOnly: true });
+  assert.deepEqual(
+    filtered.entries.map((entry) => entry.buffId),
+    ["buff-inspiration", "buff-bane"],
+  );
+});
+
+test("diagnostic search combines with inconsistencies-only filter", () => {
+  const filtered = filterActiveBuffDiagnosticReport(filterableReport(), {
+    query: "Bard",
+    warningsOnly: true,
+  });
+  assert.deepEqual(filtered.entries.map((entry) => entry.buffId), ["buff-inspiration"]);
+});
+
+test("diagnostic filter reports total, displayed and inconsistent counters", () => {
+  const filtered = filterActiveBuffDiagnosticReport(filterableReport(), { query: "spell" });
+  assert.equal(filtered.totalCount, 3);
+  assert.equal(filtered.visibleCount, 2);
+  assert.equal(filtered.inconsistentCount, 2);
+  assert.equal(filtered.report.totalBuffCount, 3);
+  assert.equal(filtered.report.visibleBuffCount, 2);
+  assert.equal(filtered.report.inconsistentBuffCount, 2);
+});
+
+test("copied text and JSON reports use the filtered view", () => {
+  const filtered = filterActiveBuffDiagnosticReport(filterableReport(), { query: "Guidance" });
+  const text = buildActiveBuffDiagnosticText(filtered.report);
+  const json = JSON.parse(JSON.stringify(filtered.report));
+
+  assert.match(text, /Guidance/);
+  assert.doesNotMatch(text, /Bardic Inspiration/);
+  assert.equal(json.entries.length, 1);
+  assert.equal(json.entries[0].buffId, "buff-guidance");
+  assert.deepEqual(json.filters, { query: "Guidance", warningsOnly: false });
 });

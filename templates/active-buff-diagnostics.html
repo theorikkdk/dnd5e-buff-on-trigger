@@ -14,14 +14,31 @@
     </div>
   </header>
 
+  <div class="bot-diagnostics-filters">
+    <label class="bot-diagnostics-search">
+      <span>{{localize "BOT.diagnostics.search"}}</span>
+      <input
+        type="search"
+        data-filter="search"
+        value="{{filterState.query}}"
+        placeholder="{{localize "BOT.diagnostics.searchPlaceholder"}}"
+        autocomplete="off"
+      />
+    </label>
+    <label class="bot-diagnostics-warning-filter">
+      <input type="checkbox" data-filter="warnings-only" {{#if filterState.warningsOnly}}checked{{/if}} />
+      {{localize "BOT.diagnostics.warningsOnly"}}
+    </label>
+  </div>
+
   <p class="bot-diagnostics-summary">
-    {{localize "BOT.diagnostics.actors"}}: {{report.actorCount}}
-    · {{localize "BOT.diagnostics.buffs"}}: {{report.buffCount}}
-    · {{localize "BOT.diagnostics.warnings"}}: {{report.warningCount}}
+    {{localize "BOT.diagnostics.totalBuffs"}}: <span data-count-total>{{counts.total}}</span>
+    · {{localize "BOT.diagnostics.visibleBuffs"}}: <span data-count-visible>{{counts.visible}}</span>
+    · {{localize "BOT.diagnostics.inconsistentBuffs"}}: <span data-count-inconsistent>{{counts.inconsistent}}</span>
   </p>
 
   {{#if hasEntries}}
-    <div class="bot-diagnostics-table-wrap">
+    <div class="bot-diagnostics-table-wrap" data-diagnostic-table>
       <table class="bot-diagnostics-table">
         <thead>
           <tr>
@@ -36,7 +53,10 @@
         </thead>
         <tbody>
           {{#each rows}}
-            <tr class="{{#if warningLabels.length}}bot-diagnostics-warning-row{{/if}}">
+            <tr
+              class="{{#if warningLabels.length}}bot-diagnostics-warning-row{{/if}}"
+              data-diagnostic-index="{{diagnosticIndex}}"
+            >
               <td>
                 <strong>{{carrierLabel}}</strong>
                 <code>{{carrier.actorUuid}}</code>
@@ -71,16 +91,21 @@
         </tbody>
       </table>
     </div>
+    <p class="notification info" data-diagnostic-no-results hidden>
+      {{localize "BOT.diagnostics.noResults"}}
+    </p>
   {{else}}
     <p class="notification info">{{localize "BOT.diagnostics.empty"}}</p>
   {{/if}}
 
   {{#if hasActorWarnings}}
-    <section class="bot-diagnostics-actor-warnings">
+    <section class="bot-diagnostics-actor-warnings" data-actor-warnings>
       <h3>{{localize "BOT.diagnostics.actorWarnings"}}</h3>
       <ul>
         {{#each actorWarnings}}
-          <li><strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}: {{label}}</li>
+          <li data-actor-warning-index="{{diagnosticIndex}}">
+            <strong>{{actorName}}</strong>{{#if buffId}} — <code>{{buffId}}</code>{{/if}}: {{label}}
+          </li>
         {{/each}}
       </ul>
     </section>

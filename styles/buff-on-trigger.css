@@ -673,6 +673,31 @@
   font-weight: 700;
 }
 
+.bot-diagnostics-filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.bot-diagnostics-search {
+  display: grid;
+  gap: 3px;
+  font-weight: 700;
+}
+
+.bot-diagnostics-search input {
+  width: 100%;
+}
+
+.bot-diagnostics-warning-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--form-field-height, 32px);
+  white-space: nowrap;
+}
+
 .bot-diagnostics-table-wrap {
   flex: 1;
   min-height: 0;
@@ -745,6 +770,7 @@
 
   .bot-preset-select-row,
   .bot-target-ability-row,
+  .bot-diagnostics-filters,
   .bot-effect-panel .bot-row {
     grid-template-columns: 1fr;
   }

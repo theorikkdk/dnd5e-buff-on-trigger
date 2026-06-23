@@ -280,6 +280,89 @@ export function collectActiveBuffDiagnostics(contexts, {
   };
 }
 
+function normalizeDiagnosticSearchText(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function getDiagnosticEntrySearchText(entry) {
+  return normalizeDiagnosticSearchText([
+    entry?.carrier?.actorName,
+    entry?.carrier?.actorUuid,
+    ...(entry?.carrier?.tokenNames ?? []),
+    ...(entry?.carrier?.tokenUuids ?? []),
+    entry?.buffName,
+    entry?.buffId,
+    entry?.sourceActor?.name,
+    entry?.sourceActor?.uuid,
+    entry?.sourceItem?.name,
+    entry?.sourceItem?.uuid,
+    entry?.triggerType,
+    entry?.stackingMode,
+    entry?.stackingKey,
+  ].filter(Boolean).join(" "));
+}
+
+function getActorWarningSearchText(warning) {
+  return normalizeDiagnosticSearchText([
+    warning?.actorName,
+    warning?.actorUuid,
+    warning?.buffId,
+    warning?.warning,
+  ].filter(Boolean).join(" "));
+}
+
+export function filterActiveBuffDiagnosticReport(report, {
+  query = "",
+  warningsOnly = false,
+} = {}) {
+  const normalizedQuery = normalizeDiagnosticSearchText(query);
+  const entries = Array.isArray(report?.entries) ? report.entries : [];
+  const actorWarnings = Array.isArray(report?.actorWarnings) ? report.actorWarnings : [];
+  const matchesQuery = (searchText) => !normalizedQuery || searchText.includes(normalizedQuery);
+  const visibleEntries = entries.filter((entry) =>
+    (!warningsOnly || (entry?.warnings?.length ?? 0) > 0)
+    && matchesQuery(getDiagnosticEntrySearchText(entry))
+  );
+  const visibleActorWarnings = actorWarnings.filter((warning) =>
+    matchesQuery(getActorWarningSearchText(warning))
+  );
+  const visibleActorKeys = new Set([
+    ...visibleEntries.map((entry) => entry?.carrier?.actorUuid).filter(Boolean),
+    ...visibleActorWarnings.map((warning) => warning?.actorUuid).filter(Boolean),
+  ]);
+  const inconsistentCount = entries.filter((entry) => (entry?.warnings?.length ?? 0) > 0).length;
+  const filteredReport = {
+    ...(report ?? {}),
+    actorCount: visibleActorKeys.size,
+    buffCount: visibleEntries.length,
+    warningCount: visibleEntries.reduce(
+      (total, entry) => total + (entry?.warnings?.length ?? 0),
+      visibleActorWarnings.length,
+    ),
+    actorWarnings: visibleActorWarnings,
+    entries: visibleEntries,
+    filters: {
+      query: String(query ?? ""),
+      warningsOnly: warningsOnly === true,
+    },
+    totalBuffCount: entries.length,
+    visibleBuffCount: visibleEntries.length,
+    inconsistentBuffCount: inconsistentCount,
+  };
+  return {
+    report: filteredReport,
+    entries: visibleEntries,
+    actorWarnings: visibleActorWarnings,
+    totalCount: entries.length,
+    visibleCount: visibleEntries.length,
+    inconsistentCount,
+  };
+}
+
 export function buildActiveBuffDiagnosticText(report) {
   const lines = [
     `Active Buff Diagnostics${report?.sceneName ? ` — ${report.sceneName}` : ""}`,
@@ -320,13 +403,23 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     const contexts = collectActiveSceneBuffActorContexts();
     const report = collectActiveBuffDiagnostics(contexts);
     this._diagnosticReport = report;
+    const filterState = this._filterState ?? { query: "", warningsOnly: false };
+    const filtered = filterActiveBuffDiagnosticReport(report, filterState);
+    this._filteredDiagnosticReport = filtered.report;
     const warningLabel = (code) => game.i18n.localize(`BOT.diagnostics.warning.${code}`);
     return {
       report,
       hasEntries: report.entries.length > 0,
       hasActorWarnings: report.actorWarnings.length > 0,
-      rows: report.entries.map((entry) => ({
+      filterState,
+      counts: {
+        total: filtered.totalCount,
+        visible: filtered.visibleCount,
+        inconsistent: filtered.inconsistentCount,
+      },
+      rows: report.entries.map((entry, diagnosticIndex) => ({
         ...entry,
+        diagnosticIndex,
         carrierLabel: [
           entry.carrier.actorName,
           entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
@@ -353,8 +446,9 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
         durationLabel: entry.duration.summary || "—",
         warningLabels: entry.warnings.map(warningLabel),
       })),
-      actorWarnings: report.actorWarnings.map((warning) => ({
+      actorWarnings: report.actorWarnings.map((warning, diagnosticIndex) => ({
         ...warning,
+        diagnosticIndex,
         label: warningLabel(warning.warning),
       })),
     };
@@ -366,11 +460,50 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     root?.querySelector?.('[data-action="refresh"]')?.addEventListener("click", () => this.render(false));
     root?.querySelector?.('[data-action="copy-text"]')?.addEventListener("click", () => this._copyReport("text"));
     root?.querySelector?.('[data-action="copy-json"]')?.addEventListener("click", () => this._copyReport("json"));
+    const searchInput = root?.querySelector?.('[data-filter="search"]');
+    const warningsOnlyInput = root?.querySelector?.('[data-filter="warnings-only"]');
+    const applyFilters = () => {
+      this._filterState = {
+        query: searchInput?.value ?? "",
+        warningsOnly: warningsOnlyInput?.checked === true,
+      };
+      const filtered = filterActiveBuffDiagnosticReport(this._diagnosticReport, this._filterState);
+      this._filteredDiagnosticReport = filtered.report;
+      const visibleEntries = new Set(filtered.entries);
+      const visibleActorWarnings = new Set(filtered.actorWarnings);
+
+      for (const row of root?.querySelectorAll?.("[data-diagnostic-index]") ?? []) {
+        const entry = this._diagnosticReport?.entries?.[Number(row.dataset.diagnosticIndex)];
+        row.hidden = !visibleEntries.has(entry);
+      }
+      for (const row of root?.querySelectorAll?.("[data-actor-warning-index]") ?? []) {
+        const warning = this._diagnosticReport?.actorWarnings?.[Number(row.dataset.actorWarningIndex)];
+        row.hidden = !visibleActorWarnings.has(warning);
+      }
+
+      const table = root?.querySelector?.("[data-diagnostic-table]");
+      const noResults = root?.querySelector?.("[data-diagnostic-no-results]");
+      const actorWarningsSection = root?.querySelector?.("[data-actor-warnings]");
+      if (table) table.hidden = filtered.visibleCount === 0;
+      if (noResults) noResults.hidden = filtered.visibleCount !== 0;
+      if (actorWarningsSection) actorWarningsSection.hidden = filtered.actorWarnings.length === 0;
+      const totalCount = root?.querySelector?.("[data-count-total]");
+      const visibleCount = root?.querySelector?.("[data-count-visible]");
+      const inconsistentCount = root?.querySelector?.("[data-count-inconsistent]");
+      if (totalCount) totalCount.textContent = String(filtered.totalCount);
+      if (visibleCount) visibleCount.textContent = String(filtered.visibleCount);
+      if (inconsistentCount) inconsistentCount.textContent = String(filtered.inconsistentCount);
+    };
+    searchInput?.addEventListener("input", applyFilters);
+    warningsOnlyInput?.addEventListener("change", applyFilters);
+    applyFilters();
   }
 
   async _copyReport(format) {
     if (!game.user?.isGM) return;
-    const report = this._diagnosticReport ?? collectActiveBuffDiagnostics(collectActiveSceneBuffActorContexts());
+    const report = this._filteredDiagnosticReport
+      ?? this._diagnosticReport
+      ?? collectActiveBuffDiagnostics(collectActiveSceneBuffActorContexts());
     const content = format === "json"
       ? JSON.stringify(report, null, 2)
       : buildActiveBuffDiagnosticText(report);
