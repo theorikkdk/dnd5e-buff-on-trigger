@@ -23,8 +23,9 @@ The first curated built-in pack contains:
 
 | Preset | Automated behavior |
 | --- | --- |
-| Guidance | Adds 1d4 to the next ability or skill check |
-| Resistance | Adds 1d4 to the next saving throw |
+| Guidance | Prompts before an ability or skill check to optionally add 1d4 |
+| Resistance | Prompts before a saving throw to optionally add 1d4 |
+| Bardic Inspiration | Prompts before or, experimentally, after a compatible Midi-QOL attack roll to add the bard's Inspiration die |
 | Bless | Adds 1d4 to attack rolls and saving throws |
 | Bane | Subtracts 1d4 from attack rolls and saving throws after the activation save fails |
 | Shield of Faith | Grants a +2 AC bonus |
@@ -34,6 +35,42 @@ The first curated built-in pack contains:
 Built-in presets cannot be edited, deleted, replaced, or exported through the custom preset manager. Creating an item from a preset copies its configuration to the item, so the item remains usable independently of the preset catalogue.
 
 Development presets whose labels begin with `[TEST]` remain included for Foundry validation. They are hidden during normal use and appear in their own group when debug mode is enabled.
+
+### Consumable roll modifiers
+
+Consumable roll modifiers support two consumption modes:
+
+- `consumptionMode: "automatic"` applies and consumes the modifier automatically, preserving the behavior of older items and configurations;
+- `consumptionMode: "prompt"` asks the player whether to use the modifier. Declining or closing the dialog leaves the buff available for a later compatible roll.
+
+Prompted modifiers also support two timings:
+
+- `promptTiming: "beforeRoll"` displays the dialog before the roll;
+- `promptTiming: "afterRoll"` displays the dialog after the d20 but before Midi-QOL resolves the attack as a hit or miss. This timing is experimental.
+
+The world setting **Prompt after the roll with Midi-QOL (experimental)** enables the experimental timing and is disabled by default. If it is disabled, Midi-QOL is unavailable, or the current workflow is not compatible, an `afterRoll` modifier safely falls back to `beforeRoll`.
+
+The built-in presets use these modes as follows:
+
+- **Bardic Inspiration** uses prompted consumption and requests `afterRoll` timing. On supported standard Midi-QOL attacks, the exact active buff instance is consumed only after its bonus is added successfully. Bardic Inspiration uses `noStack`, so a bearer cannot have multiple active Bardic Inspirations at once.
+- **Guidance** and **Resistance** use prompted consumption before the roll.
+- **Bless** and **Bane** remain automatic and never display a consumption dialog.
+
+Example roll modifier configuration:
+
+```json
+{
+  "rollModifier": {
+    "enabled": true,
+    "formula": "1d@origin.bardicInspirationDie",
+    "rollTypes": ["ability", "skill", "attack", "save"],
+    "consumptionMode": "prompt",
+    "promptTiming": "afterRoll"
+  }
+}
+```
+
+The `afterRoll` path currently targets standard Midi-QOL attack workflows first. Specialized or unsupported Midi-QOL workflows may fall back to `beforeRoll`. Without Midi-QOL, or when the required Midi-QOL API is unavailable, the prompt also falls back to `beforeRoll`.
 
 ### Custom preset management
 
