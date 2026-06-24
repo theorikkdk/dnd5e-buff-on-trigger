@@ -225,6 +225,7 @@ function buildDiagnosticIssues({
   indicators,
   activeIndicatorEffects,
   linkedStatuses,
+  linkedStatusExpected,
   storedTargetIndicatorExpected,
   concentrationExpected,
   concentrationEffect,
@@ -251,7 +252,7 @@ function buildDiagnosticIssues({
   if (storedTargetIndicatorExpected && !indicators.storedTarget.length) {
     addIssue("missingStoredTargetIndicator");
   }
-  if (getConfiguredStatusIds(activeBuff).length && !linkedStatuses.length) {
+  if (linkedStatusExpected && !linkedStatuses.length) {
     addIssue("missingLinkedStatus");
   }
   if (concentrationExpected && !concentrationEffect) addIssue("missingConcentration");
@@ -358,6 +359,13 @@ export function collectActiveBuffDiagnostics(contexts, {
         statusId: getEffectModuleFlag(effect).statusId ?? [...(effect.statuses ?? [])][0] ?? null,
         name: effect.name ?? null,
       }));
+      const statusTiming = activeBuff?.status?.timing ?? "trigger";
+      const linkedStatusExpected = activeBuff?.status?.removeWhenBuffEnds === true
+        && getConfiguredStatusIds(activeBuff).length > 0
+        && (
+          activeBuff.status?.protectWhileBuffActive === true
+          || ["activation", "both"].includes(statusTiming)
+        );
       const storedTargetIndicatorExpected = expectsStoredTargetIndicator(activeBuff, context, resolveUuid);
       const readableBuffName = activeBuff.itemName ?? activeBuff.name ?? sourceItem?.name ?? null;
       const configuredStackingMode = String(activeBuff?.stackingMode ?? "").trim() || null;
@@ -374,6 +382,7 @@ export function collectActiveBuffDiagnostics(contexts, {
         indicators,
         activeIndicatorEffects: activeIndicators.map(({ effect }) => effect),
         linkedStatuses,
+        linkedStatusExpected,
         storedTargetIndicatorExpected,
         concentrationExpected,
         concentrationEffect,
@@ -574,17 +583,6 @@ export function getActiveBuffDiagnosticNavigation(entry, {
   };
 }
 
-function getActiveBuffForDiagnosticEntry(actor, entry) {
-  const buffId = String(entry?.buffId ?? "").trim();
-  if (!actor?.getFlag || !buffId) return null;
-  const activeBuff = getActiveBuffs(actor)?.[buffId] ?? null;
-  if (!activeBuff || typeof activeBuff !== "object" || Array.isArray(activeBuff)) return null;
-  return {
-    ...activeBuff,
-    buffId: activeBuff.buffId ?? buffId,
-  };
-}
-
 function getStrictActiveBuffForDiagnosticEntry(actor, entry) {
   const buffId = String(entry?.buffId ?? "").trim();
   const actorUuid = String(actor?.uuid ?? actor?.id ?? "").trim();
@@ -647,7 +645,7 @@ export function getActiveBuffDiagnosticRepairActions(entry, {
   isGM = globalThis.game?.user?.isGM === true,
 } = {}) {
   if (!isGM || !entry?.buffId || !actor) return [];
-  const activeBuff = getActiveBuffForDiagnosticEntry(actor, entry);
+  const activeBuff = getStrictActiveBuffForDiagnosticEntry(actor, entry);
   if (!activeBuff) return [];
   return (entry?.issues ?? [])
     .map((issue) => {
@@ -668,7 +666,7 @@ export async function repairActiveBuffDiagnosticIssue(actor, entry, issueCode, {
   ensureStoredTargetIndicator = ensureStoredTargetIndicatorForActiveBuff,
   repairLinkedStatuses = repairLinkedStatusesForActiveBuff,
 } = {}) {
-  const activeBuff = getActiveBuffForDiagnosticEntry(actor, entry);
+  const activeBuff = getStrictActiveBuffForDiagnosticEntry(actor, entry);
   if (!activeBuff) return { repaired: false, reason: "missing-active-buff" };
   if (!canRepairIssueFromActiveBuff(issueCode, activeBuff)) {
     return { repaired: false, reason: "not-repairable" };

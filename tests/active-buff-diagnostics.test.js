@@ -323,6 +323,88 @@ test("invalid and explicitly expired duration data are detected", () => {
   assert.ok(report.entries.find((entry) => entry.buffId === "expired").warnings.includes("expiredDuration"));
 });
 
+test("trigger-only statuses are not reported missing before their trigger fires", () => {
+  const actor = new MockActor({
+    uuid: "Actor.trigger-status",
+    name: "Trigger status",
+    activeBuffs: {
+      buff1: activeBuff("buff1", {
+        status: {
+          id: "blinded",
+          ids: ["blinded"],
+          timing: "trigger",
+          removeWhenBuffEnds: true,
+          protectWhileBuffActive: false,
+        },
+      }),
+    },
+    effects: [{
+      name: "Guidance",
+      flags: { [MODULE_ID]: { indicator: true, buffId: "buff1" } },
+      statuses: new Set(["bot-active"]),
+    }],
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+
+  assert.equal(report.entries[0].warnings.includes("missingLinkedStatus"), false);
+});
+
+test("activation and protected linked statuses are still reported when missing", () => {
+  const actor = new MockActor({
+    uuid: "Actor.expected-status",
+    name: "Expected status",
+    activeBuffs: {
+      activation: activeBuff("activation", {
+        status: {
+          id: "blinded",
+          ids: ["blinded"],
+          timing: "activation",
+          removeWhenBuffEnds: true,
+        },
+      }),
+      protected: activeBuff("protected", {
+        status: {
+          id: "deafened",
+          ids: ["deafened"],
+          timing: "trigger",
+          removeWhenBuffEnds: true,
+          protectWhileBuffActive: true,
+        },
+      }),
+    },
+    effects: [
+      {
+        name: "Activation",
+        flags: { [MODULE_ID]: { indicator: true, buffId: "activation" } },
+        statuses: new Set(["bot-active"]),
+      },
+      {
+        name: "Protected",
+        flags: { [MODULE_ID]: { indicator: true, buffId: "protected" } },
+        statuses: new Set(["bot-active"]),
+      },
+    ],
+  });
+
+  const report = collectActiveBuffDiagnostics([context(actor)], {
+    resolveUuid: resolver,
+    concentrationPredicate: () => false,
+  });
+
+  assert.equal(
+    report.entries.find((entry) => entry.buffId === "activation").warnings.includes("missingLinkedStatus"),
+    true,
+  );
+  assert.equal(
+    report.entries.find((entry) => entry.buffId === "protected").warnings.includes("missingLinkedStatus"),
+    true,
+  );
+});
+
 test("scene contexts deduplicate linked actors and keep unlinked tokens separate", () => {
   const linkedActor = new MockActor({ uuid: "Actor.linked", name: "Linked", activeBuffs: {} });
   const syntheticA = new MockActor({ uuid: "Scene.scene.Token.a.Actor.synthetic", name: "Goblin", activeBuffs: {} });
@@ -689,6 +771,7 @@ test("repairable diagnostic issues expose targeted GM repair actions", () => {
       { code: "unresolvedSourceItem", severity: "warning" },
     ],
   };
+  entry.carrier.actorUuid = actor.uuid;
 
   const actions = getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: true });
 
@@ -725,9 +808,17 @@ test("non-GM and insufficient source data do not expose repair actions", () => {
       { code: "duplicateNoStack", severity: "critical" },
     ],
   };
+  entry.carrier.actorUuid = actor.uuid;
 
   assert.deepEqual(getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: false }), []);
   assert.deepEqual(getActiveBuffDiagnosticRepairActions(entry, { actor, isGM: true }), []);
+  assert.deepEqual(
+    getActiveBuffDiagnosticRepairActions(
+      { ...entry, carrier: { ...entry.carrier, actorUuid: "Actor.other" } },
+      { actor, isGM: true },
+    ),
+    [],
+  );
 });
 
 test("repairing a missing active indicator calls the targeted helper with the exact buffId", async () => {
@@ -741,6 +832,7 @@ test("repairing a missing active indicator calls the targeted helper with the ex
     buffName: "Guidance",
     buffId: "buff1",
   });
+  entry.carrier.actorUuid = actor.uuid;
   const calls = [];
 
   const result = await repairActiveBuffDiagnosticIssue(actor, entry, "missingActiveIndicator", {
@@ -774,6 +866,7 @@ test("repairing a linked status calls the targeted helper only when the status i
     buffName: "Guidance",
     buffId: "buff1",
   });
+  entry.carrier.actorUuid = actor.uuid;
   const calls = [];
 
   const result = await repairActiveBuffDiagnosticIssue(actor, entry, "missingLinkedStatus", {
@@ -836,7 +929,12 @@ test("repair API refuses non-repairable issues and missing active buff data", as
     buffName: "Guidance",
     buffId: "buff1",
   });
+  entry.carrier.actorUuid = actor.uuid;
   const missingEntry = { ...entry, buffId: "missing" };
+  const wrongCarrierEntry = {
+    ...entry,
+    carrier: { ...entry.carrier, actorUuid: "Actor.other" },
+  };
 
   assert.deepEqual(
     await repairActiveBuffDiagnosticIssue(actor, entry, "duplicateNoStack"),
@@ -846,12 +944,24 @@ test("repair API refuses non-repairable issues and missing active buff data", as
     await repairActiveBuffDiagnosticIssue(actor, missingEntry, "missingActiveIndicator"),
     { repaired: false, reason: "missing-active-buff" },
   );
+  assert.deepEqual(
+    await repairActiveBuffDiagnosticIssue(actor, wrongCarrierEntry, "missingActiveIndicator"),
+    { repaired: false, reason: "missing-active-buff" },
+  );
 });
 
 test("diagnostic UI does not add a global repair-all action", async () => {
   const template = await readFile("templates/active-buff-diagnostics.html", "utf8");
   assert.equal(template.includes("repair-all"), false);
   assert.equal(template.includes("data-action=\"repair\""), false);
+});
+
+test("diagnostic settings menu remains restricted to GMs", async () => {
+  const source = await readFile("scripts/main.js", "utf8");
+  assert.match(
+    source,
+    /registerMenu\(MODULE_ID,\s*"activeBuffDiagnostics",\s*\{[\s\S]*?restricted:\s*true[\s\S]*?\}\);/,
+  );
 });
 
 test("targetable active buff exposes the GM end action", () => {
