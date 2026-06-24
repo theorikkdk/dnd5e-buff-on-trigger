@@ -72,6 +72,157 @@ Example roll modifier configuration:
 
 The `afterRoll` path currently targets standard Midi-QOL attack workflows first. Specialized or unsupported Midi-QOL workflows may fall back to `beforeRoll`. Without Midi-QOL, or when the required Midi-QOL API is unavailable, the prompt also falls back to `beforeRoll`.
 
+### Creating a custom preset
+
+A preset is a reusable buff configuration. Built-in presets are maintained by the module, while custom presets are created or imported by the user. Only custom presets can be exported or deleted.
+
+Applying a preset copies its current configuration to the item. The item is independent afterward: changing or deleting the custom preset does not modify items that were already created from it.
+
+#### Creating one from the UI
+
+1. Open the item sheet and open the module's buff configuration.
+2. Select an existing preset as a starting point, or configure the fields manually from an empty/default configuration.
+3. Adjust the target, trigger, bonuses, duration, consumption, stacking, status, and end-condition fields that the effect needs.
+4. Save the item configuration and test the item in Foundry.
+5. Use **Save as custom preset** to keep the current configuration as a reusable custom preset.
+6. Open **Manage custom presets** when you want to export or delete it.
+
+Keeping item saving and preset saving separate is intentional: the item is the playable effect, while the custom preset is a reusable template.
+
+#### Common preset families
+
+| Family | Typical configuration |
+| --- | --- |
+| Roll bonus | Enable `rollModifier`, choose compatible roll types, and enter a formula such as `1d4` |
+| AC bonus | Use a passive buff with an additive AC bonus |
+| Damage resistance | Add one or more supported damage types to the resistance list |
+| Linked status | Select the status, its target, and when it is applied or removed |
+| Consumable buff | Give the buff charges and choose automatic or prompted roll-modifier consumption |
+| Automatic ending | Configure a duration or supported end condition |
+| Triggered buff | Choose a supported trigger such as damage taken, healing, turn start/end, or attack |
+
+Not every family needs every field. Start with the smallest configuration that represents the effect correctly.
+
+#### Roll modifiers
+
+Roll modifiers can affect these supported roll categories:
+
+- `ability`: ability checks;
+- `skill`: skill checks;
+- `attack`: attack rolls;
+- `save`: saving throws.
+
+Continuous modifiers such as Bless normally use automatic behavior. A consumable modifier can instead ask whether it should be used:
+
+- `consumptionMode: "automatic"` applies and consumes the modifier without asking;
+- `consumptionMode: "prompt"` asks first and consumes the exact buff instance only when the bonus is actually used;
+- `promptTiming: "beforeRoll"` asks before the roll;
+- `promptTiming: "afterRoll"` asks after the d20 on compatible Midi-QOL attacks when the experimental world setting is enabled.
+
+Guidance uses a prompted `1d4` on ability and skill checks. Resistance uses a prompted `1d4` on saving throws. Bardic Inspiration prompts for ability checks, skill checks, attacks, and saving throws. Bless applies its modifier automatically and does not display a prompt.
+
+Closing or declining a prompt does not consume the buff. An unsupported `afterRoll` workflow falls back to `beforeRoll`.
+
+#### Stacking and `stackingKey`
+
+The stacking mode controls whether related buff instances replace, coexist, or block one another. A stable `stackingKey` identifies configurations that represent the same mechanical effect.
+
+| Mode | Recommended use |
+| --- | --- |
+| `normal` | Reapplying the same item from the same source to the same bearer replaces or refreshes that instance. Other bearers remain independent. |
+| `sameEffect` | Several instances may coexist, but only the mechanically dominant instance for the same `stackingKey` applies. When it ends, the next eligible instance can become active. |
+| `noStack` | Only one instance with the same `stackingKey` may exist on a bearer. A different source is blocked instead of adding a duplicate. |
+
+Use `noStack` when the target must never hold two versions of an effect, even from different sources. Bardic Inspiration therefore uses `stackingKey: "bardic-inspiration"` with `noStack`.
+
+Use `sameEffect` when preserving separate instances matters but their mechanical bonuses must not accumulate. Bless and additive AC effects such as Shield of Faith are examples of effects that should be mechanically non-cumulative.
+
+Do not leave `stackingKey` empty for `noStack` or `sameEffect`. Use a short, stable, effect-specific value such as `bardic-inspiration`, `bless`, or `shield-of-faith`.
+
+#### Practical recipes
+
+**A. Optional +1d4 before a roll**
+
+- type: passive;
+- roll types: `ability` and `skill` (or only the categories the effect supports);
+- formula: `1d4`;
+- charges: `1`;
+- consumption mode: `prompt`;
+- prompt timing: `beforeRoll`;
+- stacking: `noStack` with a stable key when only one copy may exist.
+
+This is the basic pattern used by Guidance-like effects. Answering **No** keeps the charge for a later roll.
+
+**B. Non-cumulative AC bonus**
+
+- type: passive;
+- additive AC bonus: for example `+2`;
+- consumption: disabled;
+- stacking: `sameEffect`;
+- stacking key: a stable value such as `shield-of-faith`.
+
+Separate instances can remain traceable, but only the dominant mechanical bonus applies. This pattern is suitable for additive AC effects; it cannot implement a replacement AC formula such as Mage Armor's `13 + Dexterity modifier`.
+
+**C. Inspiration-like prompted bonus**
+
+- type: passive;
+- roll types: `ability`, `skill`, `attack`, and `save`;
+- formula: a supported fixed die such as `1d6`, or a supported origin formula;
+- charges: `1`;
+- consumption mode: `prompt`;
+- prompt timing: `beforeRoll`, or experimental `afterRoll` for compatible Midi-QOL attacks;
+- stacking: `noStack`;
+- stacking key: a unique stable value.
+
+Use `noStack` here when a bearer must not receive a second Inspiration-like buff from another source. The built-in Bardic Inspiration preset additionally resolves its die from the bard's level and falls back to `1d6` when necessary.
+
+**D. Exportable custom preset**
+
+The following file contains one simple optional `1d4` preset and can be imported as schema version 1:
+
+```json
+{
+  "module": "dnd5e-buff-on-trigger",
+  "schemaVersion": 1,
+  "version": "1",
+  "presets": [
+    {
+      "id": "custom-optional-d4",
+      "label": "Optional d4",
+      "description": "Optionally adds 1d4 to an ability or skill check.",
+      "flag": {
+        "type": "passive",
+        "targetMode": "target",
+        "fallbackToSelfIfNoTarget": true,
+        "stackingMode": "noStack",
+        "stackingKey": "optional-d4",
+        "rollModifier": {
+          "enabled": true,
+          "formula": "1d4",
+          "rollTypes": ["ability", "skill"],
+          "consumptionMode": "prompt",
+          "promptTiming": "beforeRoll"
+        },
+        "charges": 1,
+        "consumeOnTrigger": false
+      }
+    }
+  ]
+}
+```
+
+A JSON file may contain several entries in `presets`. During import, invalid entries are rejected and duplicate custom presets can be copied, skipped, or replaced. Built-in presets are never replaced.
+
+#### Common mistakes and limits
+
+- Omitting `stackingKey` while using `noStack` or `sameEffect` makes related instances impossible to classify reliably.
+- Using `sameEffect` when duplicates must be blocked still allows several instances to exist; use `noStack` for a strict one-per-bearer rule.
+- Mage Armor cannot be represented accurately because the module supports additive AC bonuses, not a base AC formula of `13 + Dexterity modifier`.
+- Built-in presets are module-owned. Save your configuration as a custom preset before expecting to export or delete it.
+- The active-buff diagnostic cannot safely repair a missing source item. Verify whether the item was deleted and resolve that case manually.
+- Experimental `afterRoll` prompting primarily targets standard Midi-QOL attack workflows and may fall back to `beforeRoll`.
+- Some spells require rules or calculations that the current configuration fields cannot represent safely. Prefer a small, reliable preset over an approximate automation.
+
 ### Custom preset management
 
 Use **Manage custom presets** in the buff configuration window to open the dedicated management window. From there you can:
