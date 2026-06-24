@@ -6,6 +6,7 @@ import {
   repairLinkedStatusesForActiveBuff,
   ensureStoredTargetIndicatorForActiveBuff,
 } from "./effects.js";
+import { endActiveBuff } from "./triggers.js";
 
 const FormApplicationBase = globalThis.FormApplication ?? class {};
 const KNOWN_STACKING_MODES = new Set(["normal", "sameEffect", "noStack", "alwaysStack"]);
@@ -584,6 +585,47 @@ function getActiveBuffForDiagnosticEntry(actor, entry) {
   };
 }
 
+function getStrictActiveBuffForDiagnosticEntry(actor, entry) {
+  const buffId = String(entry?.buffId ?? "").trim();
+  const actorUuid = String(actor?.uuid ?? actor?.id ?? "").trim();
+  const carrierUuid = String(entry?.carrier?.actorUuid ?? "").trim();
+  if (!actor?.getFlag || !buffId || !actorUuid || actorUuid !== carrierUuid) return null;
+  const activeBuff = getActiveBuffs(actor)?.[buffId] ?? null;
+  if (!activeBuff || typeof activeBuff !== "object" || Array.isArray(activeBuff)) return null;
+  if (String(activeBuff.buffId ?? "").trim() !== buffId) return null;
+  return activeBuff;
+}
+
+export function getActiveBuffDiagnosticEndAction(entry, {
+  actor = null,
+  isGM = globalThis.game?.user?.isGM === true,
+} = {}) {
+  if (!isGM || !actor) return null;
+  if (!getStrictActiveBuffForDiagnosticEntry(actor, entry)) return null;
+  return {
+    action: "end-active-buff",
+    labelKey: "BOT.diagnostics.endBuff.action",
+  };
+}
+
+export async function endActiveBuffFromDiagnostic(actor, entry, {
+  confirm = async () => true,
+  endBuff = endActiveBuff,
+} = {}) {
+  const activeBuff = getStrictActiveBuffForDiagnosticEntry(actor, entry);
+  if (!activeBuff) return { ended: false, reason: "not-targetable" };
+  if (typeof confirm !== "function" || await confirm({ actor, entry, activeBuff }) !== true) {
+    return { ended: false, reason: "cancelled" };
+  }
+  if (typeof endBuff !== "function") return { ended: false, reason: "missing-helper" };
+  await endBuff(actor, activeBuff);
+  return {
+    ended: true,
+    buffId: activeBuff.buffId,
+    actorUuid: actor.uuid ?? actor.id ?? null,
+  };
+}
+
 function canRepairIssueFromActiveBuff(issueCode, activeBuff) {
   if (!activeBuff?.buffId) return false;
   if (issueCode === "missingActiveIndicator") return true;
@@ -734,8 +776,13 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
       },
       rows: report.entries.map((entry, diagnosticIndex) => {
         const navigation = getActiveBuffDiagnosticNavigation(entry);
+        const carrierActor = contextByActorUuid.get(entry.carrier.actorUuid)?.actor ?? null;
         const repairActions = getActiveBuffDiagnosticRepairActions(entry, {
-          actor: contextByActorUuid.get(entry.carrier.actorUuid)?.actor ?? null,
+          actor: carrierActor,
+          isGM: game.user?.isGM === true,
+        });
+        const endAction = getActiveBuffDiagnosticEndAction(entry, {
+          actor: carrierActor,
           isGM: game.user?.isGM === true,
         });
         return {
@@ -743,6 +790,7 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
           diagnosticIndex,
           navigation,
           repairActions,
+          endAction,
           carrierLabel: [
             entry.carrier.actorName,
             entry.carrier.tokenNames.length ? `(${entry.carrier.tokenNames.join(", ")})` : null,
@@ -893,6 +941,10 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
       await this._repairDiagnosticIssue(entry, options.issueCode, targets.carrierActor);
       return;
     }
+    if (action === "end-active-buff") {
+      await this._endDiagnosticBuff(entry, targets.carrierActor);
+      return;
+    }
     if (action === "open-carrier") {
       targets.carrierActor?.sheet?.render?.(true);
       return;
@@ -967,6 +1019,47 @@ export class ActiveBuffDiagnosticsApplication extends FormApplicationBase {
     } catch (error) {
       console.error(`[${MODULE_ID}] Erreur de réparation diagnostic :`, error);
       ui.notifications.error(game.i18n.localize("BOT.diagnostics.repair.failed"));
+    }
+  }
+
+  async _confirmEndActiveBuff(entry) {
+    const title = game.i18n.localize("BOT.diagnostics.endBuff.confirmTitle");
+    const content = `<p>${game.i18n.format("BOT.diagnostics.endBuff.confirmContent", {
+      buff: entry?.buffName ?? entry?.buffId ?? game.i18n.localize("BOT.fallback.effectName"),
+      carrier: entry?.carrier?.actorName ?? entry?.carrier?.actorUuid ?? "—",
+      buffId: entry?.buffId ?? "—",
+    })}</p>`;
+    if (globalThis.Dialog?.confirm) {
+      return Dialog.confirm({
+        title,
+        content,
+        yes: () => true,
+        no: () => false,
+        defaultYes: false,
+      });
+    }
+    return globalThis.confirm?.(`${title}\n\n${content.replace(/<[^>]+>/g, "")}`) === true;
+  }
+
+  async _endDiagnosticBuff(entry, carrierActor) {
+    if (!carrierActor) {
+      ui.notifications.warn(game.i18n.localize("BOT.diagnostics.endBuff.unavailable"));
+      return;
+    }
+    try {
+      const result = await endActiveBuffFromDiagnostic(carrierActor, entry, {
+        confirm: () => this._confirmEndActiveBuff(entry),
+      });
+      if (result.reason === "cancelled") return;
+      if (!result.ended) {
+        ui.notifications.warn(game.i18n.localize("BOT.diagnostics.endBuff.unavailable"));
+        return;
+      }
+      ui.notifications.info(game.i18n.localize("BOT.diagnostics.endBuff.success"));
+      this.render(false);
+    } catch (error) {
+      console.error(`[${MODULE_ID}] Erreur de fin de buff depuis le diagnostic :`, error);
+      ui.notifications.error(game.i18n.localize("BOT.diagnostics.endBuff.failed"));
     }
   }
 

@@ -801,6 +801,10 @@
   line-height: 1;
 }
 
+.bot-diagnostics-row-actions .bot-diagnostics-end-buff-button {
+  color: var(--color-level-error, #8b1e1e);
+}
+
 .bot-diagnostics-suggestion {
   margin-top: 3px;
   color: var(--color-text-dark-secondary);

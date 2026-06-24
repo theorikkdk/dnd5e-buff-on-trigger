@@ -1806,7 +1806,7 @@ async function clearReplacementCandidates(actor, candidateBuffIds, appliedFlag) 
   return removedCount;
 }
 
-async function endActiveBuff(actor, activeBuff) {
+export async function endActiveBuff(actor, activeBuff) {
   if (!actor?.unsetFlag || !activeBuff) return;
   const itemName = activeBuff.itemName;
   await showBuffReminder(actor, activeBuff, "buffEnd");

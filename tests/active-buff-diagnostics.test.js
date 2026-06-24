@@ -7,7 +7,9 @@ import {
   buildActiveBuffDiagnosticText,
   collectActiveBuffDiagnostics,
   collectActiveSceneBuffActorContexts,
+  endActiveBuffFromDiagnostic,
   filterActiveBuffDiagnosticReport,
+  getActiveBuffDiagnosticEndAction,
   getActiveBuffDiagnosticNavigation,
   getActiveBuffDiagnosticRepairActions,
   getActiveBuffDiagnosticSuggestion,
@@ -375,7 +377,7 @@ test("text report is stable and contains only summarized diagnostic data", () =>
   assert.doesNotMatch(text, /rollModifier/);
 });
 
-test("diagnostic implementation contains no document mutation calls", async () => {
+test("diagnostic implementation contains no direct low-level buff mutation calls", async () => {
   const source = await readFile("scripts/active-buff-diagnostics.js", "utf8");
   for (const forbiddenCall of [
     ".setFlag(",
@@ -383,7 +385,6 @@ test("diagnostic implementation contains no document mutation calls", async () =
     ".update(",
     ".delete(",
     "removeActiveBuff(",
-    "endActiveBuff(",
     "pruneStaleActiveBuffs(",
     "refreshActorBuffRuntime(",
   ]) {
@@ -851,4 +852,181 @@ test("diagnostic UI does not add a global repair-all action", async () => {
   const template = await readFile("templates/active-buff-diagnostics.html", "utf8");
   assert.equal(template.includes("repair-all"), false);
   assert.equal(template.includes("data-action=\"repair\""), false);
+});
+
+test("targetable active buff exposes the GM end action", () => {
+  const actor = new MockActor({
+    uuid: "Actor.end-target",
+    name: "End target",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "End target",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+
+  assert.deepEqual(
+    getActiveBuffDiagnosticEndAction(entry, { actor, isGM: true }),
+    {
+      action: "end-active-buff",
+      labelKey: "BOT.diagnostics.endBuff.action",
+    },
+  );
+});
+
+test("end action is hidden for non-GM, missing buffId, unresolved carrier, and mismatched data", () => {
+  const actor = new MockActor({
+    uuid: "Actor.end-hidden",
+    name: "End hidden",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "End hidden",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+
+  assert.equal(getActiveBuffDiagnosticEndAction(entry, { actor, isGM: false }), null);
+  assert.equal(getActiveBuffDiagnosticEndAction({ ...entry, buffId: null }, { actor, isGM: true }), null);
+  assert.equal(getActiveBuffDiagnosticEndAction(entry, { actor: null, isGM: true }), null);
+  assert.equal(
+    getActiveBuffDiagnosticEndAction(
+      { ...entry, carrier: { ...entry.carrier, actorUuid: "Actor.other" } },
+      { actor, isGM: true },
+    ),
+    null,
+  );
+
+  const invalidActor = new MockActor({
+    uuid: actor.uuid,
+    name: actor.name,
+    activeBuffs: { buff1: { ...activeBuff("buff1"), buffId: "different-buff" } },
+  });
+  assert.equal(getActiveBuffDiagnosticEndAction(entry, { actor: invalidActor, isGM: true }), null);
+});
+
+test("cancelled end confirmation never calls the business helper", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.end-cancel",
+    name: "End cancel",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "End cancel",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+  let endCalls = 0;
+
+  const result = await endActiveBuffFromDiagnostic(actor, entry, {
+    confirm: async () => false,
+    endBuff: async () => {
+      endCalls += 1;
+    },
+  });
+
+  assert.deepEqual(result, { ended: false, reason: "cancelled" });
+  assert.equal(endCalls, 0);
+});
+
+test("confirmed end calls the existing helper with the exact carrier and buffId", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.end-confirm",
+    name: "End confirm",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "End confirm",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+  const calls = [];
+
+  const result = await endActiveBuffFromDiagnostic(actor, entry, {
+    confirm: async ({ actor: confirmedActor, activeBuff: confirmedBuff }) => {
+      assert.equal(confirmedActor.uuid, actor.uuid);
+      assert.equal(confirmedBuff.buffId, "buff1");
+      return true;
+    },
+    endBuff: async (targetActor, targetBuff) => {
+      calls.push({ actorUuid: targetActor.uuid, buffId: targetBuff.buffId });
+    },
+  });
+
+  assert.deepEqual(calls, [{ actorUuid: "Actor.end-confirm", buffId: "buff1" }]);
+  assert.deepEqual(result, {
+    ended: true,
+    buffId: "buff1",
+    actorUuid: "Actor.end-confirm",
+  });
+});
+
+test("end helper failures propagate without a second action", async () => {
+  const actor = new MockActor({
+    uuid: "Actor.end-failure",
+    name: "End failure",
+    activeBuffs: { buff1: activeBuff("buff1") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "End failure",
+    buffName: "Guidance",
+    buffId: "buff1",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+  let endCalls = 0;
+
+  await assert.rejects(
+    endActiveBuffFromDiagnostic(actor, entry, {
+      confirm: async () => true,
+      endBuff: async () => {
+        endCalls += 1;
+        throw new Error("expected failure");
+      },
+    }),
+    /expected failure/,
+  );
+  assert.equal(endCalls, 1);
+});
+
+test("unlinked synthetic token buff is targeted by its exact synthetic actor UUID", async () => {
+  const actor = new MockActor({
+    uuid: "Scene.scene.Token.synthetic.Actor.synthetic",
+    name: "Synthetic",
+    activeBuffs: { "buff-synthetic": activeBuff("buff-synthetic") },
+  });
+  const entry = diagnosticEntry({
+    actorName: "Synthetic",
+    tokenName: "Synthetic Token",
+    buffName: "Guidance",
+    buffId: "buff-synthetic",
+  });
+  entry.carrier.actorUuid = actor.uuid;
+  entry.carrier.actorLink = false;
+  entry.carrier.synthetic = true;
+  const calls = [];
+
+  assert.ok(getActiveBuffDiagnosticEndAction(entry, { actor, isGM: true }));
+  await endActiveBuffFromDiagnostic(actor, entry, {
+    confirm: async () => true,
+    endBuff: async (targetActor, targetBuff) => {
+      calls.push({ actorUuid: targetActor.uuid, buffId: targetBuff.buffId });
+    },
+  });
+
+  assert.deepEqual(calls, [{
+    actorUuid: "Scene.scene.Token.synthetic.Actor.synthetic",
+    buffId: "buff-synthetic",
+  }]);
+});
+
+test("diagnostic UI exposes only per-row buff ending and no global end-all action", async () => {
+  const template = await readFile("templates/active-buff-diagnostics.html", "utf8");
+  assert.equal(template.includes("data-row-action=\"{{endAction.action}}\""), true);
+  assert.equal(template.includes("end-all"), false);
+  assert.equal(template.includes("end-all-buffs"), false);
 });

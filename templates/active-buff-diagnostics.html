@@ -137,6 +137,18 @@
                 <button type="button" data-row-action="copy-summary" data-diagnostic-index="{{diagnosticIndex}}" title="{{localize "BOT.diagnostics.copySummary"}}" aria-label="{{localize "BOT.diagnostics.copySummary"}}">
                   <i class="fas fa-clipboard-list"></i>
                 </button>
+                {{#if endAction}}
+                  <button
+                    type="button"
+                    class="bot-diagnostics-end-buff-button"
+                    data-row-action="{{endAction.action}}"
+                    data-diagnostic-index="{{diagnosticIndex}}"
+                    title="{{localize endAction.labelKey}}"
+                    aria-label="{{localize endAction.labelKey}}"
+                  >
+                    <i class="fas fa-stop-circle"></i>
+                  </button>
+                {{/if}}
               </td>
             </tr>
           {{/each}}
