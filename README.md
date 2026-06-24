@@ -150,6 +150,59 @@ Built-in presets and invalid dormant custom presets are excluded. Custom `[TEST]
 - Only custom presets can be exported or deleted through the custom preset manager.
 - Built-in presets cannot be modified through the custom preset UI.
 
+## Active buff diagnostics
+
+The **Active Buff Diagnostics** tool is available to GMs from the module settings. It inspects the actors and tokens on the active scene, including supported unlinked tokens and their synthetic actors. It does not scan inactive scenes.
+
+For each active buff, the diagnostic can display the carrier actor or token, buff name and exact `buffId`, source actor and item, trigger, stacking mode and key, concentration information, linked statuses and indicators, and available duration, round, or turn data. Missing or inconsistent data is reported with an `info`, `warning`, or `critical` severity and a cautious repair suggestion.
+
+### Search, filters, and reports
+
+The diagnostic window provides:
+
+- search by carrier actor, token, buff, source actor or item, trigger, stacking mode, stacking key, or `buffId`;
+- an **inconsistencies only** filter;
+- counters for total, displayed, and inconsistent buffs;
+- text and JSON reports containing only the currently filtered rows.
+
+The global **Refresh**, **Copy text report**, and **Copy JSON report** actions do not modify world data.
+
+### Navigation actions
+
+When the referenced document is available, a diagnostic row can:
+
+- open the carrier actor;
+- select and center the carrier token on the active scene;
+- open the source actor;
+- open the source item;
+- copy the exact `buffId`;
+- copy a short summary of the row.
+
+Unavailable actors, tokens, or items simply leave the corresponding action unavailable.
+
+### Targeted repairs
+
+Most of the diagnostic is read-only. A GM may explicitly repair only a small set of missing artifacts that can be reconstructed safely from an existing active buff:
+
+- a missing active-buff indicator;
+- a missing stored-target indicator;
+- a missing linked status when the expected status is known.
+
+The repair action is shown only when the diagnostic has enough information. Every repair requires confirmation and targets one exact carrier and `buffId`; after the operation, the diagnostic refreshes so the corresponding warning can be checked again.
+
+The diagnostic does **not** repair:
+
+- a missing source actor or source item;
+- a buff without a `buffId`;
+- a `noStack` collision;
+- an expired or invalid duration;
+- an unknown stacking mode;
+- a missing stacking key;
+- broken concentration data;
+- orphaned buffs or other ambiguous records.
+
+There is no **Repair all** action, automatic repair at startup, global cleanup, buff deletion, or automatic removal of orphaned data. Navigation, reports, and suggestions remain read-only; only a confirmed targeted repair may change the specific missing artifact.
+
 ## Requirements
 
 - FoundryVTT v13+
