@@ -32,7 +32,3 @@ export function isDebugEnabled() {
 export function debugLog(...args) {
   if (isDebugEnabled()) console.log(...args);
 }
-
-export function debugWarn(...args) {
-  if (isDebugEnabled()) console.warn(...args);
-}

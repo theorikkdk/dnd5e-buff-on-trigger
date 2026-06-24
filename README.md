@@ -225,8 +225,8 @@ This action:
 ## Requirements
 
 - FoundryVTT v13+
-- D&D 5e system
-- midi-qol (optional)
+- D&D 5e system 5.2.4+
+- Midi-QOL 13.x (optional, recommended for enhanced workflows and experimental `afterRoll`)
 
 ## Installation
 
@@ -238,4 +238,4 @@ https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/mod
 
 ## License
 
-MIT
+[MIT](LICENSE)

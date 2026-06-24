@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
 
 const LANGUAGE_FILES = ["lang/en.json", "lang/fr.json"];
 const CRITICAL_KEYS = [
@@ -63,5 +64,29 @@ test("language keys do not collide with their own nested paths", async () => {
       [],
       `${path} contains flat keys that Foundry cannot expand together`,
     );
+  }
+});
+
+test("every literal module localization key used by scripts and templates exists", async () => {
+  const sourceFiles = [];
+  for (const directory of ["scripts", "templates"]) {
+    for (const name of await readdir(directory)) {
+      if (!name.endsWith(".js") && !name.endsWith(".html")) continue;
+      sourceFiles.push(path.join(directory, name));
+    }
+  }
+  const source = (await Promise.all(sourceFiles.map((file) => readFile(file, "utf8")))).join("\n");
+  const literalKeys = [...source.matchAll(/["'`](BOT\.[A-Za-z0-9_.-]+)["'`]/g)]
+    .map((match) => match[1]);
+  const uniqueKeys = [...new Set(literalKeys)].sort();
+
+  for (const languagePath of LANGUAGE_FILES) {
+    const translations = await readLanguageFile(languagePath);
+    const translationKeys = Object.keys(translations);
+    const missing = uniqueKeys.filter((key) => {
+      if (key.endsWith(".")) return !translationKeys.some((candidate) => candidate.startsWith(key));
+      return typeof translations[key] !== "string";
+    });
+    assert.deepEqual(missing, [], `${languagePath} is missing literal localization keys`);
   }
 });

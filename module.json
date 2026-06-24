@@ -7,6 +7,7 @@
     "minimum": "13",
     "verified": "13"
   },
+  "system": ["dnd5e"],
   "authors": [
     {
       "name": "Theorik"
@@ -30,21 +31,27 @@
     "systems": [
       {
         "id": "dnd5e",
-        "type": "system"
+        "type": "system",
+        "compatibility": {
+          "minimum": "5.2.4"
+        }
       }
     ],
-    "modules": [
+    "recommends": [
       {
         "id": "midi-qol",
         "type": "module",
         "compatibility": {
-          "minimum": "11"
+          "minimum": "13.0.0"
         },
-        "reason": "Enhanced attack/damage workflow hooks",
-        "required": false
+        "reason": "Enhanced attack/damage workflow hooks"
       }
     ]
   },
   "url": "https://github.com/theorikkdk/dnd5e-buff-on-trigger",
+  "manifest": "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/module.json",
+  "download": "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/module.zip",
+  "readme": "https://github.com/theorikkdk/dnd5e-buff-on-trigger/blob/main/README.md",
+  "license": "LICENSE",
   "bugs": "https://github.com/theorikkdk/dnd5e-buff-on-trigger/issues"
 }
