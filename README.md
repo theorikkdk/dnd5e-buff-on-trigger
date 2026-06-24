@@ -201,7 +201,26 @@ The diagnostic does **not** repair:
 - broken concentration data;
 - orphaned buffs or other ambiguous records.
 
-There is no **Repair all** action, automatic repair at startup, global cleanup, buff deletion, or automatic removal of orphaned data. Navigation, reports, and suggestions remain read-only; only a confirmed targeted repair may change the specific missing artifact.
+There is no **Repair all** action, automatic repair at startup, global cleanup, or automatic removal of orphaned data. Navigation, reports, and suggestions remain read-only; only an explicitly confirmed targeted action may modify world data.
+
+### Ending one active buff
+
+For a safely targetable row, a GM can use **End this buff** to end that exact active buff manually. The action is hidden for non-GM users and whenever the carrier cannot be resolved, the `buffId` is absent, the active-buff data is inconsistent, or the row cannot otherwise be matched safely.
+
+Before changing the world, the diagnostic requires confirmation and displays the carrier, buff name, and exact `buffId`. It then calls the module's existing buff-ending logic using the exact carrier and `buffId`, never a buff name. On success, the diagnostic refreshes and the targeted buff disappears from the list.
+
+The normal end-of-buff workflow removes the targeted active buff and performs the cleanup already associated with that buff, including its indicators, linked statuses, linked concentration, and other supported runtime data where applicable.
+
+This action:
+
+- does not provide an **End all** operation;
+- does not perform a global cleanup;
+- does not find or remove buffs by name;
+- does not delete actors, tokens, or source items;
+- does not trigger automatic repairs;
+- does not remove other buffs carried by the same actor.
+
+**Caution:** **End this buff** intentionally modifies world state. Use it only when you deliberately want to end the precise buff instance shown in the confirmation dialog.
 
 ## Requirements
 
