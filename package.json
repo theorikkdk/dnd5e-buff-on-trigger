@@ -1,5 +1,6 @@
 {
   "name": "dnd5e-buff-on-trigger",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

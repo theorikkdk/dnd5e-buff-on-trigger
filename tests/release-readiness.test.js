@@ -5,11 +5,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const manifest = JSON.parse(await readFile("module.json", "utf8"));
+const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 const execFileAsync = promisify(execFile);
 
 test("module manifest exposes valid release metadata and existing package paths", async () => {
   assert.equal(manifest.id, "dnd5e-buff-on-trigger");
-  assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(manifest.version, "1.0.0");
+  assert.equal(packageJson.version, manifest.version);
   assert.equal(manifest.compatibility?.minimum, "13");
   assert.equal(manifest.compatibility?.verified, "13");
   assert.deepEqual(manifest.system, ["dnd5e"]);
@@ -24,12 +26,15 @@ test("module manifest exposes valid release metadata and existing package paths"
 
   assert.equal(
     manifest.manifest,
-    "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/module.json",
+    "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/download/v1.0.0/module.json",
   );
   assert.equal(
     manifest.download,
-    "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/module.zip",
+    "https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/download/v1.0.0/module.zip",
   );
+  assert.equal(manifest.readme, "https://github.com/theorikkdk/dnd5e-buff-on-trigger/blob/main/README.md");
+  assert.equal(manifest.license, "https://github.com/theorikkdk/dnd5e-buff-on-trigger/blob/main/LICENSE");
+  assert.equal(manifest.changelog, "https://github.com/theorikkdk/dnd5e-buff-on-trigger/blob/main/CHANGELOG.md");
 });
 
 test("dnd5e is required and Midi-QOL is an optional recommendation", () => {
@@ -49,11 +54,23 @@ test("declared MIT license exists and matches the README", async () => {
     readFile("README.md", "utf8"),
   ]);
 
-  assert.equal(manifest.license, "LICENSE");
+  assert.equal(manifest.license, "https://github.com/theorikkdk/dnd5e-buff-on-trigger/blob/main/LICENSE");
   assert.match(license, /^MIT License/m);
   assert.match(license, /Copyright \(c\) 2026 Theorik/);
   assert.match(license, /Permission is hereby granted, free of charge/);
   assert.match(readme, /## License\s+\[MIT\]\(LICENSE\)/);
+});
+
+test("release changelog documents version 1.0.0", async () => {
+  const changelog = await readFile("CHANGELOG.md", "utf8");
+
+  assert.match(changelog, /^# Changelog/m);
+  assert.match(changelog, /## \[1\.0\.0\] - 2026-06-26/);
+  assert.match(changelog, /### Added/);
+  assert.match(changelog, /### Changed/);
+  assert.match(changelog, /### Fixed/);
+  assert.match(changelog, /### Documentation/);
+  assert.match(changelog, /### Internal \/ Tests/);
 });
 
 test("repository does not track accidental gitlinks", async () => {
