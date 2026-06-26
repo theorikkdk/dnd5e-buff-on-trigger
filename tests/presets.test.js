@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 
 import { validateAndNormalizeImportedPreset } from "../scripts/custom-preset-import.js";
 import { classifyNoStackApplication } from "../scripts/active-buffs.js";
+import { buildMechanicalChanges } from "../scripts/effects.js";
+import { convertPresetDistanceFields } from "../scripts/distance-units.js";
 import { BUFF_PRESETS, CORE_PRESET_IDS } from "../scripts/presets.js";
 
 const DEFAULT_CONFIG = {
@@ -52,6 +54,8 @@ test("the core preset pack contains the supported useful presets", () => {
     "shieldOfFaith",
     "heroism",
     "protectionFromPoison",
+    "darkvision",
+    "passWithoutTrace",
   ]);
 
   for (const id of CORE_PRESET_IDS) {
@@ -134,6 +138,75 @@ test("core preset mechanics match the supported module features", () => {
 
   assert.deepEqual(getPreset("protectionFromPoison").flag.buffs.resistances, ["poison"]);
   assert.equal(getPreset("protectionFromPoison").flag.buffs.conditionImmunities, undefined);
+
+  assert.equal(getPreset("darkvision").flag.type, "passive");
+  assert.equal(getPreset("darkvision").flag.buffs.darkvision, 60);
+  assert.equal(getPreset("darkvision").flag.buffs.darkvisionFeet, 60);
+  assert.equal(getPreset("darkvision").flag.consumeOnTrigger, false);
+
+  assert.equal(getPreset("passWithoutTrace").flag.type, "passive");
+  assert.deepEqual(getPreset("passWithoutTrace").flag.buffs.skillBonusSkills, ["ste"]);
+  assert.equal(getPreset("passWithoutTrace").flag.buffs.skillBonus, "+10");
+  assert.equal(getPreset("passWithoutTrace").flag.consumeOnTrigger, false);
+});
+
+test("darkvision preset converts its 60 ft distance to the actor length unit", () => {
+  const preset = getPreset("darkvision");
+  const imperialActor = { system: { attributes: { movement: { units: "ft" } } } };
+  const metricActor = { system: { attributes: { movement: { units: "m" } } } };
+  const unknownUnitActor = { system: { attributes: { movement: { units: "squares" } } } };
+
+  assert.equal(
+    buildMechanicalChanges(preset.flag, imperialActor).find((change) => change.key === "system.attributes.senses.darkvision")?.value,
+    "60",
+  );
+  assert.equal(
+    buildMechanicalChanges(preset.flag, metricActor).find((change) => change.key === "system.attributes.senses.darkvision")?.value,
+    "18",
+  );
+  assert.equal(
+    buildMechanicalChanges(preset.flag, unknownUnitActor).find((change) => change.key === "system.attributes.senses.darkvision")?.value,
+    "60",
+  );
+});
+
+test("darkvision preset form conversion writes the final unit value before saving", () => {
+  const preset = getPreset("darkvision");
+  const imperialActor = { system: { attributes: { movement: { units: "ft" } } } };
+  const metricActor = { system: { attributes: { movement: { units: "m" } } } };
+
+  assert.equal(convertPresetDistanceFields(preset.flag, imperialActor).buffs.darkvision, 60);
+  assert.equal(convertPresetDistanceFields(preset.flag, metricActor).buffs.darkvision, 18);
+});
+
+test("darkvisionFeet is the source of truth when a direct darkvision value is also present", () => {
+  const metricActor = { system: { attributes: { movement: { units: "m" } } } };
+  const flag = {
+    type: "passive",
+    buffs: {
+      darkvision: 60,
+      darkvisionFeet: 60,
+    },
+  };
+
+  assert.equal(
+    buildMechanicalChanges(flag, metricActor).find((change) => change.key === "system.attributes.senses.darkvision")?.value,
+    "18",
+  );
+  assert.equal(convertPresetDistanceFields(flag, metricActor).buffs.darkvision, 18);
+});
+
+test("pass without trace still applies only the supported stealth skill bonus", () => {
+  const changes = buildMechanicalChanges(getPreset("passWithoutTrace").flag);
+
+  assert.deepEqual(changes, [
+    {
+      key: "system.skills.ste.bonuses.check",
+      mode: 2,
+      value: "+10",
+      priority: 20,
+    },
+  ]);
 });
 
 test("bardic inspiration blocks a second caster through existing noStack rules", () => {
@@ -174,4 +247,20 @@ test("core preset labels and descriptions exist in English and French", async ()
       assert.ok(translations[preset.description].trim(), `${preset.description} is empty`);
     }
   }
+});
+
+test("darkvision preset description documents token vision synchronization limits", async () => {
+  const [english, french] = await Promise.all([
+    readFile(new URL("../lang/en.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../lang/fr.json", import.meta.url), "utf8").then(JSON.parse),
+  ]);
+
+  const englishDescription = english["BOT.presets.darkvision.description"];
+  const frenchDescription = french["BOT.presets.darkvision.description"];
+  assert.match(englishDescription, /60 ft \/ 18 m/);
+  assert.match(englishDescription, /token vision synchronization/i);
+  assert.match(englishDescription, /Vision 5e/);
+  assert.match(frenchDescription, /18 m \/ 60 ft/);
+  assert.match(frenchDescription, /vision réelle du token/i);
+  assert.match(frenchDescription, /Vision 5e/);
 });

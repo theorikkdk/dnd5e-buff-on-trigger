@@ -7,6 +7,8 @@ export const CORE_PRESET_IDS = Object.freeze([
   "shieldOfFaith",
   "heroism",
   "protectionFromPoison",
+  "darkvision",
+  "passWithoutTrace",
 ]);
 
 // Built-in presets available to players outside debug mode.
@@ -601,6 +603,39 @@ export const BUFF_PRESETS = [
       type: "passive",
       buffs: {
         movement: { enabled: true, mode: "add", value: "+10", valueFeet: 10, types: ["walk"] },
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "darkvision",
+    label: "BOT.presets.darkvision.label",
+    description: "BOT.presets.darkvision.description",
+    flag: {
+      targetMode: "target",
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        darkvision: 60,
+        darkvisionFeet: 60,
+      },
+      consumeOnTrigger: false,
+      triggerFrequency: "none",
+    },
+  },
+  {
+    id: "passWithoutTrace",
+    label: "BOT.presets.passWithoutTrace.label",
+    description: "BOT.presets.passWithoutTrace.description",
+    flag: {
+      targetMode: "target",
+      allowMultipleTargets: true,
+      fallbackToSelfIfNoTarget: true,
+      type: "passive",
+      buffs: {
+        skillBonusSkills: ["ste"],
+        skillBonus: "+10",
       },
       consumeOnTrigger: false,
       triggerFrequency: "none",

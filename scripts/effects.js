@@ -16,6 +16,7 @@ import {
 } from "./active-buffs.js";
 import { findConcentrationEffectForBuff, getConcentrationSourceActor } from "./concentration.js";
 import { cleanupExternalBuffArtifacts } from "./delete-token-cleanup.js";
+import { resolveDistanceBuffValue } from "./distance-units.js";
 import {
   getBardicInspirationDie,
   getRollModifierConsumptionMode,
@@ -2852,9 +2853,13 @@ export function buildMechanicalChanges(flag, actor = null) {
     armorProfs,
     languages,
     darkvision,
+    darkvisionFeet,
     blindsight,
+    blindsightFeet,
     tremorsense,
+    tremorsenseFeet,
     truesight,
+    truesightFeet,
     sensesSpecial,
     passivePerception
   } = flag.buffs;
@@ -2937,17 +2942,17 @@ export function buildMechanicalChanges(flag, actor = null) {
   for (const id of languages ?? []) {
     changes.push({ key: "system.traits.languages.value", mode: 0, value: id, priority: 20 });
   }
-  if (darkvision) {
-    changes.push({ key: "system.attributes.senses.darkvision", mode: 2, value: String(darkvision), priority: 20 });
+  if (darkvision || darkvisionFeet) {
+    changes.push({ key: "system.attributes.senses.darkvision", mode: 2, value: String(resolveDistanceBuffValue(darkvision, darkvisionFeet, actor)), priority: 20 });
   }
-  if (blindsight) {
-    changes.push({ key: "system.attributes.senses.blindsight", mode: 2, value: String(blindsight), priority: 20 });
+  if (blindsight || blindsightFeet) {
+    changes.push({ key: "system.attributes.senses.blindsight", mode: 2, value: String(resolveDistanceBuffValue(blindsight, blindsightFeet, actor)), priority: 20 });
   }
-  if (tremorsense) {
-    changes.push({ key: "system.attributes.senses.tremorsense", mode: 2, value: String(tremorsense), priority: 20 });
+  if (tremorsense || tremorsenseFeet) {
+    changes.push({ key: "system.attributes.senses.tremorsense", mode: 2, value: String(resolveDistanceBuffValue(tremorsense, tremorsenseFeet, actor)), priority: 20 });
   }
-  if (truesight) {
-    changes.push({ key: "system.attributes.senses.truesight", mode: 2, value: String(truesight), priority: 20 });
+  if (truesight || truesightFeet) {
+    changes.push({ key: "system.attributes.senses.truesight", mode: 2, value: String(resolveDistanceBuffValue(truesight, truesightFeet, actor)), priority: 20 });
   }
   if (sensesSpecial) {
     changes.push({ key: "system.attributes.senses.special", mode: 0, value: sensesSpecial, priority: 20 });

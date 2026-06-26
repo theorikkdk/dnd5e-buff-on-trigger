@@ -31,6 +31,8 @@ The first curated built-in pack contains:
 | Shield of Faith | Grants a +2 AC bonus |
 | Heroism | Grants temporary HP at the start of the bearer's turn and immunity to Frightened |
 | Protection from Poison | Grants resistance to poison damage |
+| Darkvision | Configures 60 ft / 18 m of darkvision according to the scene units |
+| Pass without Trace | Grants +10 to Stealth checks; aura and narrative stealth effects remain manual |
 
 Built-in presets cannot be edited, deleted, replaced, or exported through the custom preset manager. Creating an item from a preset copies its configuration to the item, so the item remains usable independently of the preset catalogue.
 
@@ -298,6 +300,8 @@ Built-in presets and invalid dormant custom presets are excluded. Custom `[TEST]
 
 - Mage Armor is not included because the module currently supports additive AC bonuses, not a base AC calculation such as `13 + Dexterity modifier`.
 - Protection from Poison automates poison damage resistance. Neutralizing an existing poison and advantage on saving throws against poison must be handled manually.
+- Darkvision configures the actor's senses. Reliable synchronization with the token's actual vision may depend on a specialized compatible module such as Vision 5e; Vision 5e is not required by this module.
+- Pass without Trace automates only the +10 Stealth check bonus. The aura, tracking restrictions, and narrative stealth effects must be handled manually.
 - Only custom presets can be exported or deleted through the custom preset manager.
 - Built-in presets cannot be modified through the custom preset UI.
 

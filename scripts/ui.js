@@ -5,6 +5,7 @@ import { BUFF_PRESETS } from "./presets.js";
 import { buildPresetSearchView } from "./preset-search.js";
 import { buildCustomPresetExportEnvelope, isValidStoredCustomPreset, normalizeImportedPresetBatch, validateCustomPresetImportEnvelope } from "./custom-preset-import.js";
 import { removeCustomPresetsByIds, selectCustomPresetsForExport } from "./custom-preset-management.js";
+import { convertPresetDistanceFields } from "./distance-units.js";
 
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
@@ -349,7 +350,7 @@ function getMovementUnit(actor = null) {
     debugLog(`[${MODULE_ID}] Unable to read dnd5e metric length setting: ${error.message}`);
   }
 
-  return canvas?.scene?.grid?.units ?? "ft";
+  return globalThis.canvas?.scene?.grid?.units ?? "ft";
 }
 
 function getMovementUnitType(unit) {
@@ -390,6 +391,7 @@ function convertPresetMovementDistances(flag, actor = null) {
   movement.value = formatSignedMovementValue(converted);
   return clone;
 }
+
 function getTriggerLabel(type) {
   if (!type) return game.i18n.localize("BOT.ui.summary.notConfigured");
   return game.i18n.localize(`BOT.ui.trigger.${type}`);
@@ -2252,7 +2254,11 @@ function updateSummaryFromFlag(form, flag) {
 
 function applyPresetFlagToForm(form, flag) {
   form.__botSuppressPresetDirty = true;
-  flag = convertPresetMovementDistances(mergeBuffConfig(buildDefaultBuffConfig(), flag ?? {}), form?.__botApp?.item?.parent ?? null);
+  const actor = form?.__botApp?.item?.parent ?? null;
+  flag = convertPresetDistanceFields(
+    convertPresetMovementDistances(mergeBuffConfig(buildDefaultBuffConfig(), flag ?? {}), actor),
+    actor,
+  );
   const rollTypes = flag.rollModifier?.rollTypes ?? [];
 
   setFormValue(form, "enabled", true);
