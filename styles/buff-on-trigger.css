@@ -145,6 +145,15 @@
   line-height: 1.25;
 }
 
+.bot-config-btn.bot-item-config-inactive i {
+  color: var(--color-text-light-highlight, #f0f0e0);
+}
+
+.bot-config-btn.bot-item-config-active i {
+  color: #f6c744;
+  text-shadow: 0 0 4px rgba(246, 199, 68, 0.65);
+}
+
 .bot-row {
   display: flex;
   align-items: center;

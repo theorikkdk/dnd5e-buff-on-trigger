@@ -10,6 +10,7 @@ import { convertPresetDistanceFields } from "./distance-units.js";
 const MOVEMENT_TYPES = ["walk", "fly", "swim", "climb", "burrow"];
 const CREATURE_TYPES = ["aberration", "celestial", "elemental", "fey", "fiend", "undead", "beast", "dragon", "giant", "humanoid", "monstrosity", "ooze", "plant", "construct"];
 const ATTACK_MODE_ATTACK_TYPES = ["weapon", "spell", "melee", "ranged", "mwak", "rwak", "msak", "rsak"];
+const NON_PASSIVE_TRIGGER_TYPES = new Set([...ATTACK_TRIGGER_TYPES, "damaged", "healed", "turnStart", "turnEnd", "targetTurnStart", "targetTurnEnd"]);
 const FORMULA_VARIABLES = [
   "@spellLevel",
   "@spell.mod",
@@ -1529,6 +1530,7 @@ class BuffTriggerConfig extends foundry.applications.api.HandlebarsApplicationMi
       await this.item.unsetFlag(MODULE_ID, "buffTrigger");
       await this.item.setFlag(MODULE_ID, "buffTrigger", flag);
     }
+    updateOpenItemSheetConfigButtons(this.item);
     debugLog(`[${MODULE_ID}] Configuration sauvegardee sur ${this.item.name}`);
   }
 }
@@ -2110,6 +2112,100 @@ function buildDefaultBuffConfig() {
       conditionImmunities: [],
     },
   };
+}
+
+function hasText(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function hasArrayValues(value) {
+  return Array.isArray(value) && value.filter((entry) => entry !== null && entry !== undefined && String(entry).trim() !== "").length > 0;
+}
+
+function hasObjectValues(value) {
+  if (!isPlainObject(value)) return false;
+  return Object.values(value).some((entry) => entry !== null && entry !== undefined && String(entry).trim() !== "");
+}
+
+function hasConfiguredMovementValue(movement = null) {
+  return isPlainObject(movement)
+    && movement.enabled === true
+    && (movement.value != null && String(movement.value).trim() !== "");
+}
+
+function hasConfiguredBuffValues(buffs = null) {
+  if (!isPlainObject(buffs)) return false;
+  return buffs.ac != null
+    || !!buffs.attackMode
+    || !!buffs.saveMode
+    || !!buffs.incomingAttackMode
+    || !!buffs.skillMode
+    || hasArrayValues(buffs.abilityCheckAdvantages)
+    || hasArrayValues(buffs.abilityCheckDisadvantages)
+    || hasArrayValues(buffs.savingThrowAdvantages)
+    || hasArrayValues(buffs.savingThrowDisadvantages)
+    || hasObjectValues(buffs.abilityCheckModifiers)
+    || hasObjectValues(buffs.savingThrowModifiers)
+    || hasArrayValues(buffs.skills)
+    || hasArrayValues(buffs.skillBonusSkills)
+    || hasText(buffs.skillBonus)
+    || hasText(buffs.skillBonusAll)
+    || hasText(buffs.saveBonus)
+    || hasText(buffs.attackBonus)
+    || hasConfiguredMovementValue(buffs.movement)
+    || buffs.speed != null
+    || hasArrayValues(buffs.weaponProfs)
+    || hasArrayValues(buffs.armorProfs)
+    || hasArrayValues(buffs.languages)
+    || buffs.darkvision != null
+    || buffs.darkvisionFeet != null
+    || buffs.blindsight != null
+    || buffs.blindsightFeet != null
+    || buffs.tremorsense != null
+    || buffs.tremorsenseFeet != null
+    || buffs.truesight != null
+    || buffs.truesightFeet != null
+    || hasText(buffs.sensesSpecial)
+    || buffs.passivePerception != null
+    || hasArrayValues(buffs.resistances)
+    || hasArrayValues(buffs.vulnerabilities)
+    || hasArrayValues(buffs.immunities)
+    || hasArrayValues(buffs.conditionImmunities);
+}
+
+function hasConfiguredEndConditions(endConditions = null) {
+  if (!isPlainObject(endConditions)) return false;
+  return !!endConditions.onAttack
+    || !!endConditions.onSpellCast
+    || !!endConditions.onDamageDealt
+    || !!endConditions.onDamageTaken
+    || !!endConditions.onTemporaryHpLost;
+}
+
+function hasConfiguredReminder(reminders = null) {
+  if (!isPlainObject(reminders)) return false;
+  return reminders.enabled === true && hasText(reminders.message);
+}
+
+function hasConfiguredStatus(status = null) {
+  if (!isPlainObject(status)) return false;
+  return hasArrayValues(status.ids) || hasText(status.id);
+}
+
+export function hasUsableBuffTriggerConfig(flag = null) {
+  if (!isPlainObject(flag)) return false;
+  return NON_PASSIVE_TRIGGER_TYPES.has(String(flag.type ?? ""))
+    || flag.rememberTargetOnActivation === true
+    || flag.requireStoredTargetMatch === true
+    || hasText(flag.damage?.formula)
+    || hasText(flag.healing?.formula)
+    || hasText(flag.temporaryHp?.formula)
+    || (flag.rollModifier?.enabled === true && hasText(flag.rollModifier?.formula) && hasArrayValues(flag.rollModifier?.rollTypes))
+    || hasConfiguredStatus(flag.status)
+    || hasText(flag.save?.ability)
+    || hasConfiguredEndConditions(flag.endConditions)
+    || hasConfiguredReminder(flag.reminders)
+    || hasConfiguredBuffValues(flag.buffs);
 }
 
 function isPlainObject(value) {
@@ -3214,6 +3310,26 @@ window.botInsertFormulaVariable = function(buttonEl, variableName) {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
+function applyItemConfigButtonState(button, item) {
+  const active = hasUsableBuffTriggerConfig(item?.getFlag?.(MODULE_ID, "buffTrigger"));
+  button.classList.toggle("bot-item-config-active", active);
+  button.classList.toggle("bot-item-config-inactive", !active);
+  button.dataset.botConfigured = active ? "true" : "false";
+}
+
+function updateOpenItemSheetConfigButtons(item) {
+  const itemUuid = item?.uuid ?? "";
+  const itemId = item?.id ?? "";
+  for (const button of document.querySelectorAll?.(".bot-config-btn") ?? []) {
+    if (
+      (itemUuid && button.dataset.itemUuid === itemUuid)
+      || (itemId && button.dataset.itemId === itemId)
+    ) {
+      applyItemConfigButtonState(button, item);
+    }
+  }
+}
+
 export function registerItemSheetButton() {
   debugLog(`[${MODULE_ID}] registerItemSheetButton enregistre`);
 
@@ -3246,7 +3362,10 @@ export function registerItemSheetButton() {
     button.type = "button";
     button.title = game.i18n.localize("BOT.moduleTitle");
     button.setAttribute("aria-label", game.i18n.localize("BOT.moduleTitle"));
+    button.dataset.itemUuid = item?.uuid ?? "";
+    button.dataset.itemId = item?.id ?? "";
     button.innerHTML = '<i class="fas fa-bolt" aria-hidden="true"></i>';
+    applyItemConfigButtonState(button, item);
 
     button.addEventListener("click", (event) => {
       event.preventDefault();

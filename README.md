@@ -6,6 +6,7 @@ A FoundryVTT module for D&D 5e that automates deferred buff effects triggered by
 
 - Apply temporary buffs automatically when specific combat triggers fire
 - Integrates with the D&D 5e system and optionally with midi-qol for enhanced workflow hooks
+- The item sheet lightning icon is highlighted when the item has an active Buff on Trigger configuration.
 
 ## Presets
 
