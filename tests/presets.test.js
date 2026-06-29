@@ -24,6 +24,24 @@ const DEFAULT_CONFIG = {
 };
 
 const CORE_PRESET_ID_SET = new Set(CORE_PRESET_IDS);
+const NON_SRD_PRESET_IDS = [
+  "absorbElementsAcid",
+  "absorbElementsCold",
+  "absorbElementsFire",
+  "absorbElementsLightning",
+  "absorbElementsThunder",
+  "holyWeapon",
+  "flameArrows",
+  "spiritShroudCold",
+  "spiritShroudRadiant",
+  "spiritShroudNecrotic",
+  "charmMonster",
+  "tashasHideousLaughter",
+];
+const REMOVED_PRESET_IDS = [
+  ...NON_SRD_PRESET_IDS,
+  "simpleRegeneration",
+];
 
 function isTestPreset(preset) {
   return preset?.isTestPreset === true
@@ -42,6 +60,14 @@ function getPreset(id) {
 test("built-in preset IDs are unique", () => {
   const ids = BUFF_PRESETS.map((preset) => preset.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test("published built-in presets exclude non-SRD and removed local-only presets", () => {
+  const ids = new Set(BUFF_PRESETS.map((preset) => preset.id));
+
+  for (const id of REMOVED_PRESET_IDS) {
+    assert.equal(ids.has(id), false, `${id} must not be published as a built-in preset`);
+  }
 });
 
 test("the core preset pack contains the supported useful presets", () => {

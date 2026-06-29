@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Added a curated built-in preset library for common D&D5e buffs:
+- Added a curated public built-in preset library for common clearly SRD-oriented D&D5e buffs:
   - Guidance / Assistance.
   - Resistance / Résistance.
   - Bless / Bénédiction.
@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Bardic Inspiration / Inspiration bardique.
   - Darkvision / Vision dans le noir.
   - Pass without Trace / Passage sans trace.
+- Kept non-SRD preset examples out of the public built-in catalogue and out of the public release package.
 - Added custom preset management:
   - import one or many custom presets from JSON;
   - export all visible custom presets or a selected subset;
@@ -70,6 +71,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Improved runtime refresh for active scene actors, including unlinked tokens and synthetic actors.
 - Hid `[TEST]` presets during normal use while keeping them available in debug mode.
 - Improved the module utility macro so it is recognized by stable flags and not by name alone.
+- Limited public built-in presets to clearly SRD-oriented entries for release readiness.
 
 ### Fixed
 
@@ -84,10 +86,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Fixed Bardic Inspiration prompt text to avoid raw formulas such as `@origin.bardicInspirationDie`.
 - Fixed Midi-QOL attack prompt consumption so accepted prompted bonuses consume the exact active buff instance.
 - Fixed Darkvision preset unit conversion so 60 ft is applied as 60 in imperial scenes and 18 in metric scenes.
+- Removed non-SRD presets from the public built-in catalogue before publication.
 
 ### Documentation
 
 - Documented built-in presets and current preset limitations.
+- Documented that public built-in presets are limited to clearly SRD-oriented entries and that this is not legal advice.
 - Documented custom preset creation from the UI.
 - Documented custom preset import/export, schema versioning, and duplicate strategies.
 - Documented roll modifier consumption modes and prompt timings.

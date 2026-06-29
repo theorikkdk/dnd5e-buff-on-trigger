@@ -11,7 +11,7 @@ A FoundryVTT module for D&D 5e that automates deferred buff effects triggered by
 
 The buff configuration window includes searchable built-in and custom presets. Presets are grouped as:
 
-- **Built-in presets** provided by the module
+- **Built-in presets** provided by the module, limited to clearly SRD-oriented entries for the public package
 - **Custom presets** created or imported by the user
 - **Test presets**, visible only when the module's debug setting is enabled
 
@@ -19,7 +19,7 @@ The search field matches preset labels, descriptions, and trigger types. Searche
 
 ### Useful built-in presets
 
-The first curated built-in pack contains:
+The public built-in preset catalogue is intentionally limited to clearly SRD-oriented entries. This is a practical release policy, not legal advice. It currently includes:
 
 | Preset | Automated behavior |
 | --- | --- |
@@ -35,6 +35,8 @@ The first curated built-in pack contains:
 | Pass without Trace | Grants +10 to Stealth checks; aura and narrative stealth effects remain manual |
 
 Built-in presets cannot be edited, deleted, replaced, or exported through the custom preset manager. Creating an item from a preset copies its configuration to the item, so the item remains usable independently of the preset catalogue.
+
+Non-SRD preset examples are not included in the public Foundry package. If you maintain local/private preset packs, import them manually as custom presets instead of treating them as module-owned built-ins.
 
 Development presets whose labels begin with `[TEST]` remain included for Foundry validation. They are hidden during normal use and appear in their own group when debug mode is enabled.
 
@@ -302,6 +304,7 @@ Built-in presets and invalid dormant custom presets are excluded. Custom `[TEST]
 - Protection from Poison automates poison damage resistance. Neutralizing an existing poison and advantage on saving throws against poison must be handled manually.
 - Darkvision configures the actor's senses. Reliable synchronization with the token's actual vision may depend on a specialized compatible module such as Vision 5e; Vision 5e is not required by this module.
 - Pass without Trace automates only the +10 Stealth check bonus. The aura, tracking restrictions, and narrative stealth effects must be handled manually.
+- The public package includes only clearly SRD-oriented built-in presets. Presets outside that scope are not shipped as public built-ins.
 - Only custom presets can be exported or deleted through the custom preset manager.
 - Built-in presets cannot be modified through the custom preset UI.
 
@@ -388,7 +391,7 @@ This action:
 Install via the FoundryVTT module manager using the manifest URL:
 
 ```
-https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/latest/download/module.json
+https://github.com/theorikkdk/dnd5e-buff-on-trigger/releases/download/v1.0.0/module.json
 ```
 
 ## License
