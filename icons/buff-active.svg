@@ -1,3 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
-  <polygon points="55,5 20,55 45,55 35,95 80,40 52,40 65,5" fill="#FFD700" stroke="#B8860B" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Active buff">
+  <title>Active buff</title>
+  <path
+    d="M57 6 20 57h24L34 94l46-56H55L66 6Z"
+    fill="#f7c948"
+    stroke="#6f4e00"
+    stroke-width="5"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M55 14 31 50h22l-6 26 23-31H48Z"
+    fill="#fff3a3"
+    opacity="0.38"
+  />
 </svg>
